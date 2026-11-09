@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'register_screen.dart';
 import 'admin/admin_dashboard.dart';
@@ -363,18 +364,49 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-      googleProvider.addScope('email');
-      googleProvider.addScope('profile');
-      googleProvider.setCustomParameters({'prompt': 'select_account'});
-
       UserCredential userCredential;
       if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({'prompt': 'select_account'});
         userCredential =
             await FirebaseAuth.instance.signInWithPopup(googleProvider);
       } else {
+        // Native Google Sign-In for Android/iOS (uses native Google Play Services, no browser redirect or sessionStorage issues)
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          serverClientId:
+              '275534919089-9b4ulah2fub1uob6gbaa6ggh5tnkq3f9.apps.googleusercontent.com',
+          scopes: ['email', 'profile'],
+        );
+
+        try {
+          await googleSignIn.signOut();
+        } catch (_) {}
+
+        final GoogleSignInAccount? googleSignInAccount =
+            await googleSignIn.signIn();
+
+        if (googleSignInAccount == null) {
+          // User dismissed account chooser
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+            });
+          }
+          return;
+        }
+
+        final GoogleSignInAuthentication googleAuth =
+            await googleSignInAccount.authentication;
+
+        final OAuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
         userCredential =
-            await FirebaseAuth.instance.signInWithProvider(googleProvider);
+            await FirebaseAuth.instance.signInWithCredential(credential);
       }
 
       final User? googleUser = userCredential.user;
