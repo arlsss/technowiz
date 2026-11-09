@@ -489,6 +489,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (e.code == 'operation-not-allowed') {
         message =
             "Google Sign-In is not enabled yet in Firebase Console. Please enable Google provider under Authentication > Sign-in method.";
+      } else if (e.code == 'unauthorized-domain' ||
+          message.toLowerCase().contains('domain is not authorized') ||
+          message.toLowerCase().contains('authorized domain')) {
+        message =
+            "Domain not authorized! Palihug i-add ang 'vercel.app' ug imong Vercel link sa Firebase Console > Authentication > Settings > Authorized domains.";
+      } else if (e.code == 'popup-blocked') {
+        message =
+            "Na-block ang Google login popup. Palihug i-allow/tugoti ang popups sa imong browser settings aron makapadayon.";
       } else if (message.toLowerCase().contains('package certificate hash') ||
           message.toLowerCase().contains('certificate hash')) {
         message =
