@@ -46,34 +46,18 @@ class _QuizScreenState extends State<QuizScreen> {
 
   int? _lastProceededDecisionLevel;
   bool _hasExitedToDashboard = false;
+  bool _quizFinishedForContestant = false;
 
   void _handleQuizFinishedAndExit() {
     if (_hasExitedToDashboard) return;
-    _hasExitedToDashboard = true;
     timer?.cancel();
     answered = true;
     submitting = false;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _clearQuizScreenPersistence();
-      if (!mounted) return;
-      showTopSnackBar(
-        context,
-        const SnackBar(
-          content: Text(
-            'The Quiz Master has finished the quiz. Returning to Dashboard...',
-          ),
-          backgroundColor: Color(0xFF0B2E6B),
-          duration: Duration(seconds: 4),
-        ),
-      );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => const CompetitorDashboard(),
-        ),
-        (route) => false,
-      );
-    });
+    if (mounted) {
+      setState(() {
+        _quizFinishedForContestant = true;
+      });
+    }
   }
 
   int timeLeft = 0;
@@ -5572,36 +5556,10 @@ class _QuizScreenState extends State<QuizScreen> {
               quizData['completed'] == true ||
               quizData['isCompleted'] == true;
 
-          if (isQuizFinished) {
+          if (isQuizFinished || _quizFinishedForContestant) {
             timer?.cancel();
-            _handleQuizFinishedAndExit();
-            return const Scaffold(
-              backgroundColor: lightGreen,
-              body: TechCircuitBackground(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.flag_rounded, size: 64, color: primaryGreen),
-                      SizedBox(height: 16),
-                      Text(
-                        'QUIZ FINISHED',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: darkGreen,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Returning to dashboard...',
-                        style: TextStyle(color: Colors.grey, fontSize: 15),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
+            final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+            return _buildFinishedCongratulationsScreen(context, currentUid);
           }
 
           final status = quizData['status']?.toString() ?? 'waiting';
@@ -6678,6 +6636,412 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                       ),
                   ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // ==========================================================
+  // CONGRATULATIONS RANKING SCREEN (When Quizmaster finishes quiz)
+  // ==========================================================
+  Widget _buildFinishedCongratulationsScreen(BuildContext context, String uid) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _joinRequestRef(uid).snapshots(),
+        builder: (context, joinSnap) {
+          final jData = joinSnap.data?.data() ?? const <String, dynamic>{};
+
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('quiz_sessions')
+                .doc(widget.quizCode)
+                .collection('scores')
+                .snapshots(),
+            builder: (context, scoresSnap) {
+              final scoreDocs = scoresSnap.data?.docs ?? [];
+
+              // Calculate rank dynamically if not yet synced in join request
+              int computedRank = 1;
+              if (scoreDocs.isNotEmpty) {
+                final sorted = [...scoreDocs]
+                  ..sort((a, b) {
+                    final int sA =
+                        int.tryParse(a.data()['score']?.toString() ?? '') ?? 0;
+                    final int sB =
+                        int.tryParse(b.data()['score']?.toString() ?? '') ?? 0;
+                    if (sB != sA) return sB.compareTo(sA);
+                    final rawA = a.data()['updatedAt'];
+                    final rawB = b.data()['updatedAt'];
+                    final int tA =
+                        rawA is Timestamp ? rawA.millisecondsSinceEpoch : 0;
+                    final int tB =
+                        rawB is Timestamp ? rawB.millisecondsSinceEpoch : 0;
+                    if (tA > 0 && tB > 0 && tA != tB) return tA.compareTo(tB);
+                    return a.id.compareTo(b.id);
+                  });
+                final myIdx = sorted.indexWhere((d) => d.id == uid);
+                if (myIdx >= 0) computedRank = myIdx + 1;
+              }
+
+              final rawRank = jData['finalRank'] ?? jData['rank'];
+              final int finalRank = (rawRank is num && rawRank > 0)
+                  ? rawRank.toInt()
+                  : computedRank;
+
+              final rawTeam = (jData['teamName'] ?? '').toString().trim();
+              final rawMembers = jData['teamMembers'] ?? jData['members'];
+              final List<String> members = [];
+              if (rawMembers is List) {
+                for (final m in rawMembers) {
+                  final s = m is Map
+                      ? (m['name'] ?? m['displayName'] ?? '').toString().trim()
+                      : m.toString().trim();
+                  if (s.isNotEmpty) members.add(s);
+                }
+              }
+              final bool isTeam = jData['isTeam'] == true ||
+                  jData['contestantType'] == 'team' ||
+                  rawTeam.isNotEmpty ||
+                  members.isNotEmpty;
+              final String displayName = isTeam
+                  ? (rawTeam.isNotEmpty ? rawTeam : (jData['name'] ?? 'Team'))
+                  : (jData['realName'] ??
+                      jData['fullName'] ??
+                      jData['name'] ??
+                      'Contestant');
+
+              final int finalScore = int.tryParse(
+                      (jData['finalScore'] ?? jData['score'] ?? '')
+                          .toString()) ??
+                  (scoreDocs.where((d) => d.id == uid).isNotEmpty
+                      ? (int.tryParse(scoreDocs
+                                  .firstWhere((d) => d.id == uid)
+                                  .data()['score']
+                                  ?.toString() ??
+                              '') ??
+                          0)
+                      : 0);
+
+              final isTop3 = finalRank >= 1 && finalRank <= 3;
+
+              String trophyAsset;
+              Color rankColor;
+              String rankSubtitle;
+              if (finalRank == 1) {
+                trophyAsset = 'assets/trophies/gold_trophy_3d.jpg';
+                rankColor = const Color(0xFFF59E0B);
+                rankSubtitle = "CHAMPION • 1ST PLACE";
+              } else if (finalRank == 2) {
+                trophyAsset = 'assets/trophies/silver_trophy_3d.jpg';
+                rankColor = const Color(0xFF94A3B8);
+                rankSubtitle = "1ST RUNNER-UP • 2ND PLACE";
+              } else if (finalRank == 3) {
+                trophyAsset = 'assets/trophies/bronze_trophy_3d.jpg';
+                rankColor = const Color(0xFFD97706);
+                rankSubtitle = "2ND RUNNER-UP • 3RD PLACE";
+              } else {
+                trophyAsset = 'assets/trophies/top10_badge_3d.jpg';
+                rankColor = const Color(0xFF3B82F6);
+                rankSubtitle = "COMPETITOR • RANK #$finalRank";
+              }
+
+              return TechCircuitBackground(
+                child: SafeArea(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 28),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: rankColor.withValues(alpha: 0.25),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: rankColor.withValues(alpha: 0.4),
+                              width: 1.8,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Top Tag: QUIZ COMPLETED
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.flag_rounded,
+                                        color: Color(0xFF0F172A), size: 14),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      "QUIZ COMPLETED",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.0,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 18),
+
+                              // Trophy / Badge Image with glow
+                              Container(
+                                width: 130,
+                                height: 130,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: rankColor.withValues(alpha: 0.35),
+                                      blurRadius: 24,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    trophyAsset,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: rankColor.withValues(alpha: 0.15),
+                                      child: Icon(
+                                        isTop3
+                                            ? Icons.emoji_events_rounded
+                                            : Icons.military_tech_rounded,
+                                        size: 72,
+                                        color: rankColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Header: CONGRATULATIONS!
+                              Text(
+                                isTop3 ? "CONGRATULATIONS!" : "WELL DONE!",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                  color: isTop3
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFF1E3A8A),
+                                ),
+                              ),
+
+                              const SizedBox(height: 6),
+
+                              // Big Rank Banner: "YOU'RE RANK 1!"
+                              Container(
+                                margin:
+                                    const EdgeInsets.symmetric(vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isTop3
+                                        ? [
+                                            rankColor,
+                                            rankColor.withValues(alpha: 0.8)
+                                          ]
+                                        : [
+                                            const Color(0xFF2563EB),
+                                            const Color(0xFF1D4ED8)
+                                          ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: rankColor.withValues(alpha: 0.4),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  "YOU'RE RANK $finalRank!",
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+
+                              Text(
+                                rankSubtitle,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: rankColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+
+                              const SizedBox(height: 18),
+                              const Divider(
+                                  height: 1, color: Color(0xFFE2E8F0)),
+                              const SizedBox(height: 16),
+
+                              // Name / Team
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isTeam
+                                        ? Icons.groups_rounded
+                                        : Icons.person_rounded,
+                                    size: 20,
+                                    color: const Color(0xFF2563EB),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      displayName,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              if (isTeam && members.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Members: ${members.join(', ')}",
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 16),
+
+                              // Score Box
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      "FINAL SCORE",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.0,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "$finalScore PTS",
+                                      style: const TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF16A34A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 22),
+
+                              // Action: Return to Dashboard button
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await _clearQuizScreenPersistence();
+                                    if (!context.mounted) return;
+                                    Navigator.of(context).pushAndRemoveUntil(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              const CompetitorDashboard()),
+                                      (route) => false,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.dashboard_rounded,
+                                      color: Colors.white, size: 20),
+                                  label: const Text(
+                                    "RETURN TO DASHBOARD",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14.5,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(25),
+                                    ),
+                                    elevation: 4,
+                                    shadowColor: const Color(0xFF2563EB)
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               );
             },

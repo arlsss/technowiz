@@ -2262,21 +2262,93 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         'timer': 0,
       });
 
-      // Also mark all join_requests so contestants get notified instantly
+      // Compute final rankings and update all participants so they instantly see their rank
       try {
-        final requests = await quizRef.collection('join_requests').get();
-        if (requests.docs.isNotEmpty) {
+        final scoresSnap = await quizRef.collection('scores').get();
+        final requestsSnap = await quizRef.collection('join_requests').get();
+
+        final List<Map<String, dynamic>> participantScores = [];
+        for (final doc in scoresSnap.docs) {
+          final sData = doc.data();
+          final int score =
+              int.tryParse(sData['score']?.toString() ?? '') ?? 0;
+          final rawUpdated = sData['updatedAt'];
+          final int timeMs =
+              rawUpdated is Timestamp ? rawUpdated.millisecondsSinceEpoch : 0;
+          participantScores.add({
+            'uid': doc.id,
+            'score': score,
+            'timeMs': timeMs,
+            'name': (sData['name'] ?? sData['teamName'] ?? doc.id).toString(),
+          });
+        }
+
+        final existingUids = participantScores.map((p) => p['uid']).toSet();
+        for (final req in requestsSnap.docs) {
+          if (!existingUids.contains(req.id)) {
+            final rData = req.data();
+            final int score =
+                int.tryParse(rData['score']?.toString() ?? '') ?? 0;
+            participantScores.add({
+              'uid': req.id,
+              'score': score,
+              'timeMs': 0,
+              'name': (rData['teamName'] ?? rData['name'] ?? req.id).toString(),
+            });
+          }
+        }
+
+        // Sort: highest score first, earlier time on tie, then name
+        participantScores.sort((a, b) {
+          final int scoreCompare =
+              (b['score'] as int).compareTo(a['score'] as int);
+          if (scoreCompare != 0) return scoreCompare;
+          final int timeA = a['timeMs'] as int;
+          final int timeB = b['timeMs'] as int;
+          if (timeA > 0 && timeB > 0 && timeA != timeB) {
+            return timeA.compareTo(timeB);
+          }
+          return (a['name'] as String).compareTo(b['name'] as String);
+        });
+
+        final Map<String, int> ranksByUid = {};
+        for (int i = 0; i < participantScores.length; i++) {
+          final uid = participantScores[i]['uid'] as String;
+          ranksByUid[uid] = i + 1;
+        }
+
+        if (requestsSnap.docs.isNotEmpty || scoresSnap.docs.isNotEmpty) {
           final batch = FirebaseFirestore.instance.batch();
-          for (final req in requests.docs) {
+          for (final req in requestsSnap.docs) {
+            final int assignedRank =
+                ranksByUid[req.id] ?? (ranksByUid.length + 1);
+            final int score =
+                int.tryParse(req.data()['score']?.toString() ?? '') ?? 0;
             batch.set(req.reference, {
               'quizFinished': true,
               'quizEnded': true,
+              'finalRank': assignedRank,
+              'rank': assignedRank,
+              'levelRank': assignedRank,
+              'currentRank': assignedRank,
+              'finalScore': score,
+              'rankUpdatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+          for (final doc in scoresSnap.docs) {
+            final int assignedRank =
+                ranksByUid[doc.id] ?? (ranksByUid.length + 1);
+            batch.set(doc.reference, {
+              'finalRank': assignedRank,
+              'rank': assignedRank,
+              'levelRank': assignedRank,
+              'currentRank': assignedRank,
             }, SetOptions(merge: true));
           }
           await batch.commit();
         }
       } catch (e) {
-        debugPrint('UPDATE JOIN REQUESTS ON FINISH ERROR: $e');
+        debugPrint('UPDATE FINAL RANKS ON FINISH ERROR: $e');
       }
 
       try {
