@@ -472,7 +472,7 @@ class QuizInstructionsScreen extends StatelessWidget {
                     _instructionItem(
                       Icons.balance_rounded,
                       const Color(0xFF64748B),
-                      "Contest Answer: Challenge a wrong Identification mark with a valid explanation.",
+                      "Contest Answer: Challenge an incorrect mark on any question type with a valid explanation.",
                     ),
                     _instructionItem(
                       Icons.cast_for_education_rounded,

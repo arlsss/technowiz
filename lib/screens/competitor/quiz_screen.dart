@@ -3182,7 +3182,6 @@ class _QuizScreenState extends State<QuizScreen> {
   Future<void> showContestDialog() async {
     if (!answered ||
         !resultRevealed ||
-        currentQuestionType != "Identification" ||
         lastAnswerCorrect ||
         contestStatus != "none" ||
         previousQuestion < 0) {
@@ -3307,8 +3306,7 @@ class _QuizScreenState extends State<QuizScreen> {
         contestStatus != "none" ||
         !answered ||
         !resultRevealed ||
-        lastAnswerCorrect ||
-        currentQuestionType != "Identification") {
+        lastAnswerCorrect) {
       return;
     }
 
@@ -3433,7 +3431,19 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final acceptedAnswers = getAcceptedAnswers(question);
 
-      final contestantAnswer = questionTypeSafeAnswer();
+      String contestantAnswer = questionTypeSafeAnswer();
+      if (contestantAnswer.isEmpty) {
+        try {
+          final savedResp = await responseRef.get();
+          if (savedResp.exists) {
+            contestantAnswer = (savedResp.data()?['selectedAnswer'] ??
+                    savedResp.data()?['answer'] ??
+                    '')
+                .toString()
+                .trim();
+          }
+        } catch (_) {}
+      }
 
       await requestRef.set({
         'contestantUid': uid,
@@ -3795,11 +3805,8 @@ class _QuizScreenState extends State<QuizScreen> {
   // ==========================================================
 
   Widget contestAnswerButton() {
-    final normalizedQuestionType = currentQuestionType.trim().toLowerCase();
-
     if (!answered ||
         !resultRevealed ||
-        normalizedQuestionType != "identification" ||
         lastAnswerCorrect ||
         contestStatus != "none") {
       return const SizedBox.shrink();
