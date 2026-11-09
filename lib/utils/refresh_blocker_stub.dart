@@ -1,0 +1,4 @@
+void enableRefreshBlocker() {}
+
+void disableRefreshBlocker() {}
+

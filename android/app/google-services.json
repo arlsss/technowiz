@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "275534919089",
+    "project_id": "technowiz-73132",
+    "storage_bucket": "technowiz-73132.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:275534919089:android:9729af35f34830529e7990",
+        "android_client_info": {
+          "package_name": "com.example.technowiz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3WYjTbqYLkAujXAAGv54JLE58z9ub9c4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
