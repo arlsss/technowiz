@@ -1,8 +1,14 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import 'admin/admin_dashboard.dart';
+import 'quizmaster/quizmaster_dashboard.dart';
+import 'competitor/competitor_dashboard.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -300,6 +306,246 @@ class _RegisterScreenState extends State<RegisterScreen> {
           break;
         default:
           message = e.message ?? "Registration failed.";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  // =========================================================
+  // REGISTER / CONTINUE WITH GOOGLE
+  // =========================================================
+  Future<void> registerWithGoogle() async {
+    if (selectedRole == "Contestant" && contestantType == "Team") {
+      final teamName = teamNameController.text.trim();
+      final teamSize = int.tryParse(teamSizeController.text.trim());
+      if (teamName.isEmpty || teamSize == null || teamSize < 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                "Palihug ibutang ang Team Name ug Team Size (at least 2 members)."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      UserCredential userCredential;
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({'prompt': 'select_account'});
+        userCredential =
+            await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      } else {
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          serverClientId:
+              '275534919089-9b4ulah2fub1uob6gbaa6ggh5tnkq3f9.apps.googleusercontent.com',
+          scopes: ['email', 'profile'],
+        );
+
+        try {
+          await googleSignIn.signOut();
+        } catch (_) {}
+
+        final GoogleSignInAccount? googleSignInAccount =
+            await googleSignIn.signIn();
+
+        if (googleSignInAccount == null) {
+          if (mounted) setState(() => isLoading = false);
+          return;
+        }
+
+        final GoogleSignInAuthentication googleAuth =
+            await googleSignInAccount.authentication;
+
+        final OAuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        userCredential =
+            await FirebaseAuth.instance.signInWithCredential(credential);
+      }
+
+      final User? googleUser = userCredential.user;
+      if (googleUser == null) {
+        throw Exception("Unable to sign in with Google account.");
+      }
+
+      final String uid = googleUser.uid;
+      final String email = googleUser.email ?? '';
+      final String name = (googleUser.displayName != null &&
+              googleUser.displayName!.trim().isNotEmpty)
+          ? googleUser.displayName!.trim()
+          : (nameController.text.trim().isNotEmpty
+              ? nameController.text.trim()
+              : (email.isNotEmpty ? email.split('@').first : selectedRole));
+
+      final DocumentSnapshot<Map<String, dynamic>> userDoc =
+          await FirebaseFirestore.instance.collection("users").doc(uid).get();
+
+      String role = selectedRole;
+
+      if (userDoc.exists) {
+        // User already registered: retain existing role
+        final Map<String, dynamic> userData = userDoc.data() ?? {};
+        role = userData["role"]?.toString() ?? selectedRole;
+
+        final Map<String, dynamic> updateData = {
+          "status": "Online",
+          "lastLogin": FieldValue.serverTimestamp(),
+        };
+        if (googleUser.photoURL != null &&
+            (userData["photoUrl"] == null ||
+                userData["photoUrl"].toString().isEmpty)) {
+          updateData["photoUrl"] = googleUser.photoURL;
+        }
+        await FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .update(updateData);
+      } else {
+        // First-time Google user: Register using the selected role on this screen
+        final Map<String, dynamic> userData = {
+          "uid": uid,
+          "name": name,
+          "fullName": name,
+          "displayName": name,
+          "email": email,
+          "role": selectedRole,
+          "photoUrl": googleUser.photoURL ?? "",
+          "score": 0,
+          "status": "Online",
+          "createdAt": FieldValue.serverTimestamp(),
+          "lastLogin": FieldValue.serverTimestamp(),
+        };
+
+        if (selectedRole == "Contestant") {
+          if (contestantType == "Team") {
+            final String teamName = teamNameController.text.trim().isNotEmpty
+                ? teamNameController.text.trim()
+                : "$name's Team";
+            final List<String> teamMembers = memberNameControllers
+                .map((c) => c.text.trim())
+                .where((s) => s.isNotEmpty)
+                .toList();
+            final int teamSize = teamMembers.isNotEmpty
+                ? teamMembers.length
+                : (int.tryParse(teamSizeController.text.trim()) ?? 2);
+
+            userData["contestantType"] = "team";
+            userData["isTeam"] = true;
+            userData["teamName"] = teamName;
+            userData["teamSize"] = teamSize;
+            userData["teamMembers"] = teamMembers;
+            userData["members"] = teamMembers;
+            userData["teamLeader"] = name;
+            userData["leaderName"] = name;
+            userData["name"] = teamName;
+            userData["displayName"] = teamName;
+            userData["fullName"] = teamName;
+
+            try {
+              await googleUser.updateDisplayName(teamName);
+            } catch (_) {}
+          } else {
+            userData["contestantType"] = "solo";
+            userData["isTeam"] = false;
+            userData["teamName"] = "";
+            userData["teamMembers"] = <String>[];
+            userData["members"] = <String>[];
+            userData["teamSize"] = 1;
+            userData["name"] = name;
+            userData["displayName"] = name;
+            userData["fullName"] = name;
+
+            try {
+              await googleUser.updateDisplayName(name);
+            } catch (_) {}
+          }
+        }
+
+        await FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .set(userData);
+
+        final String notifUserName =
+            (selectedRole == "Contestant" && contestantType == "Team")
+                ? teamNameController.text.trim()
+                : name;
+        final String notifMessage =
+            (selectedRole == "Contestant" && contestantType == "Team")
+                ? "${teamNameController.text.trim()} registered via Google as Team Contestant with ${memberNameControllers.length} members in TechNoWiz."
+                : "$name registered via Google as ${selectedRole == 'Contestant' ? 'Solo Contestant' : selectedRole} in TechNoWiz.";
+
+        try {
+          await FirebaseFirestore.instance.collection("notifications").add({
+            "type": "new_user",
+            "title": "New User Registered",
+            "message": notifMessage,
+            "userName": notifUserName,
+            "userEmail": email,
+            "role": selectedRole,
+            "createdAt": FieldValue.serverTimestamp(),
+            "isRead": false,
+          });
+        } catch (_) {}
+      }
+
+      final String normalizedRole =
+          role.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+
+      if (!mounted) return;
+
+      if (normalizedRole == "admin") {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          (route) => false,
+        );
+      } else if (normalizedRole == "quizmaster") {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
+          (route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const CompetitorDashboard()),
+          (route) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'popup-closed-by-user' || e.code == 'cancelled') {
+        return;
+      }
+      String message = e.message ?? "Google Sign-In failed.";
+      if (e.code == 'operation-not-allowed') {
+        message =
+            "Google Sign-In is not enabled yet in Firebase Console. Please enable Google provider under Authentication > Sign-in method.";
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
@@ -953,6 +1199,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: isLoading ? null : registerUser,
                 ),
 
+                const SizedBox(height: 16),
+
+                // OR Divider
+                const Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: Color(0xFFE2E8F0),
+                        thickness: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        "OR",
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: Color(0xFFE2E8F0),
+                        thickness: 1,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Continue with Google Button
+                _buildGoogleButton(),
+
                 const SizedBox(height: 18),
 
                 // 8. Already have an account? Log In >
@@ -1326,6 +1608,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================
+  // CONTINUE WITH GOOGLE BUTTON
+  // =========================================================
+  Widget _buildGoogleButton() {
+    String roleLabel = selectedRole;
+    if (selectedRole == "Contestant") {
+      roleLabel =
+          contestantType == "Team" ? "Team Contestant" : "Solo Contestant";
+    }
+
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFCBD5E1),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: isLoading ? null : registerWithGoogle,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text(
+                      "G",
+                      style: TextStyle(
+                        color: Color(0xFF4285F4),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  "Continue with Google as $roleLabel",
+                  style: const TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

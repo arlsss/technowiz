@@ -423,39 +423,122 @@ class _LoginScreenState extends State<LoginScreen> {
       String role = "Contestant";
 
       if (!userDoc.exists) {
-        // Register first-time Google user as Contestant
+        // First-time Google user: Prompt user to choose their Role (Contestant, Quizmaster, Admin)
+        if (!mounted) return;
+        final Map<String, dynamic>? roleSelection =
+            await showDialog<Map<String, dynamic>>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => _GoogleRoleDialog(googleUser: googleUser),
+        );
+
+        if (roleSelection == null) {
+          // User clicked Cancel
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+            });
+          }
+          return;
+        }
+
+        final String chosenRole =
+            roleSelection["role"]?.toString() ?? "Contestant";
         final String displayName = (googleUser.displayName != null &&
                 googleUser.displayName!.trim().isNotEmpty)
             ? googleUser.displayName!.trim()
-            : (email.isNotEmpty ? email.split('@').first : "Contestant");
+            : (email.isNotEmpty ? email.split('@').first : chosenRole);
 
-        await FirebaseFirestore.instance.collection("users").doc(uid).set({
+        final Map<String, dynamic> newUserData = {
           "uid": uid,
           "name": displayName,
+          "fullName": displayName,
+          "displayName": displayName,
           "email": email,
-          "role": "Contestant",
-          "contestantType": "Solo",
+          "role": chosenRole,
           "photoUrl": googleUser.photoURL ?? "",
           "score": 0,
           "status": "Online",
           "createdAt": FieldValue.serverTimestamp(),
           "lastLogin": FieldValue.serverTimestamp(),
-        });
+        };
+
+        if (chosenRole == "Contestant") {
+          final String cType =
+              roleSelection["contestantType"]?.toString() ?? "Solo";
+          if (cType == "Team") {
+            final String teamName =
+                roleSelection["teamName"]?.toString() ?? displayName;
+            final List<String> teamMembers =
+                List<String>.from(roleSelection["teamMembers"] ?? []);
+            final int teamSize = teamMembers.isNotEmpty
+                ? teamMembers.length
+                : (int.tryParse(roleSelection["teamSize"]?.toString() ?? "2") ??
+                    2);
+
+            newUserData["contestantType"] = "team";
+            newUserData["isTeam"] = true;
+            newUserData["teamName"] = teamName;
+            newUserData["teamSize"] = teamSize;
+            newUserData["teamMembers"] = teamMembers;
+            newUserData["members"] = teamMembers;
+            newUserData["teamLeader"] = displayName;
+            newUserData["leaderName"] = displayName;
+            newUserData["name"] = teamName;
+            newUserData["displayName"] = teamName;
+            newUserData["fullName"] = teamName;
+
+            try {
+              await googleUser.updateDisplayName(teamName);
+            } catch (_) {}
+          } else {
+            newUserData["contestantType"] = "solo";
+            newUserData["isTeam"] = false;
+            newUserData["teamName"] = "";
+            newUserData["teamMembers"] = <String>[];
+            newUserData["members"] = <String>[];
+            newUserData["teamSize"] = 1;
+            newUserData["name"] = displayName;
+            newUserData["displayName"] = displayName;
+            newUserData["fullName"] = displayName;
+
+            try {
+              await googleUser.updateDisplayName(displayName);
+            } catch (_) {}
+          }
+        }
+
+        await FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .set(newUserData);
 
         // Add welcome notification
+        final String notifUserName = (chosenRole == "Contestant" &&
+                roleSelection["contestantType"] == "Team")
+            ? (roleSelection["teamName"] ?? displayName)
+            : displayName;
+        final String notifMessage = (chosenRole == "Contestant" &&
+                roleSelection["contestantType"] == "Team")
+            ? "$notifUserName registered via Google as Team Contestant with ${roleSelection["teamMembers"]?.length ?? 2} members."
+            : "$displayName registered via Google as $chosenRole in TechNoWiz.";
+
         try {
           await FirebaseFirestore.instance.collection("notifications").add({
-            "title": "Welcome to TechNoWiz!",
-            "message": "$displayName signed in via Google as Contestant.",
-            "type": "registration",
+            "title": "New User Registered",
+            "message": notifMessage,
+            "type": "new_user",
+            "userName": notifUserName,
+            "userEmail": email,
             "userId": uid,
-            "role": "Contestant",
+            "role": chosenRole,
             "createdAt": FieldValue.serverTimestamp(),
             "isRead": false,
           });
         } catch (_) {}
 
-        role = "Contestant";
+        role = chosenRole;
       } else {
         final Map<String, dynamic> userData = userDoc.data() ?? {};
         role = userData["role"]?.toString() ?? "Contestant";
@@ -1755,4 +1838,603 @@ class _TechCircuitBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// =========================================================
+// GOOGLE ROLE SELECTION DIALOG (For new Google users)
+// =========================================================
+class _GoogleRoleDialog extends StatefulWidget {
+  final User googleUser;
+  const _GoogleRoleDialog({required this.googleUser});
+
+  @override
+  State<_GoogleRoleDialog> createState() => _GoogleRoleDialogState();
+}
+
+class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
+  String selectedRole = "Contestant";
+  String contestantType = "Solo";
+
+  final TextEditingController teamNameController = TextEditingController();
+  final TextEditingController teamSizeController =
+      TextEditingController(text: "2");
+  final List<TextEditingController> memberNameControllers = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
+
+  @override
+  void dispose() {
+    teamNameController.dispose();
+    teamSizeController.dispose();
+    for (final c in memberNameControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _updateMemberControllers(int count) {
+    if (count < 2) count = 2;
+    if (count > 20) count = 20;
+    while (memberNameControllers.length < count) {
+      memberNameControllers.add(TextEditingController());
+    }
+    while (memberNameControllers.length > count) {
+      final last = memberNameControllers.removeLast();
+      last.dispose();
+    }
+  }
+
+  void _confirm() {
+    if (selectedRole == "Contestant" && contestantType == "Team") {
+      final tName = teamNameController.text.trim();
+      final size = int.tryParse(teamSizeController.text.trim()) ?? 2;
+      if (tName.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Palihug ibutang ang Team Name."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+      final validMembers = memberNameControllers
+          .map((c) => c.text.trim())
+          .where((m) => m.isNotEmpty)
+          .toList();
+      if (validMembers.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Palihug ibutang ang mga miyembro sa team."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).pop({
+        "role": "Contestant",
+        "contestantType": "Team",
+        "teamName": tName,
+        "teamSize": size,
+        "teamMembers": validMembers,
+      });
+      return;
+    }
+
+    Navigator.of(context).pop({
+      "role": selectedRole,
+      "contestantType": contestantType,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayName = widget.googleUser.displayName ??
+        (widget.googleUser.email != null
+            ? widget.googleUser.email!.split('@').first
+            : "Contestant");
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Google User Info Banner
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundImage: widget.googleUser.photoURL != null
+                        ? NetworkImage(widget.googleUser.photoURL!)
+                        : null,
+                    child: widget.googleUser.photoURL == null
+                        ? Text(
+                            displayName.isNotEmpty
+                                ? displayName[0].toUpperCase()
+                                : "U",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          widget.googleUser.email ?? "",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 16),
+
+              // Title: SELECT YOUR ROLE
+              const Row(
+                children: [
+                  Icon(Icons.workspace_premium_rounded,
+                      color: Color(0xFF2563EB), size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    "CHOOSE YOUR ROLE",
+                    style: TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // 3 Role Cards (Contestant, Quizmaster, Admin)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRoleCard(
+                      title: "Contestant",
+                      subtitle: "Compete",
+                      icon: Icons.sports_esports_rounded,
+                      selected: selectedRole == "Contestant",
+                      onTap: () => setState(() => selectedRole = "Contestant"),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildRoleCard(
+                      title: "Quizmaster",
+                      subtitle: "Host",
+                      icon: Icons.school_rounded,
+                      selected: selectedRole == "Quizmaster",
+                      onTap: () => setState(() => selectedRole = "Quizmaster"),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildRoleCard(
+                      title: "Admin",
+                      subtitle: "Control",
+                      icon: Icons.admin_panel_settings_rounded,
+                      selected: selectedRole == "Admin",
+                      onTap: () => setState(() => selectedRole = "Admin"),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Contestant Type (Solo / Team)
+              if (selectedRole == "Contestant") ...[
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Icon(Icons.category_rounded,
+                        color: Color(0xFF2563EB), size: 15),
+                    SizedBox(width: 6),
+                    Text(
+                      "CONTESTANT PARTICIPATION TYPE",
+                      style: TextStyle(
+                        color: Color(0xFF1E3A8A),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F6FD),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFBFDBFE),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildPill(
+                          label: "Solo Contestant",
+                          icon: Icons.person_rounded,
+                          selected: contestantType == "Solo",
+                          onTap: () => setState(() => contestantType = "Solo"),
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildPill(
+                          label: "Team Contestant",
+                          icon: Icons.groups_rounded,
+                          selected: contestantType == "Team",
+                          onTap: () => setState(() => contestantType = "Team"),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Team options
+                if (contestantType == "Team") ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: teamNameController,
+                    decoration: InputDecoration(
+                      hintText: "Team Name",
+                      prefixIcon: const Icon(Icons.shield_rounded,
+                          color: Color(0xFF2563EB), size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF2563EB), width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Team Size Stepper
+                  TextField(
+                    controller: teamSizeController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: "Number of members",
+                      prefixIcon: const Icon(Icons.group_add_rounded,
+                          color: Color(0xFF2563EB), size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF2563EB), width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                                Icons.remove_circle_outline_rounded,
+                                size: 20,
+                                color: Color(0xFF2563EB)),
+                            onPressed: () {
+                              final current =
+                                  int.tryParse(teamSizeController.text.trim()) ??
+                                      2;
+                              if (current > 2) {
+                                final next = current - 1;
+                                teamSizeController.text = next.toString();
+                                setState(() {
+                                  _updateMemberControllers(next);
+                                });
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline_rounded,
+                                size: 20, color: Color(0xFF2563EB)),
+                            onPressed: () {
+                              final current =
+                                  int.tryParse(teamSizeController.text.trim()) ??
+                                      2;
+                              final next = current + 1;
+                              teamSizeController.text = next.toString();
+                              setState(() {
+                                _updateMemberControllers(next);
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                      ),
+                    ),
+                    onChanged: (val) {
+                      final size = int.tryParse(val.trim());
+                      if (size != null && size >= 2 && size <= 20) {
+                        setState(() {
+                          _updateMemberControllers(size);
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Member names
+                  ...List.generate(memberNameControllers.length, (i) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TextField(
+                        controller: memberNameControllers[i],
+                        decoration: InputDecoration(
+                          hintText: "Member ${i + 1} Name",
+                          prefixIcon: const Icon(Icons.person_outline_rounded,
+                              color: Color(0xFF64748B), size: 18),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ],
+
+              const SizedBox(height: 20),
+
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(null),
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF2563EB).withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: _confirm,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Confirm & Enter",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(Icons.arrow_forward_rounded,
+                                color: Colors.white, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFEFF6FF) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            width: selected ? 1.8 : 1.0,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color:
+                  selected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+              size: 24,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: TextStyle(
+                color: selected
+                    ? const Color(0xFF1E3A8A)
+                    : const Color(0xFF1E293B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: selected
+                    ? const Color(0xFF3B82F6)
+                    : const Color(0xFF94A3B8),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPill({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 16,
+                color: selected
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF64748B)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? const Color(0xFF1E3A8A)
+                    : const Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
