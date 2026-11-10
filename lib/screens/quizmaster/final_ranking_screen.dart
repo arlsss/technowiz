@@ -27,8 +27,7 @@ class _RankingEntry {
   final String id;
   final Map<String, dynamic> _data;
 
-  _RankingEntry({required this.id, required Map<String, dynamic> data})
-      : _data = data;
+  _RankingEntry(this.id, this._data);
 
   Map<String, dynamic> data() => _data;
 }
@@ -207,44 +206,6 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     return fromLevel == level;
   }
 
-  // Kung ang contestant na-eliminate sa una nga level (e.g. Level 1),
-  // dili na dapat makita ilang ngalan sa sunod nga level (e.g. Level 2, 3...)
-  bool _wasEliminatedInPreviousLevel(Map<String, dynamic> data) {
-    if (widget.level <= 1) return false;
-
-    final isElim = _isEliminated(data);
-    if (!isElim) return false;
-
-    // 1. Tan-awa ang explicit elimination level markers
-    final rawLevel = data['eliminatedLevel'] ??
-        data['eliminatedAfterLevel'] ??
-        data['decisionLevel'];
-    final int? elimLevel = rawLevel is num
-        ? rawLevel.toInt()
-        : int.tryParse(rawLevel?.toString() ?? '');
-
-    if (elimLevel != null) {
-      // Na-eliminate sa mas sayo nga level: ayaw na i-apil sa sunod nga level
-      return elimLevel < widget.level;
-    }
-
-    // 2. Kon walay elimLevel, tan-awa kon nakapadayon ba sa karon nga level
-    final rawProceededFrom = data['proceededFromLevel'];
-    final int? proceededFrom = rawProceededFrom is num
-        ? rawProceededFrom.toInt()
-        : int.tryParse(rawProceededFrom?.toString() ?? '');
-
-    final rawNext = data['nextLevel'];
-    final int? next = rawNext is num
-        ? rawNext.toInt()
-        : int.tryParse(rawNext?.toString() ?? '');
-
-    if (proceededFrom != (widget.level - 1) && (next == null || next < widget.level)) {
-      return true;
-    }
-
-    return false;
-  }
 
   // Tagsa-tagsa ka rank (1, 2, 3...) base sa fixed sorted order.
   // Walay mag-share og parehas nga rank ug dili mag-ilis-ilis og ranking.
@@ -359,12 +320,13 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
       final db = FirebaseFirestore.instance;
       final sessionRef = db.collection('quiz_sessions').doc(quizCode);
       final scores = await sessionRef.collection('scores').get();
+      final requests = await sessionRef.collection('join_requests').get();
       final eliminatedIds = <String>{
         for (final d in scores.docs)
           if (_isEliminated(d.data())) d.id,
+        for (final r in requests.docs)
+          if (_isEliminated(r.data())) r.id,
       };
-
-      final requests = await sessionRef.collection('join_requests').get();
       final batch = db.batch();
       bool hasUpdates = false;
 
@@ -499,7 +461,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
     // QuizControl owns the synchronized readiness/countdown flow. Return to it
     // and let its existing _startNextLevel method open Contestant Readiness.
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     final startNextLevel = onStartNextLevel;
     if (startNextLevel == null) {
       showQuizMasterTopNotification(
@@ -900,7 +862,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
                           final allContestants = mergedMap.entries
                               .map(
-                                (e) => _RankingEntry(id: e.key, data: e.value),
+                                (e) => _RankingEntry(e.key, e.value),
                               )
                               .toList();
 
@@ -911,11 +873,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                             );
                           }
 
-                          // Dili i-apil sa sunod nga level ang mga contestant nga na-eliminate sa miaging mga level
-                          final activeDocs = allContestants.where((doc) {
-                            if (effectiveIsFinal) return true;
-                            return !_wasEliminatedInPreviousLevel(doc.data());
-                          }).toList();
+                          // Ipakita ang tanang contestant nga naka-apil, apil ang mga na-eliminate
+                          final activeDocs = allContestants.toList();
 
                           if (activeDocs.isEmpty) {
                             return _emptyRanking(
@@ -927,18 +886,17 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                           _fetchResponseTimesIfNeeded(activeDocs);
 
                 // Sort sa client:
-                // 1. Elimination state (kon final round)
+                // 1. Elimination state (ang active una, ang eliminated sa ubos)
                 // 2. Score (descending - highest score first)
                 // 3. Speed / Submission time (earlier timestamp = faster = higher rank)
                 // 4. Locked order if already locked and times equal
                 // 5. Stable deterministic fallback (by ID)
                 final rankings = [...activeDocs]
                   ..sort((a, b) {
-                    if (effectiveIsFinal) {
-                      final aElim = _isEliminated(a.data());
-                      final bElim = _isEliminated(b.data());
-                      if (aElim != bElim) return aElim ? 1 : -1;
-                    }
+                    final aElim = _isEliminated(a.data());
+                    final bElim = _isEliminated(b.data());
+                    if (aElim != bElim) return aElim ? 1 : -1;
+
                     final scoreA = _scoreOf(a.data());
                     final scoreB = _scoreOf(b.data());
                     final byScore = scoreB.compareTo(scoreA);
@@ -1549,7 +1507,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                 if (members.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Members: ' + members.join(', '),
+                    'Members: ${members.join(', ')}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1714,12 +1672,36 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                   ],
                 )
               else
-                Text(
-                  'ELIMINATED',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.red.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cancel_rounded,
+                        size: 13,
+                        color: Colors.red.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'ELIMINATED',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],

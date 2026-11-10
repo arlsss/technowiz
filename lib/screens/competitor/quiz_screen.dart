@@ -6664,12 +6664,27 @@ class _QuizScreenState extends State<QuizScreen> {
                                 // ==================================================
                                 submittedWaitingCard(),
 
-                                resultCard(points: points),
-
-                                // ==================================================
-                                // CONTEST
-                                // ==================================================
-                                contestAnswerButton(),
+                                Builder(
+                                  builder: (context) {
+                                    final yourCurrentAnswer =
+                                        currentQuestionType == "Identification" ||
+                                                currentQuestionType == "Enumeration"
+                                            ? answerInputController.text.trim()
+                                            : (selectedAnswer?.trim() ?? '');
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        resultCard(
+                                          points: points,
+                                          yourAnswer: yourCurrentAnswer,
+                                        ),
+                                        contestAnswerButton(
+                                          yourAnswer: yourCurrentAnswer,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
 
                                 // ==================================================
                                 // CONTEST REALTIME STATUS
