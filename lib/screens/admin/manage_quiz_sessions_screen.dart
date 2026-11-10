@@ -1492,6 +1492,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   final TextEditingController levelDifficultyController = TextEditingController(
     text: 'Easy',
   );
+  String levelQuestionType = 'Multiple Choice';
 
   bool isAddingLevel = false;
   String? editingLevelName;
@@ -2022,6 +2023,10 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           .toString();
       levelDifficulty = (settings['difficulty'] ?? 'Easy').toString();
       levelDifficultyController.text = levelDifficulty;
+      levelQuestionType = (settings['questionType'] ??
+              settings['type'] ??
+              'Multiple Choice')
+          .toString();
     });
   }
 
@@ -2106,6 +2111,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       levelPointsController.clear();
       levelDifficulty = '';
       levelDifficultyController.clear();
+      levelQuestionType = 'Multiple Choice';
     });
   }
 
@@ -2197,6 +2203,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         'eliminateCount': eliminateCount,
         'pointsPerCorrectAnswer': pointsPerCorrectAnswer,
         'difficulty': levelDifficulty,
+        'questionType': levelQuestionType,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -2219,6 +2226,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         levelPointsController.clear();
         levelDifficulty = '';
         levelDifficultyController.clear();
+        levelQuestionType = 'Multiple Choice';
       });
 
       showMessage('$level saved successfully.');
@@ -3503,6 +3511,64 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
+                            ),
+
+                            const SizedBox(height: 10),
+
+                            // QUESTION TYPE
+                            DropdownButtonFormField<String>(
+                              value: const [
+                                'Multiple Choice',
+                                'Identification',
+                                'True/False',
+                                'Enumeration',
+                                'Fill in the Blank',
+                                'Mixed',
+                              ].contains(levelQuestionType)
+                                  ? levelQuestionType
+                                  : 'Multiple Choice',
+                              decoration: InputDecoration(
+                                labelText: 'Question Type',
+                                prefixIcon: const Icon(
+                                  Icons.account_tree_outlined,
+                                  color: primaryPurple,
+                                ),
+                                isDense: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'Multiple Choice',
+                                  child: Text('Multiple Choice'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Identification',
+                                  child: Text('Identification'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'True/False',
+                                  child: Text('True / False'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Enumeration',
+                                  child: Text('Enumeration'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Fill in the Blank',
+                                  child: Text('Fill in the Blank'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Mixed',
+                                  child: Text('Mixed / All'),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => levelQuestionType = val);
+                                }
+                              },
                             ),
 
                             const SizedBox(height: 12),

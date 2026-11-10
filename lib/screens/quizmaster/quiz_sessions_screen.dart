@@ -3858,6 +3858,18 @@ class ParticipantReadinessPage extends StatelessWidget {
           return null;
         }
 
+        String formatQuestionType(String raw) {
+          final clean = raw.trim();
+          final lower = clean.toLowerCase().replaceAll(RegExp(r'[\s_\-]+'), '');
+          if (lower == 'multiplechoice' || lower == 'mc') return 'Multiple Choice';
+          if (lower == 'identification' || lower == 'ident') return 'Identification';
+          if (lower == 'truefalse' || lower == 'tf' || lower == 'true/false') return 'True/False';
+          if (lower == 'fillintheblank' || lower == 'fillblank' || lower == 'fitb') return 'Fill in the Blank';
+          if (lower == 'enumeration' || lower == 'enum') return 'Enumeration';
+          if (lower == 'mixed' || lower == 'all') return 'Mixed / All';
+          return clean;
+        }
+
         return Column(
           children: entries.map((entry) {
             final levelKey = entry.key;
@@ -3870,9 +3882,85 @@ class ParticipantReadinessPage extends StatelessWidget {
                 ? '$count ${count == 1 ? 'question' : 'questions'}'
                 : 'Not set';
 
-            final questionType = settings['questionType'] ??
-                settings['type'] ??
-                settings['category'];
+            final assignedQuestionDocs = questionsForLevel(levelKey);
+
+            String resolveQuestionType() {
+              // 1. Explicit setting on level by admin
+              final explicit = (settings['questionType'] ??
+                      settings['type'] ??
+                      settings['category'] ??
+                      '')
+                  .toString()
+                  .trim();
+              if (explicit.isNotEmpty &&
+                  explicit.toLowerCase() != 'not set' &&
+                  explicit.toLowerCase() != 'null') {
+                return formatQuestionType(explicit);
+              }
+
+              // 2. Derive question type from actual questions assigned to this level
+              final target = normalizeLevel(levelKey);
+              final assignedIds = <String>{};
+              final rawAssignments = data['levelQuestions'];
+              if (rawAssignments is Map) {
+                for (final e in rawAssignments.entries) {
+                  if (normalizeLevel(e.key) == target) {
+                    if (e.value is List) {
+                      for (final id in e.value) {
+                        assignedIds.add(id.toString());
+                      }
+                    }
+                  }
+                }
+              }
+
+              final matchedDocs = questionDocs.where((doc) {
+                if (assignedIds.contains(doc.id)) return true;
+                return assignedQuestionDocs.contains(doc);
+              }).toList();
+
+              if (matchedDocs.isNotEmpty) {
+                final types = <String>{};
+                for (final doc in matchedDocs) {
+                  final q = doc.data();
+                  final rawType = (q['questionType'] ??
+                          q['type'] ??
+                          q['question_type'] ??
+                          '')
+                      .toString()
+                      .trim();
+                  if (rawType.isNotEmpty) {
+                    types.add(formatQuestionType(rawType));
+                  } else {
+                    final options = q['options'];
+                    final ans = q['correctAnswer'] ?? q['answer'];
+                    if (options is List && options.isNotEmpty) {
+                      types.add('Multiple Choice');
+                    } else if (ans is List) {
+                      types.add('Enumeration');
+                    }
+                  }
+                }
+
+                const preferredOrder = [
+                  'Multiple Choice',
+                  'Identification',
+                  'True/False',
+                  'Enumeration',
+                  'Fill in the Blank',
+                ];
+                final ordered = preferredOrder.where(types.contains).toList();
+                for (final t in types) {
+                  if (!ordered.contains(t)) ordered.add(t);
+                }
+                if (ordered.isNotEmpty) {
+                  return ordered.join(', ');
+                }
+              }
+
+              return 'Not set';
+            }
+
             final timerSeconds = settings['timerSeconds'] ??
                 settings['timer'] ??
                 settings['timeLimit'];
@@ -3911,7 +3999,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                   _levelSettingRow(
                     Icons.account_tree_outlined,
                     'Question Type',
-                    valueOrNotSet(questionType),
+                    resolveQuestionType(),
                   ),
                   const SizedBox(height: 7),
                   _levelSettingRow(
