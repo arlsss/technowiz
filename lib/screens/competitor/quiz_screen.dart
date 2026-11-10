@@ -50,6 +50,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _handleQuizFinishedAndExit() {
     if (_hasExitedToDashboard) return;
+    _hasExitedToDashboard = true;
     timer?.cancel();
     answered = true;
     submitting = false;
@@ -106,6 +107,16 @@ class _QuizScreenState extends State<QuizScreen> {
   void _loadSessionQuestions() {
     if (_loadingSessionQuestions) return;
     _loadingSessionQuestions = true;
+    FirebaseFirestore.instance
+        .collection('quiz_sessions')
+        .doc(widget.quizCode)
+        .get()
+        .then((doc) {
+      if (doc.exists && doc.data() != null) {
+        _latestQuizData = doc.data()!;
+      }
+    }).catchError((_) {});
+
     _questionsFuture = FirebaseFirestore.instance
         .collection('quiz_sessions')
         .doc(widget.quizCode)
@@ -950,7 +961,93 @@ class _QuizScreenState extends State<QuizScreen> {
     return getLevelFromQuestionNumber(fallbackQuestionNumber);
   }
 
-  int getPointsForLevel(int level) {
+  int? _parsePoints(dynamic source) {
+    if (source == null) return null;
+    if (source is num && source > 0) return source.toInt();
+    if (source is! Map) {
+      final parsed = int.tryParse(source.toString().trim());
+      if (parsed != null && parsed > 0) return parsed;
+      return null;
+    }
+
+    const keys = [
+      'pointsPerCorrectAnswer',
+      'points_per_correct_answer',
+      'pointsPerQuestion',
+      'points_per_question',
+      'pointsPerCorrect',
+      'points',
+      'point',
+      'pointValue',
+      'point_value',
+      'pts',
+      'correctAnswerPoints',
+      'scorePerQuestion',
+      'scoreValue',
+      'questionPoints',
+    ];
+
+    for (final key in keys) {
+      final value = source[key];
+      if (value is num && value > 0) return value.toInt();
+      if (value != null) {
+        final parsed = int.tryParse(value.toString().trim());
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+    return null;
+  }
+
+  int getPointsForLevel(int level, {Map<String, dynamic>? question}) {
+    // 1. Check if the specific question has points explicitly set
+    if (question != null) {
+      final qPoints = _parsePoints(question);
+      if (qPoints != null && qPoints > 0) return qPoints;
+    }
+
+    // 2. Check quiz session levelSettings configured by Admin
+    final quizData = _latestQuizData;
+    final rawLevelSettings = quizData['levelSettings'] ?? quizData['levels'];
+    if (rawLevelSettings is Map) {
+      final target = 'level$level';
+      for (final entry in rawLevelSettings.entries) {
+        final norm = entry.key
+            .toString()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if ((norm == target || norm == '$level') && entry.value is Map) {
+          final lp =
+              _parsePoints(Map<String, dynamic>.from(entry.value as Map));
+          if (lp != null && lp > 0) return lp;
+        }
+      }
+    }
+
+    // 3. Check top-level session keys
+    for (final key in [
+      'level${level}Points',
+      'level${level}PointsPerCorrectAnswer',
+      'level${level}PointsPerQuestion',
+      'level${level}PointValue',
+      'level_${level}_points',
+    ]) {
+      final v = quizData[key];
+      final p = _parsePoints(v);
+      if (p != null && p > 0) return p;
+    }
+
+    // 4. Check questions in _sortedSessionQuestions for this level
+    for (final doc in _sortedSessionQuestions) {
+      final qData = doc.data() as Map<String, dynamic>?;
+      if (qData == null) continue;
+      final qLvl = getLevelFromSessionQuestion(qData);
+      if (qLvl == level) {
+        final p = _parsePoints(qData);
+        if (p != null && p > 0) return p;
+      }
+    }
+
+    // 5. Fallback default
     switch (level) {
       case 1:
         return 1;
@@ -959,7 +1056,7 @@ class _QuizScreenState extends State<QuizScreen> {
       case 3:
         return 3;
       default:
-        return level > 0 ? level : 0;
+        return level > 0 ? level : 1;
     }
   }
 
@@ -2238,7 +2335,8 @@ class _QuizScreenState extends State<QuizScreen> {
               questionForEval,
               fallbackQuestionNumber: questionIndex + 1,
             );
-            final earnedPoints = getPointsForLevel(sessionLevel);
+            final earnedPoints =
+                getPointsForLevel(sessionLevel, question: questionForEval);
             responseRef.update({
               'isCorrect': true,
               'answerStatus': 'correct',
@@ -2399,7 +2497,8 @@ class _QuizScreenState extends State<QuizScreen> {
                     questionForEval,
                     fallbackQuestionNumber: questionNumber,
                   );
-                  final earnedPoints = getPointsForLevel(sessionLevel);
+                  final earnedPoints =
+                      getPointsForLevel(sessionLevel, question: questionForEval);
                   responseRef.update({
                     'isCorrect': true,
                     'answerStatus': 'correct',
@@ -2471,7 +2570,8 @@ class _QuizScreenState extends State<QuizScreen> {
         question,
         fallbackQuestionNumber: questionNumber,
       );
-      final earnedPoints = correct ? getPointsForLevel(sessionLevel) : 0;
+      final earnedPoints =
+          correct ? getPointsForLevel(sessionLevel, question: question) : 0;
 
       await answerDoc.set({
         'uid': uid,
@@ -3543,7 +3643,8 @@ class _QuizScreenState extends State<QuizScreen> {
       currentQuestionData ?? {},
       fallbackQuestionNumber: questionNumber,
     );
-    final points = getPointsForLevel(contestLevel);
+    final points =
+        getPointsForLevel(contestLevel, question: currentQuestionData);
 
     final requestId = contestRequestId ?? '${uid}_question_$questionIndex';
 
@@ -4411,14 +4512,23 @@ class _QuizScreenState extends State<QuizScreen> {
         .collection('answers')
         .doc(user.uid)
         .collection('responses')
-        .where('level', isEqualTo: level)
         .get();
 
     var total = 0;
     for (final response in snapshot.docs) {
       final data = response.data();
-      final value = data['points'];
-      if (value is num) total += value.toInt();
+      final rawLvl = data['level'];
+      int? itemLevel;
+      if (rawLvl is num) {
+        itemLevel = rawLvl.toInt();
+      } else if (rawLvl != null) {
+        final match = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+        if (match != null) itemLevel = int.tryParse(match.group(1)!);
+      }
+      if (itemLevel == level) {
+        final value = data['points'];
+        if (value is num) total += value.toInt();
+      }
     }
     return total;
   }
@@ -5928,7 +6038,14 @@ class _QuizScreenState extends State<QuizScreen> {
                         )
                       : getLevelFromQuestionNumber((previousQuestion >= 0 ? previousQuestion : currentQuestion) + 1));
 
-            final resultPoints = getPointsForLevel(resultLevel);
+            final resultQuestionData = currentQuestionData ??
+                (previousQuestion >= 0 &&
+                        previousQuestion < _sortedSessionQuestions.length
+                    ? _sortedSessionQuestions[previousQuestion].data()
+                        as Map<String, dynamic>?
+                    : null);
+            final resultPoints =
+                getPointsForLevel(resultLevel, question: resultQuestionData);
 
             return resultScreen(
               points: resultPoints,
@@ -6296,7 +6413,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 'QUESTION $levelQuestionNumber',
               );
 
-              final points = getPointsForLevel(currentLevel);
+              final points =
+                  getPointsForLevel(currentLevel, question: questionData);
 
               // Cache the level-specific question position for resultScreen,
               // which is checked earlier in the build method.
@@ -6373,6 +6491,30 @@ class _QuizScreenState extends State<QuizScreen> {
                                 : currentLevel == 2
                                 ? const Color(0xFF7038C9)
                                 : const Color(0xFF9A6700),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFFDE68A),
+                          ),
+                        ),
+                        child: Text(
+                          "$points ${points == 1 ? 'PT' : 'PTS'}",
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: Color(0xFFB45309),
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                             letterSpacing: 0.3,
@@ -6912,7 +7054,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   child: Image.asset(
                                     trophyAsset,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
+                                    errorBuilder: (_, _, _) => Container(
                                       color: rankColor.withValues(alpha: 0.15),
                                       child: Icon(
                                         isTop3
