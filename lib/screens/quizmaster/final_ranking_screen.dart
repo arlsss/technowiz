@@ -23,6 +23,16 @@ class FinalRankingScreen extends StatefulWidget {
   State<FinalRankingScreen> createState() => _FinalRankingScreenState();
 }
 
+class _RankingEntry {
+  final String id;
+  final Map<String, dynamic> _data;
+
+  _RankingEntry({required this.id, required Map<String, dynamic> data})
+      : _data = data;
+
+  Map<String, dynamic> data() => _data;
+}
+
 class _FinalRankingScreenState extends State<FinalRankingScreen> {
   String get quizCode => widget.quizCode;
   int get level => widget.level;
@@ -32,6 +42,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
   late final DocumentReference<Map<String, dynamic>> _sessionRef;
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> _sessionStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _scoresStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _requestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _participantsStream;
 
   final Map<String, int> _userResponseTimes = {};
   final Map<String, int> _lockedRankOrder = {};
@@ -43,7 +55,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
   int? _lastSyncedLevel;
 
   void _fetchResponseTimesIfNeeded(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    List<_RankingEntry> docs,
   ) {
     final missingUids = docs
         .map((d) => d.id)
@@ -123,6 +135,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
         .doc(widget.quizCode);
     _sessionStream = _sessionRef.snapshots();
     _scoresStream = _sessionRef.collection('scores').snapshots();
+    _requestsStream = _sessionRef.collection('join_requests').snapshots();
+    _participantsStream = _sessionRef.collection('participants').snapshots();
   }
 
   @override
@@ -235,7 +249,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
   // Tagsa-tagsa ka rank (1, 2, 3...) base sa fixed sorted order.
   // Walay mag-share og parehas nga rank ug dili mag-ilis-ilis og ranking.
   List<int> _computeRanks(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> rankingsDocs,
+    List<_RankingEntry> rankingsDocs,
   ) {
     final ranks = <int>[];
     for (int i = 0; i < rankingsDocs.length; i++) {
@@ -247,7 +261,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
   // Awtomatikong i-sync ang accurate ranking sa Firestore aron parehas
   // gyud ang rank nga makita sa quizmaster ug sa contestant side.
   void _syncRankingsToFirestore(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> rankings,
+    List<_RankingEntry> rankings,
     List<int> ranks,
   ) {
     if (rankings.isEmpty || ranks.isEmpty) return;
@@ -759,42 +773,158 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
           body: QuizMasterCircuitBackground(
             child: SafeArea(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _scoresStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: primaryBlue),
-                  );
-                }
+                stream: _scoresStream,
+                builder: (context, scoreSnapshot) {
+                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _requestsStream,
+                    builder: (context, requestSnapshot) {
+                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: _participantsStream,
+                        builder: (context, participantsSnapshot) {
+                          if ((scoreSnapshot.connectionState ==
+                                      ConnectionState.waiting &&
+                                  !scoreSnapshot.hasData) ||
+                              (requestSnapshot.connectionState ==
+                                      ConnectionState.waiting &&
+                                  !requestSnapshot.hasData)) {
+                            return const Center(
+                              child: CircularProgressIndicator(color: primaryBlue),
+                            );
+                          }
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(25),
-                      child: Text(
-                        'Unable to Load Ranking\n\n${snapshot.error}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: darkBlue),
-                      ),
-                    ),
-                  );
-                }
+                          if (scoreSnapshot.hasError || requestSnapshot.hasError) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(25),
+                                child: Text(
+                                  'Unable to Load Ranking\n\n${scoreSnapshot.error ?? requestSnapshot.error}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: darkBlue),
+                                ),
+                              ),
+                            );
+                          }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return _emptyRanking(context, isFinalView: effectiveIsFinal);
-                }
+                          final scoreDocs = scoreSnapshot.data?.docs ?? [];
+                          final requestDocs = requestSnapshot.data?.docs ?? [];
+                          final participantDocs =
+                              participantsSnapshot.data?.docs ?? [];
 
-                // Dili i-apil sa sunod nga level ang mga contestant nga na-eliminate sa miaging mga level
-                final activeDocs = snapshot.data!.docs.where((doc) {
-                  if (effectiveIsFinal) return true;
-                  return !_wasEliminatedInPreviousLevel(doc.data());
-                }).toList();
+                          final Map<String, Map<String, dynamic>> mergedMap = {};
 
-                if (activeDocs.isEmpty) {
-                  return _emptyRanking(context, isFinalView: effectiveIsFinal);
-                }
+                          // 1. Process join_requests (all approved/joined contestants)
+                          for (final doc in requestDocs) {
+                            final data = doc.data();
+                            final status =
+                                (data['status'] ?? '').toString().trim().toLowerCase();
+                            if (status == 'left' ||
+                                status == 'rejected' ||
+                                status == 'declined' ||
+                                data['leftQuiz'] == true) {
+                              continue;
+                            }
+                            final id = (data['uid'] ?? doc.id).toString().trim();
+                            if (id.isEmpty) continue;
+                            mergedMap[id] = Map<String, dynamic>.from(data);
+                            mergedMap[id]!['uid'] = id;
+                          }
 
-                _fetchResponseTimesIfNeeded(activeDocs);
+                          // 2. Process participants (supplemental)
+                          for (final doc in participantDocs) {
+                            final data = doc.data();
+                            final status =
+                                (data['status'] ?? '').toString().trim().toLowerCase();
+                            if (status == 'left' ||
+                                status == 'rejected' ||
+                                status == 'declined' ||
+                                data['leftQuiz'] == true) {
+                              continue;
+                            }
+                            final id = (data['uid'] ?? doc.id).toString().trim();
+                            if (id.isEmpty) continue;
+                            if (!mergedMap.containsKey(id)) {
+                              mergedMap[id] = Map<String, dynamic>.from(data);
+                              mergedMap[id]!['uid'] = id;
+                            } else {
+                              final current = mergedMap[id]!;
+                              if ((current['teamName'] == null ||
+                                      current['teamName']
+                                          .toString()
+                                          .trim()
+                                          .isEmpty) &&
+                                  data['teamName'] != null) {
+                                current['teamName'] = data['teamName'];
+                              }
+                              if (current['teamMembers'] == null &&
+                                  data['teamMembers'] != null) {
+                                current['teamMembers'] = data['teamMembers'];
+                              }
+                            }
+                          }
+
+                          // 3. Process scores (overlay scores and points)
+                          for (final doc in scoreDocs) {
+                            final data = doc.data();
+                            final id = (data['uid'] ?? doc.id).toString().trim();
+                            if (id.isEmpty) continue;
+                            if (mergedMap.containsKey(id)) {
+                              final existing = mergedMap[id]!;
+                              final oldName =
+                                  existing['name'] ?? existing['displayName'];
+                              final oldTeamName = existing['teamName'];
+                              final oldMembers = existing['teamMembers'] ??
+                                  existing['members'];
+                              existing.addAll(data);
+                              if ((existing['name'] == null ||
+                                      existing['name'].toString().trim().isEmpty) &&
+                                  oldName != null) {
+                                existing['name'] = oldName;
+                              }
+                              if ((existing['teamName'] == null ||
+                                      existing['teamName']
+                                          .toString()
+                                          .trim()
+                                          .isEmpty) &&
+                                  oldTeamName != null) {
+                                existing['teamName'] = oldTeamName;
+                              }
+                              if (existing['teamMembers'] == null &&
+                                  oldMembers != null) {
+                                existing['teamMembers'] = oldMembers;
+                              }
+                            } else {
+                              mergedMap[id] = Map<String, dynamic>.from(data);
+                              mergedMap[id]!['uid'] = id;
+                            }
+                          }
+
+                          final allContestants = mergedMap.entries
+                              .map(
+                                (e) => _RankingEntry(id: e.key, data: e.value),
+                              )
+                              .toList();
+
+                          if (allContestants.isEmpty) {
+                            return _emptyRanking(
+                              context,
+                              isFinalView: effectiveIsFinal,
+                            );
+                          }
+
+                          // Dili i-apil sa sunod nga level ang mga contestant nga na-eliminate sa miaging mga level
+                          final activeDocs = allContestants.where((doc) {
+                            if (effectiveIsFinal) return true;
+                            return !_wasEliminatedInPreviousLevel(doc.data());
+                          }).toList();
+
+                          if (activeDocs.isEmpty) {
+                            return _emptyRanking(
+                              context,
+                              isFinalView: effectiveIsFinal,
+                            );
+                          }
+
+                          _fetchResponseTimesIfNeeded(activeDocs);
 
                 // Sort sa client:
                 // 1. Elimination state (kon final round)
@@ -962,8 +1092,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                     context: context,
                                     rank: ranks[index],
                                     playerId: player.id,
-                                    playerName:
-                                        data['name']?.toString() ?? player.id,
+                                    playerName: (data['displayName'] ??
+                                            data['name'] ??
+                                            player.id)
+                                        .toString()
+                                        .trim(),
                                     team:
                                         data['teamName']?.toString().trim() ??
                                         '',
@@ -1056,18 +1189,22 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                       ),
                     ),
                   ],
-                );
-              },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
-    },
-  );
-}
+    }
 
   Widget _buildTopWinnersShowcase({
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> rankings,
+    required List<_RankingEntry> rankings,
     required List<int> ranks,
   }) {
     final topEntries = <({int rank, String name, String team, int score})>[];
