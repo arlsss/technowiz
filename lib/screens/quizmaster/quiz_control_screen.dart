@@ -2318,12 +2318,17 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         }
 
         if (requestsSnap.docs.isNotEmpty || scoresSnap.docs.isNotEmpty) {
+          final Map<String, int> scoresByUid = {
+            for (final p in participantScores)
+              p['uid'] as String: p['score'] as int,
+          };
+
           final batch = FirebaseFirestore.instance.batch();
           for (final req in requestsSnap.docs) {
             final int assignedRank =
                 ranksByUid[req.id] ?? (ranksByUid.length + 1);
-            final int score =
-                int.tryParse(req.data()['score']?.toString() ?? '') ?? 0;
+            final int score = scoresByUid[req.id] ??
+                (int.tryParse(req.data()['score']?.toString() ?? '') ?? 0);
             batch.set(req.reference, {
               'quizFinished': true,
               'quizEnded': true,
@@ -2332,17 +2337,21 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               'levelRank': assignedRank,
               'currentRank': assignedRank,
               'finalScore': score,
+              'score': score,
               'rankUpdatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
           }
           for (final doc in scoresSnap.docs) {
             final int assignedRank =
                 ranksByUid[doc.id] ?? (ranksByUid.length + 1);
+            final int score = scoresByUid[doc.id] ??
+                (int.tryParse(doc.data()['score']?.toString() ?? '') ?? 0);
             batch.set(doc.reference, {
               'finalRank': assignedRank,
               'rank': assignedRank,
               'levelRank': assignedRank,
               'currentRank': assignedRank,
+              'finalScore': score,
             }, SetOptions(merge: true));
           }
           await batch.commit();

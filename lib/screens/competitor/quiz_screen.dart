@@ -6692,67 +6692,119 @@ class _QuizScreenState extends State<QuizScreen> {
             builder: (context, scoresSnap) {
               final scoreDocs = scoresSnap.data?.docs ?? [];
 
-              // Calculate rank dynamically if not yet synced in join request
-              int computedRank = 1;
-              if (scoreDocs.isNotEmpty) {
-                final sorted = [...scoreDocs]
-                  ..sort((a, b) {
-                    final int sA =
-                        int.tryParse(a.data()['score']?.toString() ?? '') ?? 0;
-                    final int sB =
-                        int.tryParse(b.data()['score']?.toString() ?? '') ?? 0;
-                    if (sB != sA) return sB.compareTo(sA);
-                    final rawA = a.data()['updatedAt'];
-                    final rawB = b.data()['updatedAt'];
-                    final int tA =
-                        rawA is Timestamp ? rawA.millisecondsSinceEpoch : 0;
-                    final int tB =
-                        rawB is Timestamp ? rawB.millisecondsSinceEpoch : 0;
-                    if (tA > 0 && tB > 0 && tA != tB) return tA.compareTo(tB);
-                    return a.id.compareTo(b.id);
-                  });
-                final myIdx = sorted.indexWhere((d) => d.id == uid);
-                if (myIdx >= 0) computedRank = myIdx + 1;
-              }
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('quiz_sessions')
+                    .doc(widget.quizCode)
+                    .collection('answers')
+                    .doc(uid)
+                    .collection('responses')
+                    .snapshots(),
+                builder: (context, responsesSnap) {
+                  final responseDocs = responsesSnap.data?.docs ?? [];
+                  final Map<int, int> levelScores = {};
+                  int responsesTotal = 0;
+                  for (final r in responseDocs) {
+                    final rData = r.data();
+                    final lvl = (rData['level'] as num?)?.toInt() ?? 1;
+                    final pts = (rData['points'] as num?)?.toInt() ?? 0;
+                    levelScores[lvl] = (levelScores[lvl] ?? 0) + pts;
+                    responsesTotal += pts;
+                  }
 
-              final rawRank = jData['finalRank'] ?? jData['rank'];
-              final int finalRank = (rawRank is num && rawRank > 0)
-                  ? rawRank.toInt()
-                  : computedRank;
+                  // Calculate rank dynamically if not yet synced in join request
+                  int computedRank = 1;
+                  if (scoreDocs.isNotEmpty) {
+                    final sorted = [...scoreDocs]
+                      ..sort((a, b) {
+                        final int sA =
+                            int.tryParse(a.data()['score']?.toString() ?? '') ??
+                                0;
+                        final int sB =
+                            int.tryParse(b.data()['score']?.toString() ?? '') ??
+                                0;
+                        if (sB != sA) return sB.compareTo(sA);
+                        final rawA = a.data()['updatedAt'];
+                        final rawB = b.data()['updatedAt'];
+                        final int tA =
+                            rawA is Timestamp ? rawA.millisecondsSinceEpoch : 0;
+                        final int tB =
+                            rawB is Timestamp ? rawB.millisecondsSinceEpoch : 0;
+                        if (tA > 0 && tB > 0 && tA != tB) {
+                          return tA.compareTo(tB);
+                        }
+                        return a.id.compareTo(b.id);
+                      });
+                    final myIdx = sorted.indexWhere((d) => d.id == uid);
+                    if (myIdx >= 0) computedRank = myIdx + 1;
+                  }
 
-              final rawTeam = (jData['teamName'] ?? '').toString().trim();
-              final rawMembers = jData['teamMembers'] ?? jData['members'];
-              final List<String> members = [];
-              if (rawMembers is List) {
-                for (final m in rawMembers) {
-                  final s = m is Map
-                      ? (m['name'] ?? m['displayName'] ?? '').toString().trim()
-                      : m.toString().trim();
-                  if (s.isNotEmpty) members.add(s);
-                }
-              }
-              final bool isTeam = jData['isTeam'] == true ||
-                  jData['contestantType'] == 'team' ||
-                  rawTeam.isNotEmpty ||
-                  members.isNotEmpty;
-              final String displayName = isTeam
-                  ? (rawTeam.isNotEmpty ? rawTeam : (jData['name'] ?? 'Team'))
-                  : (jData['realName'] ??
-                      jData['fullName'] ??
-                      jData['name'] ??
-                      'Contestant');
+                  final rawRank = jData['finalRank'] ?? jData['rank'];
+                  final int finalRank = (rawRank is num && rawRank > 0)
+                      ? rawRank.toInt()
+                      : computedRank;
 
-              final int finalScore = int.tryParse(
-                      (jData['finalScore'] ?? jData['score'] ?? '')
-                          .toString()) ??
-                  (scoreDocs.where((d) => d.id == uid).isNotEmpty
-                      ? (int.tryParse(scoreDocs
-                                  .firstWhere((d) => d.id == uid)
-                                  .data()['score']
-                                  ?.toString() ??
-                              '') ??
-                          0)
-                      : 0);
+                  final rawTeam = (jData['teamName'] ?? '').toString().trim();
+                  final rawMembers = jData['teamMembers'] ?? jData['members'];
+                  final List<String> members = [];
+                  if (rawMembers is List) {
+                    for (final m in rawMembers) {
+                      final s = m is Map
+                          ? (m['name'] ?? m['displayName'] ?? '')
+                              .toString()
+                              .trim()
+                          : m.toString().trim();
+                      if (s.isNotEmpty) members.add(s);
+                    }
+                  }
+                  final bool isTeam = jData['isTeam'] == true ||
+                      jData['contestantType'] == 'team' ||
+                      rawTeam.isNotEmpty ||
+                      members.isNotEmpty;
+                  final String displayName = isTeam
+                      ? (rawTeam.isNotEmpty
+                          ? rawTeam
+                          : (jData['name'] ?? 'Team'))
+                      : (jData['realName'] ??
+                          jData['fullName'] ??
+                          jData['name'] ??
+                          'Contestant');
+
+                  // Compute accurate overall score across all levels
+                  int finalScore = 0;
+                  for (final d in scoreDocs) {
+                    if (d.id == uid || d.data()['uid'] == uid) {
+                      final s =
+                          int.tryParse(d.data()['score']?.toString() ?? '') ??
+                              0;
+                      if (s > finalScore) finalScore = s;
+                    }
+                  }
+                  if (rawTeam.isNotEmpty) {
+                    for (final d in scoreDocs) {
+                      final tName =
+                          (d.data()['teamName'] ?? '').toString().trim();
+                      if (tName.isNotEmpty &&
+                          tName.toLowerCase() == rawTeam.toLowerCase()) {
+                        final s =
+                            int.tryParse(d.data()['score']?.toString() ?? '') ??
+                                0;
+                        if (s > finalScore) finalScore = s;
+                      }
+                    }
+                  }
+                  if (responsesTotal > finalScore) {
+                    finalScore = responsesTotal;
+                  }
+                  final jFinal =
+                      int.tryParse((jData['finalScore'] ?? '').toString()) ?? 0;
+                  final jScore =
+                      int.tryParse((jData['score'] ?? '').toString()) ?? 0;
+                  if (jFinal > finalScore) finalScore = jFinal;
+                  if (jScore > finalScore) finalScore = jScore;
+                  if (currentScore > finalScore) {
+                    finalScore = currentScore;
+                  }
 
               final isTop3 = finalRank >= 1 && finalRank <= 3;
 
@@ -6957,7 +7009,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                         ? Icons.groups_rounded
                                         : Icons.person_rounded,
                                     size: 20,
-                                    color: const Color(0xFF2563EB),
+                                    color: primaryGreen,
                                   ),
                                   const SizedBox(width: 8),
                                   Flexible(
@@ -6989,11 +7041,11 @@ class _QuizScreenState extends State<QuizScreen> {
 
                               const SizedBox(height: 16),
 
-                              // Score Box
+                              // Score Box: OVERALL SCORE across all levels
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(
-                                    vertical: 12, horizontal: 16),
+                                    vertical: 14, horizontal: 16),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(16),
@@ -7003,7 +7055,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 child: Column(
                                   children: [
                                     const Text(
-                                      "FINAL SCORE",
+                                      "OVERALL SCORE",
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
@@ -7015,18 +7067,59 @@ class _QuizScreenState extends State<QuizScreen> {
                                     Text(
                                       "$finalScore PTS",
                                       style: const TextStyle(
-                                        fontSize: 26,
+                                        fontSize: 28,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFF16A34A),
+                                        color: primaryGreen,
                                       ),
                                     ),
+                                    if (levelScores.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      const Divider(
+                                        height: 1,
+                                        color: Color(0xFFE2E8F0),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Wrap(
+                                        alignment: WrapAlignment.center,
+                                        spacing: 8,
+                                        runSpacing: 6,
+                                        children: (levelScores.keys.toList()
+                                              ..sort())
+                                            .map((lvl) {
+                                          return Container(
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE8F5E9),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color:
+                                                    const Color(0xFFA5D6A7),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              "Level $lvl: ${levelScores[lvl]} pts",
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF1B5E20),
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
 
                               const SizedBox(height: 22),
 
-                              // Action: Return to Dashboard button
+                              // Action: Return to Dashboard button (Green for Competitor)
                               SizedBox(
                                 width: double.infinity,
                                 height: 50,
@@ -7053,13 +7146,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2563EB),
+                                    backgroundColor: primaryGreen,
+                                    foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(25),
                                     ),
                                     elevation: 4,
-                                    shadowColor: const Color(0xFF2563EB)
-                                        .withValues(alpha: 0.4),
+                                    shadowColor:
+                                        primaryGreen.withValues(alpha: 0.4),
                                   ),
                                 ),
                               ),
@@ -7070,6 +7164,8 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
                 ),
+              );
+                },
               );
             },
           );
