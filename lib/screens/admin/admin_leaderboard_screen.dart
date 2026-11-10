@@ -1239,6 +1239,16 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       configuredLevels.insert(0, 'Level 1');
     }
 
+    // Siguradoha nga numerically ascending ang levels: Level 1, Level 2, Level 3...
+    configuredLevels.sort((a, b) {
+      final matchA = RegExp(r'\d+').firstMatch(a);
+      final matchB = RegExp(r'\d+').firstMatch(b);
+      final numA = matchA != null ? int.tryParse(matchA.group(0)!) ?? 0 : 0;
+      final numB = matchB != null ? int.tryParse(matchB.group(0)!) ?? 0 : 0;
+      if (numA != numB) return numA.compareTo(numB);
+      return a.compareTo(b);
+    });
+
     final levels = <String>[...configuredLevels, 'Overall'];
     if (!levels.contains(selectedLevel)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
