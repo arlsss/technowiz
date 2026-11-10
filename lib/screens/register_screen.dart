@@ -546,6 +546,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (e.code == 'operation-not-allowed') {
         message =
             "Google Sign-In is not enabled yet in Firebase Console. Please enable Google provider under Authentication > Sign-in method.";
+      } else if (e.code == 'unauthorized-domain' ||
+          message.toLowerCase().contains('domain is not authorized') ||
+          message.toLowerCase().contains('authorized domain')) {
+        final currentHost =
+            kIsWeb && Uri.base.host.isNotEmpty ? Uri.base.host : 'vercel.app';
+        message =
+            "Domain not authorized ($currentHost)! Palihug i-add ang '$currentHost' ug 'vercel.app' sa Firebase Console > Authentication > Settings > Authorized domains.";
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.redAccent),

@@ -607,8 +607,75 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (e.code == 'unauthorized-domain' ||
           message.toLowerCase().contains('domain is not authorized') ||
           message.toLowerCase().contains('authorized domain')) {
+        final currentHost =
+            kIsWeb && Uri.base.host.isNotEmpty ? Uri.base.host : 'vercel.app';
         message =
-            "Domain not authorized! Palihug i-add ang 'vercel.app' ug imong Vercel link sa Firebase Console > Authentication > Settings > Authorized domains.";
+            "Domain not authorized ($currentHost)! Palihug i-add ang '$currentHost' ug 'vercel.app' sa Firebase Console > Authentication > Settings > Authorized domains.";
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.security_rounded, color: Colors.orange, size: 28),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Domain Authorization",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Aron makasulod gamit ang Google Sign-In sa Vercel/Web, kinahanglan i-authorize ang domain sa Firebase Console:",
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: SelectableText(
+                      currentHost,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    "Mga Lakang:\n1. Ablihi ang Firebase Console (technowiz-73132)\n2. Adto sa Authentication > Settings > Authorized domains\n3. I-click ang 'Add domain'\n4. I-paste ang domain sa ibabaw ug i-add pud ang 'vercel.app'",
+                    style: TextStyle(
+                        fontSize: 12.5, height: 1.5, color: Color(0xFF334155)),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text("OK",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
       } else if (e.code == 'popup-blocked') {
         message =
             "Na-block ang Google login popup. Palihug i-allow/tugoti ang popups sa imong browser settings aron makapadayon.";
