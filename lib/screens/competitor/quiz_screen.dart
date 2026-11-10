@@ -2985,16 +2985,6 @@ class _QuizScreenState extends State<QuizScreen> {
                         letterSpacing: 0.4,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Please get ready for Level $activeLevel, Question $nextQuestionNumber.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                     const SizedBox(height: 28),
                     Container(
                       width: double.infinity,
