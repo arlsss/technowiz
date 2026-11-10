@@ -7950,7 +7950,7 @@ class PartialRankingScreen extends StatelessWidget {
                                                   ),
                                                   child: Text(
                                                     rank == 1
-                                                        ? '🏆 RANK 1 • LEADER'
+                                                        ? '🏆 RANK 1 • 1ST'
                                                         : (rank == 2
                                                             ? '🥈 RANK 2 • 2ND'
                                                             : (rank == 3
