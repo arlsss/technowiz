@@ -1461,14 +1461,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ],
                 const Spacer(),
-                if (isMobile)
-                  IconButton(
-                    tooltip: "Menu",
+                Builder(
+                  builder: (scaffoldContext) => IconButton(
+                    tooltip: "Open navigation menu",
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.menu_rounded,
+                      color: textDark,
+                      size: 24,
+                    ),
                     onPressed: () {
-                      Scaffold.of(context).openEndDrawer();
+                      Scaffold.of(scaffoldContext).openEndDrawer();
                     },
-                    icon: const Icon(Icons.menu_rounded, color: textDark),
                   ),
+                ),
               ],
             ),
           ),
@@ -2506,94 +2512,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Scaffold(
       backgroundColor: backgroundColor,
 
-      drawer: sidebar,
       endDrawer: sidebar,
+      endDrawerEnableOpenDragGesture: true,
 
       body: AdminCircuitBackground(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final double width = constraints.maxWidth;
-
             final bool isMobile = width < 900;
 
-            if (isMobile) {
-              return Column(
-                children: [
-                  Builder(
-                    builder: (context) {
-                      return topBar(context, true);
-                    },
-                  ),
-
-                  Expanded(child: dashboardContent(context, width)),
-                ],
-              );
-            }
-
-            return Row(
+            return Column(
               children: [
-                SizedBox(
-                  width: 245,
-                  child: AdminSidebar(
-                    currentPage: 'dashboard',
-                    onProfileTap: () => showProfileMenu(context),
-                    onDestinationSelected: (destination) {
-                      switch (destination) {
-                        case 'manage_users':
-                          openPage(
-                            context,
-                            const ManageUsersScreen(),
-                            'manage_users',
-                          );
-                          break;
-                        case 'add_question':
-                          openPage(
-                            context,
-                            const AddQuestionScreen(),
-                            'add_question',
-                          );
-                          break;
-                        case 'question_list':
-                          openPage(
-                            context,
-                            const QuestionListScreen(),
-                            'question_list',
-                          );
-                          break;
-                        case 'quiz_sessions':
-                          openPage(
-                            context,
-                            const ManageQuizSessionsScreen(),
-                            'quiz_sessions',
-                          );
-                          break;
-                        case 'leaderboard':
-                          openPage(
-                            context,
-                            const AdminLeaderboardScreen(),
-                            'leaderboard',
-                          );
-                          break;
-                        case 'reports':
-                          openPage(context, const AdminReportScreen(), 'reports');
-                          break;
-                        case 'dashboard':
-                          _saveLastAdminPage('dashboard');
-                          break;
-                      }
-                    },
-                  ),
-                ),
-
-                Expanded(
-                  child: Column(
-                    children: [
-                      topBar(context, false),
-
-                      Expanded(child: dashboardContent(context, width)),
-                    ],
-                  ),
-                ),
+                topBar(context, isMobile),
+                Expanded(child: dashboardContent(context, width)),
               ],
             );
           },
