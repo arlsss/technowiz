@@ -670,6 +670,11 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                               .toLowerCase() ==
                           'published';
 
+                  // Only show quizzes that have actually been published by the Admin!
+                  if (!isPublished) {
+                    return false;
+                  }
+
                   // Keep only sessions that are genuinely unfinished.
                   // Finished sessions must appear in Quiz History instead.
                   final status =
@@ -713,27 +718,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                     return false;
                   }
 
-                  // If published by Admin, display it ready for launch / in progress
-                  if (isPublished) return true;
-
-                  return {
-                    'active',
-                    'live',
-                    'started',
-                    'ongoing',
-                    'waiting',
-                    'countdown',
-                    'level_pause',
-                    'paused',
-                    'in_progress',
-                    'inprogress',
-                    'scheduled',
-                    'ready',
-                    'standby',
-                    'open',
-                    'pending',
-                    'published',
-                  }.contains(status);
+                  return true;
                 }).toList();
 
                 // Sort in memory by updatedAt or createdAt descending so newest is first
@@ -903,24 +888,6 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
       final sessions = await FirebaseFirestore.instance
           .collection('quiz_sessions')
           .get();
-      const activeStatuses = <String>{
-        'active',
-        'live',
-        'started',
-        'ongoing',
-        'waiting',
-        'countdown',
-        'level_pause',
-        'paused',
-        'in_progress',
-        'inprogress',
-        'published',
-        'scheduled',
-        'ready',
-        'standby',
-        'open',
-        'pending',
-      };
       final sortedDocs = sessions.docs.toList()
         ..sort((a, b) {
           final aDate = _dateValue(
@@ -954,14 +921,13 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
             data['finished'] == true ||
             status == 'finished' ||
             status == 'completed';
-        if (!isFinished && (isPub || activeStatuses.contains(status))) {
+        if (isPub && !isFinished) {
           active = doc;
           break;
         }
       }
       if (!mounted) return;
-      final chosen =
-          active ?? (sortedDocs.isNotEmpty ? sortedDocs.first : null);
+      final chosen = active;
       final quizCode = chosen != null
           ? (chosen.data()['quizCode'] ?? chosen.id).toString().trim()
           : '';
@@ -1742,21 +1708,16 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                       data['published'] == true ||
                       data['isPublished'] == true ||
                       data['is_published'] == true ||
+                      data['published'] == 1 ||
+                      data['isPublished'] == 1 ||
+                      data['published']?.toString().trim().toLowerCase() ==
+                          'true' ||
+                      data['isPublished']?.toString().trim().toLowerCase() ==
+                          'true' ||
                       status == 'published';
 
-                  return isPub ||
-                      status == 'active' ||
-                      status == 'live' ||
-                      status == 'started' ||
-                      status == 'ongoing' ||
-                      status == 'waiting' ||
-                      status == 'countdown' ||
-                      status == 'level_pause' ||
-                      status == 'paused' ||
-                      status == 'in_progress' ||
-                      status == 'inprogress' ||
-                      status == 'scheduled' ||
-                      status == 'ready';
+                  if (!isPub) return false;
+                  return true;
                 }).toList() ??
                 [];
 
@@ -1945,25 +1906,6 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                   final prefs = await SharedPreferences.getInstance();
                   String? quizCode = prefs.getString(_quizCodeKey);
 
-                  const activeStatuses = {
-                    'waiting',
-                    'countdown',
-                    'active',
-                    'live',
-                    'started',
-                    'ongoing',
-                    'paused',
-                    'level_pause',
-                    'in_progress',
-                    'inprogress',
-                    'published',
-                    'scheduled',
-                    'ready',
-                    'standby',
-                    'open',
-                    'pending',
-                  };
-
                   if (quizCode != null && quizCode.trim().isNotEmpty) {
                     final savedQuiz = await FirebaseFirestore.instance
                         .collection('quiz_sessions')
@@ -1988,8 +1930,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                           savedStatus == 'finished' ||
                           savedStatus == 'completed';
 
-                      if (isFinished ||
-                          (!isPub && !activeStatuses.contains(savedStatus))) {
+                      if (isFinished || !isPub) {
                         quizCode = null;
                       }
                     } else {
@@ -2016,23 +1957,32 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                     QueryDocumentSnapshot<Map<String, dynamic>>? chosen;
                     for (final doc in sortedDocs) {
                       final data = doc.data();
-                      final status = (data['status'] ?? '')
-                          .toString()
-                          .trim()
-                          .toLowerCase()
-                          .replaceAll('-', '_')
-                          .replaceAll(' ', '_');
                       final isPub =
                           data['published'] == true ||
                           data['isPublished'] == true ||
-                          status == 'published';
+                          data['is_published'] == true ||
+                          data['published'] == 1 ||
+                          data['isPublished'] == 1 ||
+                          data['published']
+                                  ?.toString()
+                                  .trim()
+                                  .toLowerCase() ==
+                              'true' ||
+                          data['isPublished']
+                                  ?.toString()
+                                  .trim()
+                                  .toLowerCase() ==
+                              'true' ||
+                          (data['status'] ?? '').toString().toLowerCase() ==
+                              'published';
                       final isFinished =
                           data['isFinished'] == true ||
                           data['isCompleted'] == true ||
-                          status == 'finished' ||
-                          status == 'completed';
-                      if (!isFinished &&
-                          (isPub || activeStatuses.contains(status))) {
+                          data['completed'] == true ||
+                          data['finished'] == true ||
+                          data['status'] == 'finished' ||
+                          data['status'] == 'completed';
+                      if (isPub && !isFinished) {
                         chosen = doc;
                         break;
                       }
@@ -2040,11 +1990,6 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
 
                     if (chosen != null) {
                       quizCode = (chosen.data()['quizCode'] ?? chosen.id)
-                          .toString()
-                          .trim();
-                    } else if (sortedDocs.isNotEmpty) {
-                      final firstDoc = sortedDocs.first;
-                      quizCode = (firstDoc.data()['quizCode'] ?? firstDoc.id)
                           .toString()
                           .trim();
                     } else {
@@ -2088,24 +2033,6 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                   final sessions = await FirebaseFirestore.instance
                       .collection('quiz_sessions')
                       .get();
-                  const activeStatuses = {
-                    'waiting',
-                    'countdown',
-                    'active',
-                    'live',
-                    'started',
-                    'ongoing',
-                    'paused',
-                    'level_pause',
-                    'in_progress',
-                    'inprogress',
-                    'published',
-                    'scheduled',
-                    'ready',
-                    'standby',
-                    'open',
-                    'pending',
-                  };
                   final sortedDocs = sessions.docs.toList()
                     ..sort((a, b) {
                       final aDate = _dateValue(
@@ -2118,23 +2045,32 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                     });
                   final active = sortedDocs.where((doc) {
                     final data = doc.data();
-                    final status = (data['status'] ?? '')
-                        .toString()
-                        .trim()
-                        .toLowerCase()
-                        .replaceAll('-', '_')
-                        .replaceAll(' ', '_');
                     final isPub =
                         data['published'] == true ||
                         data['isPublished'] == true ||
-                        status == 'published';
+                        data['is_published'] == true ||
+                        data['published'] == 1 ||
+                        data['isPublished'] == 1 ||
+                        data['published']
+                                ?.toString()
+                                .trim()
+                                .toLowerCase() ==
+                            'true' ||
+                        data['isPublished']
+                                ?.toString()
+                                .trim()
+                                .toLowerCase() ==
+                            'true' ||
+                        (data['status'] ?? '').toString().toLowerCase() ==
+                            'published';
                     final isFinished =
                         data['isFinished'] == true ||
                         data['isCompleted'] == true ||
-                        status == 'finished' ||
-                        status == 'completed';
-                    return !isFinished &&
-                        (isPub || activeStatuses.contains(status));
+                        data['completed'] == true ||
+                        data['finished'] == true ||
+                        data['status'] == 'finished' ||
+                        data['status'] == 'completed';
+                    return isPub && !isFinished;
                   }).toList();
 
                   if (!context.mounted) return;
@@ -2142,12 +2078,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                       ? (active.first.data()['quizCode'] ?? active.first.id)
                             .toString()
                             .trim()
-                      : (sortedDocs.isNotEmpty
-                            ? (sortedDocs.first.data()['quizCode'] ??
-                                      sortedDocs.first.id)
-                                  .toString()
-                                  .trim()
-                            : '');
+                      : '';
 
                   await _saveChildPage('contestant', quizCode);
                   if (!context.mounted) return;

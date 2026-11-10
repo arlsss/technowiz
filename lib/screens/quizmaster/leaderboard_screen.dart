@@ -117,7 +117,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           'inprogress',
         };
         for (final doc in snapshot.docs) {
-          final status = (doc.data()['status'] ?? '')
+          final data = doc.data();
+          final isPub = data['published'] == true ||
+              data['isPublished'] == true ||
+              data['is_published'] == true ||
+              data['published'] == 1 ||
+              data['isPublished'] == 1 ||
+              data['published']?.toString().toLowerCase() == 'true' ||
+              data['isPublished']?.toString().toLowerCase() == 'true' ||
+              (data['status'] ?? '').toString().toLowerCase() == 'published';
+          if (!isPub) continue;
+
+          final status = (data['status'] ?? '')
               .toString()
               .trim()
               .toLowerCase()
@@ -273,7 +284,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   };
 
                   final activeSessions = allSessions.where((doc) {
-                    final status = (doc.data()['status'] ?? '')
+                    final data = doc.data();
+                    final isPub = data['published'] == true ||
+                        data['isPublished'] == true ||
+                        data['is_published'] == true ||
+                        data['published'] == 1 ||
+                        data['isPublished'] == 1 ||
+                        data['published']?.toString().toLowerCase() == 'true' ||
+                        data['isPublished']?.toString().toLowerCase() == 'true' ||
+                        (data['status'] ?? '').toString().toLowerCase() == 'published';
+                    if (!isPub) return false;
+
+                    final status = (data['status'] ?? '')
                         .toString()
                         .trim()
                         .toLowerCase()

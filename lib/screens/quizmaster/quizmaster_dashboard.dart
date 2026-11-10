@@ -695,10 +695,15 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         final isPub = data['published'] == true ||
             data['isPublished'] == true ||
             data['is_published'] == true ||
+            data['published'] == 1 ||
+            data['isPublished'] == 1 ||
+            data['published']?.toString().toLowerCase() == 'true' ||
+            data['isPublished']?.toString().toLowerCase() == 'true' ||
             status == 'published';
 
-        if (isPub ||
-            status == 'active' ||
+        if (!isPub) continue;
+
+        if (status == 'active' ||
             status == 'live' ||
             status == 'started' ||
             status == 'ongoing' ||
@@ -822,9 +827,14 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         final isPub = data['published'] == true ||
             data['isPublished'] == true ||
             data['is_published'] == true ||
+            data['published'] == 1 ||
+            data['isPublished'] == 1 ||
+            data['published']?.toString().toLowerCase() == 'true' ||
+            data['isPublished']?.toString().toLowerCase() == 'true' ||
             status == 'published';
 
-        if (!isPub && !activeStatuses.contains(status)) continue;
+        if (!isPub) continue;
+        if (!activeStatuses.contains(status)) continue;
 
         final code = doc.id.trim();
         if (code.isNotEmpty) {
@@ -1022,13 +1032,28 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           for (final doc in docs) {
             final data = doc.data() as Map<String, dynamic>;
 
+            final isPublished = data['published'] == true ||
+                data['isPublished'] == true ||
+                data['is_published'] == true ||
+                data['published'] == 1 ||
+                data['isPublished'] == 1 ||
+                data['published']?.toString().trim().toLowerCase() == 'true' ||
+                data['isPublished']?.toString().trim().toLowerCase() == 'true' ||
+                (data['status'] ?? '').toString().toLowerCase() == 'published';
+
+            if (!isPublished) continue;
+
             final status = (data['status']?.toString() ?? '')
                 .trim()
                 .toLowerCase()
                 .replaceAll('-', '_')
                 .replaceAll(' ', '_');
 
-            final isFinished = finishedStatuses.contains(status);
+            final isFinished = finishedStatuses.contains(status) ||
+                data['isFinished'] == true ||
+                data['isCompleted'] == true ||
+                data['completed'] == true ||
+                data['finished'] == true;
 
             if (!isFinished) {
               recentUnfinishedQuizzes++;
@@ -1215,8 +1240,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                               status == 'closed' ||
                               status == 'archived';
 
-                          if (isFinished) continue;
-                          if (!isPublished && !activeStatuses.contains(status)) continue;
+                          if (isFinished || !isPublished) continue;
+                          if (!activeStatuses.contains(status)) continue;
 
                           final candidateName =
                               (data['title'] ??
@@ -1558,6 +1583,16 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
     QueryDocumentSnapshot? targetDoc;
     for (final doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
+      final isPub = data['published'] == true ||
+          data['isPublished'] == true ||
+          data['is_published'] == true ||
+          data['published'] == 1 ||
+          data['isPublished'] == 1 ||
+          data['published']?.toString().toLowerCase() == 'true' ||
+          data['isPublished']?.toString().toLowerCase() == 'true' ||
+          (data['status'] ?? '').toString().toLowerCase() == 'published';
+      if (!isPub) continue;
+
       final st = (data['status']?.toString() ?? '')
           .trim()
           .toLowerCase()

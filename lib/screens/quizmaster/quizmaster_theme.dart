@@ -614,11 +614,36 @@ class QuizMasterBrandTitle extends StatelessWidget {
                     };
                     for (final doc in snapshot.data!.docs) {
                       final data = doc.data() as Map<String, dynamic>;
+                      final isPublished = data['published'] == true ||
+                          data['isPublished'] == true ||
+                          data['is_published'] == true ||
+                          data['published'] == 1 ||
+                          data['isPublished'] == 1 ||
+                          data['published']?.toString().trim().toLowerCase() ==
+                              'true' ||
+                          data['isPublished']
+                                  ?.toString()
+                                  .trim()
+                                  .toLowerCase() ==
+                              'true' ||
+                          (data['status'] ?? '').toString().toLowerCase() ==
+                              'published';
+                      if (!isPublished) continue;
+
                       final status = (data['status']?.toString() ?? '')
                           .trim()
                           .toLowerCase()
                           .replaceAll('-', '_')
                           .replaceAll(' ', '_');
+                      final isFinished = data['isFinished'] == true ||
+                          data['isCompleted'] == true ||
+                          data['completed'] == true ||
+                          data['finished'] == true ||
+                          status == 'finished' ||
+                          status == 'completed' ||
+                          status == 'closed' ||
+                          status == 'archived';
+                      if (isFinished) continue;
                       if (!activeStatuses.contains(status)) continue;
                       final quizName = (data['title'] ??
                               data['quizTitle'] ??
