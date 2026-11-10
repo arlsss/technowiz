@@ -2603,7 +2603,7 @@ class _QuizScreenState extends State<QuizScreen> {
               children: [
                 resultCard(points: points, yourAnswer: yourAnswer),
                 const SizedBox(height: 12),
-                contestAnswerButton(),
+                contestAnswerButton(yourAnswer: yourAnswer),
                 if (contestStatus != "none" && contestRequestId != null)
                   contestStatusListener(questionIndex: previousQuestion),
                 const SizedBox(height: 12),
@@ -2630,10 +2630,14 @@ class _QuizScreenState extends State<QuizScreen> {
       return const SizedBox.shrink();
     }
 
-    final displayAnswer = (yourAnswer ?? '').trim().isEmpty
-        ? "No answer"
-        : yourAnswer!.trim();
-    final bool noAnswer = displayAnswer.toLowerCase() == 'no answer';
+    final effectiveAnswer = (yourAnswer != null && yourAnswer.trim().isNotEmpty)
+        ? yourAnswer.trim()
+        : questionTypeSafeAnswer().trim();
+
+    final bool noAnswer = effectiveAnswer.isEmpty ||
+        effectiveAnswer.toLowerCase() == 'no answer' ||
+        effectiveAnswer.toLowerCase() == 'unanswered';
+    final displayAnswer = noAnswer ? "No answer" : effectiveAnswer;
     final Color resultAccent = noAnswer
         ? Colors.orange.shade700
         : (lastAnswerCorrect ? primaryGreen : Colors.red.shade600);
@@ -3153,12 +3157,22 @@ class _QuizScreenState extends State<QuizScreen> {
   // CONTEST ANSWER
   // ==========================================================
 
-  Future<void> showContestDialog() async {
+  Future<void> showContestDialog({String? yourAnswer}) async {
     if (!answered ||
         !resultRevealed ||
         lastAnswerCorrect ||
         contestStatus != "none" ||
         previousQuestion < 0) {
+      return;
+    }
+
+    final effectiveAnswer = (yourAnswer != null && yourAnswer.trim().isNotEmpty)
+        ? yourAnswer.trim()
+        : questionTypeSafeAnswer().trim();
+
+    if (effectiveAnswer.isEmpty ||
+        effectiveAnswer.toLowerCase() == 'no answer' ||
+        effectiveAnswer.toLowerCase() == 'unanswered') {
       return;
     }
 
@@ -3417,6 +3431,17 @@ class _QuizScreenState extends State<QuizScreen> {
                 .trim();
           }
         } catch (_) {}
+      }
+
+      if (contestantAnswer.isEmpty ||
+          contestantAnswer.toLowerCase() == 'no answer' ||
+          contestantAnswer.toLowerCase() == 'unanswered') {
+        if (mounted) {
+          setState(() {
+            contestSubmitting = false;
+          });
+        }
+        return;
       }
 
       await requestRef.set({
@@ -3778,7 +3803,7 @@ class _QuizScreenState extends State<QuizScreen> {
   // CONTEST BUTTON
   // ==========================================================
 
-  Widget contestAnswerButton() {
+  Widget contestAnswerButton({String? yourAnswer}) {
     if (!answered ||
         !resultRevealed ||
         lastAnswerCorrect ||
@@ -3786,11 +3811,23 @@ class _QuizScreenState extends State<QuizScreen> {
       return const SizedBox.shrink();
     }
 
+    final effectiveAnswer = (yourAnswer != null && yourAnswer.trim().isNotEmpty)
+        ? yourAnswer.trim()
+        : questionTypeSafeAnswer().trim();
+
+    if (effectiveAnswer.isEmpty ||
+        effectiveAnswer.toLowerCase() == 'no answer' ||
+        effectiveAnswer.toLowerCase() == 'unanswered') {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 12),
       child: OutlinedButton.icon(
-        onPressed: contestSubmitting ? null : showContestDialog,
+        onPressed: contestSubmitting
+            ? null
+            : () => showContestDialog(yourAnswer: yourAnswer),
         icon: contestSubmitting
             ? const SizedBox(
                 width: 19,
