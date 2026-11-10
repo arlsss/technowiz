@@ -1036,6 +1036,41 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                   ),
                                 ),
                               ],
+                              const SizedBox(height: 18),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: lightBlue,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.format_list_numbered_rounded,
+                                      color: primaryBlue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'ALL CONTESTANTS & RANKINGS',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: darkBlue,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${rankings.length}',
+                                    style: const TextStyle(
+                                      color: primaryBlue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ] else ...[
                               Row(
                                 children: [
@@ -1071,46 +1106,50 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 14),
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: rankings.length,
-                                itemBuilder: (context, index) {
-                                  final player = rankings[index];
-                                  final data = player.data();
-                                  final rawMembers = data['teamMembers'] ?? data['members'];
-                                  final List<String> members = [];
-                                  if (rawMembers is List) {
-                                    for (final m in rawMembers) {
-                                      final s = m is Map ? (m['name'] ?? '').toString().trim() : m.toString().trim();
-                                      if (s.isNotEmpty && !members.contains(s)) members.add(s);
+                            ],
+                            const SizedBox(height: 14),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: rankings.length,
+                              itemBuilder: (context, index) {
+                                final player = rankings[index];
+                                final data = player.data();
+                                final rawMembers =
+                                    data['teamMembers'] ?? data['members'];
+                                final List<String> members = [];
+                                if (rawMembers is List) {
+                                  for (final m in rawMembers) {
+                                    final s = m is Map
+                                        ? (m['name'] ?? '').toString().trim()
+                                        : m.toString().trim();
+                                    if (s.isNotEmpty &&
+                                        !members.contains(s)) {
+                                      members.add(s);
                                     }
                                   }
+                                }
 
-                                  return _rankingCard(
-                                    context: context,
-                                    rank: ranks[index],
-                                    playerId: player.id,
-                                    playerName: (data['displayName'] ??
-                                            data['name'] ??
-                                            player.id)
-                                        .toString()
-                                        .trim(),
-                                    team:
-                                        data['teamName']?.toString().trim() ??
-                                        '',
-                                    members: members,
-                                    score: _scoreOf(data),
-                                    eliminated: _isEliminated(data),
-                                    proceeded: _isProceededForCurrentLevel(
-                                      data,
-                                    ),
-                                    isFinalView: false,
-                                  );
-                                },
-                              ),
-                            ],
+                                return _rankingCard(
+                                  context: context,
+                                  rank: ranks[index],
+                                  playerId: player.id,
+                                  playerName: (data['displayName'] ??
+                                          data['name'] ??
+                                          player.id)
+                                      .toString()
+                                      .trim(),
+                                  team:
+                                      data['teamName']?.toString().trim() ?? '',
+                                  members: members,
+                                  score: _scoreOf(data),
+                                  eliminated: _isEliminated(data),
+                                  proceeded:
+                                      _isProceededForCurrentLevel(data),
+                                  isFinalView: effectiveIsFinal,
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
