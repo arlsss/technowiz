@@ -440,6 +440,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _restoreAdminPage() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
 
     final String? page = prefs.getString(_adminLastPageKey);
 

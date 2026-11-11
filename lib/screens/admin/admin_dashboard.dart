@@ -3,8 +3,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,9 +18,6 @@ import 'admin_report_screen.dart';
 import 'admin_leaderboard_screen.dart';
 
 import 'manage_quiz_sessions_screen.dart';
-import 'create_quiz_screen.dart';
-import 'manage_quiz_screen.dart';
-import 'edit_question_screen.dart';
 import '../../navigation_persistence.dart';
 
 import 'admin_sidebar.dart';
@@ -31,10 +26,9 @@ import 'admin_theme.dart';
 import '../login_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key, this.restoreLastPage = true});
+  const AdminDashboard({super.key, this.restoreLastPage = false});
 
-  /// Set to false when navigating to Dashboard from another Admin screen.
-  /// This prevents an old saved page from immediately opening over Dashboard.
+  /// Retained for backwards compatibility across existing navigation calls.
   final bool restoreLastPage;
 
   @override
@@ -88,18 +82,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     super.initState();
 
     startNotificationListener();
-
-    // Restore the saved Admin page only when this dashboard is used as
-    // the app's entry point (for example, after browser refresh).
-    // When another screen explicitly navigates to Dashboard, do not restore
-    // an older saved destination on top of it.
-    if (widget.restoreLastPage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _restoreLastAdminPage();
-      });
-    } else {
-      AdminNavPersistence.savePage('dashboard');
-    }
+    AdminNavPersistence.savePage('dashboard');
   }
 
   void startNotificationListener() {
@@ -318,147 +301,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   // =========================================================
 
-  static const String _lastAdminPageKey = 'technowiz_admin_last_page';
-
-  bool _isRestoringAdminPage = false;
-
-  Future<void> _restoreLastAdminPage() async {
-    if (!mounted || _isRestoringAdminPage) return;
-    _isRestoringAdminPage = true;
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.reload();
-      final String? savedPage = prefs.getString(_lastAdminPageKey);
-
-      debugPrint('TECHNOWIZ ADMIN PAGE RESTORE: $savedPage');
-
-      Widget? page;
-      switch (savedPage) {
-        case 'manage_users':
-          page = const ManageUsersScreen();
-          break;
-        case 'leaderboard':
-          page = const AdminLeaderboardScreen();
-          break;
-        case 'add_question':
-          page = const AddQuestionScreen();
-          break;
-        case 'question_list':
-          page = const QuestionListScreen();
-          break;
-        case 'quiz_sessions':
-          page = const ManageQuizSessionsScreen();
-          break;
-        case 'create_quiz':
-          page = const CreateQuizScreen();
-          break;
-        case 'manage_quiz':
-          page = const ManageQuizScreen();
-          break;
-        case 'quiz_history':
-          page = const AdminQuizHistoryScreen();
-          break;
-        case 'quiz_history_results':
-          final hCode = prefs.getString(AdminNavPersistence.historyQuizCodeKey);
-          final hTitle = prefs.getString(AdminNavPersistence.historyQuizTitleKey) ?? 'Quiz Results';
-          final hDate = prefs.getString(AdminNavPersistence.historyQuizDateKey) ?? '';
-          final hDocId = prefs.getString(AdminNavPersistence.historyDocIdKey) ?? (hCode ?? '');
-          if (hCode != null && hCode.isNotEmpty) {
-            page = AdminFinishedQuizResultsScreen(
-              quizCode: hCode,
-              quizTitle: hTitle,
-              quizDate: hDate,
-              docId: hDocId.isNotEmpty ? hDocId : hCode,
-            );
-          } else {
-            page = const AdminQuizHistoryScreen();
-          }
-          break;
-        case 'quiz_session_detail':
-          final qCode = prefs.getString('technowiz_admin_detail_quiz_code');
-          if (qCode != null && qCode.isNotEmpty) {
-            final doc = await FirebaseFirestore.instance.collection('quiz_sessions').doc(qCode).get();
-            if (doc.exists) {
-              page = QuizSessionDetailScreen(quizCode: qCode, quizData: doc.data() ?? {});
-            } else {
-              page = const ManageQuizSessionsScreen();
-            }
-          } else {
-            page = const ManageQuizSessionsScreen();
-          }
-          break;
-        case 'edit_question':
-          final eqId = prefs.getString(AdminNavPersistence.editQuestionIdKey);
-          if (eqId != null && eqId.isNotEmpty) {
-            final qDoc = await FirebaseFirestore.instance.collection('questions').doc(eqId).get();
-            if (qDoc.exists) {
-              page = EditQuestionScreen(questionId: eqId, questionData: qDoc.data() ?? {});
-            } else {
-              page = const QuestionListScreen();
-            }
-          } else {
-            page = const QuestionListScreen();
-          }
-          break;
-        case 'quiz_leaderboard':
-          final lbCode = prefs.getString(AdminNavPersistence.leaderboardQuizCodeKey);
-          if (lbCode != null && lbCode.isNotEmpty) {
-            page = AdminQuizLeaderboardScreen(quizCode: lbCode);
-          } else {
-            page = const AdminLeaderboardScreen();
-          }
-          break;
-        case 'reports':
-          page = const AdminReportScreen();
-          break;
-        default:
-          // Keep the dashboard open if no valid page was saved.
-          break;
-      }
-
-      if (!mounted || page == null) return;
-
-      // Restore only while this dashboard is still the active route.
-      // Browser refresh can rebuild/dispose the route while async preferences load.
-      if (!mounted) return;
-      final navigator = Navigator.of(context);
-      if (!ModalRoute.of(context)!.isCurrent) return;
-      // Push only the saved page once; do not overwrite the saved key here.
-      navigator.pushReplacement(adminPageRoute(page));
-    } catch (error, stackTrace) {
-      debugPrint('TECHNOWIZ ADMIN PAGE RESTORE ERROR: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    } finally {
-      _isRestoringAdminPage = false;
-    }
-  }
-
   Future<void> _saveLastAdminPage(String page) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Persist the selected Admin page before opening it.
-    final bool saved = await prefs.setString(_lastAdminPageKey, page);
-    await prefs.reload();
-
-    final String? verifiedPage = prefs.getString(_lastAdminPageKey);
-    debugPrint(
-      'TECHNOWIZ ADMIN PAGE SAVE: requested=$page, '
-      'saved=$saved, verified=$verifiedPage',
-    );
-
-    if (verifiedPage != page) {
-      throw StateError(
-        'Could not persist Admin page "$page". '
-        'Saved value was "$verifiedPage".',
-      );
-    }
+    await AdminNavPersistence.savePage(page);
   }
 
   Future<void> _clearLastAdminPage() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.remove(_lastAdminPageKey);
+    await AdminNavPersistence.clear();
   }
 
   Future<void> logout(BuildContext context) async {

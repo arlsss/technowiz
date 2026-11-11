@@ -10,6 +10,7 @@ import 'register_screen.dart';
 import 'admin/admin_dashboard.dart';
 import 'quizmaster/quizmaster_dashboard.dart';
 import 'competitor/competitor_dashboard.dart';
+import '../navigation_persistence.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool clearCredentials;
@@ -309,6 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (normalizedRole == "admin") {
+        AdminNavPersistence.savePage('dashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
@@ -576,6 +578,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (normalizedRole == "admin") {
+        AdminNavPersistence.savePage('dashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
