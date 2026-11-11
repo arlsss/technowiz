@@ -48,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    AuthNavPersistence.saveUnauthPage('login');
     emailFocusNode.addListener(() => setState(() {}));
     passwordFocusNode.addListener(() => setState(() {}));
     if (widget.clearCredentials) {
@@ -1437,13 +1438,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await AuthNavPersistence.saveUnauthPage('register');
+                          if (!context.mounted) return;
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => const RegisterScreen(),
                             ),
                           );
+                          if (mounted) {
+                            await AuthNavPersistence.saveUnauthPage('login');
+                          }
                         },
                         child: const Text(
                           "Sign Up >",

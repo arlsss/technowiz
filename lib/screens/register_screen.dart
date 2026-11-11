@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'login_screen.dart';
 import 'admin/admin_dashboard.dart';
 import 'quizmaster/quizmaster_dashboard.dart';
 import 'competitor/competitor_dashboard.dart';
@@ -54,6 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+    AuthNavPersistence.saveUnauthPage('register');
     nameFocusNode.addListener(() => setState(() {}));
     emailFocusNode.addListener(() => setState(() {}));
     passwordFocusNode.addListener(() => setState(() {}));
@@ -279,6 +281,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "isRead": false,
       });
 
+      await AuthNavPersistence.saveUnauthPage('login');
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -288,7 +291,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
-      Navigator.pop(context);
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       String message;
@@ -1272,7 +1282,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () async {
+                          await AuthNavPersistence.saveUnauthPage('login');
+                          if (!context.mounted) return;
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          } else {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
+                            );
+                          }
+                        },
                         child: const Text(
                           "Log In >",
                           style: TextStyle(

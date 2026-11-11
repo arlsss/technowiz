@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 
 import 'screens/admin/admin_dashboard.dart';
 
@@ -822,12 +823,17 @@ class _SplashScreenState extends State<SplashScreen> {
   // ==========================================================
 
   Future<void> _goToLogin() async {
+    final String? unauthPage = await AuthNavPersistence.getUnauthPage();
     if (!mounted) return;
+
+    final Widget destination = unauthPage == 'register'
+        ? const RegisterScreen()
+        : const LoginScreen();
 
     Navigator.pushReplacement(
       context,
       PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => const LoginScreen(),
+        pageBuilder: (_, _, _) => destination,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
       ),

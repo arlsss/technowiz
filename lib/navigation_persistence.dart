@@ -295,6 +295,24 @@ class QuizMasterNavPersistence {
 class AuthNavPersistence {
   static const String uidKey = 'technowiz_auth_uid';
   static const String roleKey = 'technowiz_auth_role';
+  static const String unauthPageKey = 'technowiz_unauth_page';
+
+  static Future<void> saveUnauthPage(String page) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(unauthPageKey, page);
+    } catch (_) {}
+  }
+
+  static Future<String?> getUnauthPage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      return prefs.getString(unauthPageKey);
+    } catch (_) {
+      return null;
+    }
+  }
 
   static Future<void> saveSession({
     required String uid,
@@ -304,6 +322,7 @@ class AuthNavPersistence {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(uidKey, uid);
       await prefs.setString(roleKey, role);
+      await prefs.setString(unauthPageKey, 'login');
     } catch (_) {}
   }
 
@@ -337,6 +356,7 @@ class AuthNavPersistence {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(uidKey);
       await prefs.remove(roleKey);
+      await prefs.setString(unauthPageKey, 'login');
     } catch (_) {}
   }
 }
