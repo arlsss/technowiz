@@ -286,8 +286,8 @@ class _MyScoreScreenState extends State<MyScoreScreen> {
                                   height: 58,
                                   child: ElevatedButton.icon(
                                     icon: const Icon(Icons.emoji_events_rounded),
-                                    onPressed: () {
-                                      Navigator.push(
+                                    onPressed: () async {
+                                      await Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => PartialRankingScreen(
@@ -296,6 +296,7 @@ class _MyScoreScreenState extends State<MyScoreScreen> {
                                           ),
                                         ),
                                       );
+                                      await _saveCurrentState();
                                     },
                                     label: const Text(
                                       "FINAL RESULTS",

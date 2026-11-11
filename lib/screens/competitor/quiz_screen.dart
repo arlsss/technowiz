@@ -4774,8 +4774,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),
-                                  onPressed: () {
-                                    Navigator.push(
+                                  onPressed: () async {
+                                    await Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => PartialRankingScreen(
@@ -4784,6 +4784,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                         ),
                                       ),
                                     );
+                                    if (mounted) {
+                                      await _rememberQuizScreen();
+                                    }
                                   },
                                 ),
                               ),
@@ -5172,8 +5175,8 @@ class _QuizScreenState extends State<QuizScreen> {
                       height: 58,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.emoji_events_rounded),
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => PartialRankingScreen(
@@ -5182,6 +5185,9 @@ class _QuizScreenState extends State<QuizScreen> {
                               ),
                             ),
                           );
+                          if (mounted) {
+                            await _rememberQuizScreen();
+                          }
                         },
                         label: const Text(
                           "FINAL RESULTS",
@@ -7402,20 +7408,36 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          leading: !isFinal
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: primaryGreen),
-                  tooltip: 'Back',
-                  onPressed: () => Navigator.of(context).maybePop(),
-                )
-              : null,
-          leadingWidth: !isFinal ? 44 : 16,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: primaryGreen),
+            tooltip: 'Back',
+            onPressed: () async {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                await CompetitorNavPersistence.savePage('dashboard');
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('contestant_current_quiz_code');
+                await prefs.remove('contestant_current_quiz_title');
+                await prefs.remove('contestant_current_quiz_level');
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const CompetitorDashboard(initialPage: 'dashboard'),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+          leadingWidth: 44,
           backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
           centerTitle: false,
-          titleSpacing: !isFinal ? 0 : 16,
+          titleSpacing: 0,
           iconTheme: const IconThemeData(color: primaryGreen),
           title: Text(
             isFinal ? "Final Results" : "Partial Ranking",
@@ -8280,56 +8302,6 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                         ],
                       ),
                     ),
-                    if (isActuallyFinal)
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
-                        decoration: const BoxDecoration(
-                          color: Colors.transparent,
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              await prefs.setString(
-                                'contestant_last_page',
-                                'dashboard',
-                              );
-                              await prefs.remove(
-                                'contestant_current_quiz_code',
-                              );
-                              await prefs.remove(
-                                'contestant_current_quiz_title',
-                              );
-                              await prefs.remove(
-                                'contestant_current_quiz_level',
-                              );
-                              if (!context.mounted) return;
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder: (_) => const CompetitorDashboard(),
-                                ),
-                                (route) => false,
-                              );
-                            },
-                            icon: const Icon(Icons.dashboard_rounded),
-                            label: const Text(
-                              'BACK TO DASHBOARD',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryGreen,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               );
