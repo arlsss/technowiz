@@ -2908,11 +2908,11 @@ class _AdminFinishedQuizResultsScreenState
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () {
+            AdminNavPersistence.savePage('quiz_history');
             final navigator = Navigator.of(context);
             if (navigator.canPop()) {
               navigator.pop();
             } else {
-              AdminNavPersistence.savePage('quiz_history');
               navigator.pushAndRemoveUntil<void>(
                 adminPageRoute<void>(
                   const AdminQuizHistoryScreen(),
@@ -4576,11 +4576,11 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
           tooltip: 'Back to Admin Dashboard',
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () {
+            AdminNavPersistence.savePage('dashboard');
             final navigator = Navigator.of(context);
             if (navigator.canPop()) {
               navigator.pop();
             } else {
-              AdminNavPersistence.savePage('dashboard');
               navigator.pushAndRemoveUntil<void>(
                 adminPageRoute<void>(
                   const AdminDashboard(restoreLastPage: false),

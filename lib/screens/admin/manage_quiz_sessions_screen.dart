@@ -795,6 +795,7 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
                       // Close the profile sheet, sign out, and clear protected pages.
                       Navigator.pop(sheetContext);
                       try {
+                        await AdminNavPersistence.clear();
                         await LoginScreen.clearSavedCredentials();
                         await FirebaseAuth.instance.signOut();
                         if (!context.mounted) return;

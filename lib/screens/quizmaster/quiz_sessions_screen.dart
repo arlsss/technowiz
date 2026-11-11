@@ -132,6 +132,9 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
       // guard; this prevents the tap guard remaining locked on the overview.
       _navigationInProgress = false;
       await Future.wait<void>([savePageFuture, routeFuture]);
+      if (mounted) {
+        await _saveCurrentPage();
+      }
     } finally {
       _navigationInProgress = false;
     }
@@ -3977,7 +3980,23 @@ class ParticipantReadinessPage extends StatelessWidget {
         subtitle: 'Code: $quizCode',
         badgeText: 'TECHNOWIZ • QUIZMASTER COMMAND',
         badgeIcon: Icons.checklist_rounded,
-        onBack: () => Navigator.of(context).pop(),
+        onBack: () async {
+          await QuizMasterNavPersistence.savePage('quiz_sessions');
+          if (!context.mounted) return;
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder<void>(
+                pageBuilder: (_, _, _) => const QuizSessionsScreen(),
+                transitionDuration: Duration.zero,
+                reverseTransitionDuration: Duration.zero,
+                transitionsBuilder: (_, animation, secondaryAnimation, child) =>
+                    child,
+              ),
+            );
+          }
+        },
       ),
       body: QuizMasterCircuitBackground(
         child: SafeArea(

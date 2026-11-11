@@ -711,6 +711,10 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
               child,
         ),
       );
+      if (mounted) {
+        setState(() => selectedMenu = 0);
+        await _saveLastPage('dashboard');
+      }
     } catch (e) {
       if (!context.mounted) return;
 
@@ -834,6 +838,10 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
               child,
         ),
       );
+      if (mounted) {
+        setState(() => selectedMenu = 0);
+        await _saveLastPage('dashboard');
+      }
     } catch (e) {
       if (!context.mounted) return;
 

@@ -83,14 +83,19 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _goToNextScreen() async {
     final DateTime startTime = DateTime.now();
 
-    // 1. Resolve Auth & Destination in background
+    // 1. Check whether a previous authenticated session exists locally.
+    final String? cachedUid = await AuthNavPersistence.getUid();
+    final bool hasCachedSession = cachedUid != null && cachedUid.isNotEmpty;
+
+    // 2. Resolve FirebaseAuth user cleanly, ignoring transient initial null events
+    // while IndexedDB/local persistence finishes hydrating on Web/mobile reload.
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       try {
         user = await FirebaseAuth.instance
             .authStateChanges()
-            .first
-            .timeout(const Duration(milliseconds: 2000));
+            .firstWhere((u) => u != null)
+            .timeout(Duration(milliseconds: hasCachedSession ? 4500 : 1800));
       } catch (_) {
         user = FirebaseAuth.instance.currentUser;
       }
@@ -102,44 +107,72 @@ class _SplashScreenState extends State<SplashScreen> {
       debugPrint('❌ NO USER → DESTINATION IS LOGIN');
       navigateAction = _goToLogin;
     } else {
-      try {
-        debugPrint('✅ USER FOUND: ${user.uid}, GETTING ROLE...');
+      debugPrint('✅ USER FOUND: ${user.uid}, GETTING ROLE...');
 
+      String role = '';
+      bool confirmedMissingDoc = false;
+
+      try {
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .get();
+            .get()
+            .timeout(const Duration(seconds: 5));
 
-        if (!doc.exists) {
-          debugPrint('❌ USER DOCUMENT NOT FOUND');
-          await FirebaseAuth.instance.signOut();
-          navigateAction = _goToLogin;
-        } else {
+        if (doc.exists) {
           final data = doc.data() ?? {};
           final String rawRole = data['role']?.toString().trim() ?? '';
-          final String role =
-              rawRole.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-
-          debugPrint('🔥 ROLE: $role');
-
-          if (role == 'admin') {
-            navigateAction = _restoreAdminPage;
-          } else if (role == 'quizmaster') {
-            navigateAction = _restoreQuizMasterPage;
-          } else if (role == 'contestant' || role == 'competitor') {
-            navigateAction = _restoreContestantPage;
-          } else {
-            await FirebaseAuth.instance.signOut();
-            navigateAction = _goToLogin;
-          }
+          role = rawRole.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+        } else if (!doc.metadata.isFromCache) {
+          confirmedMissingDoc = true;
         }
       } catch (e) {
-        debugPrint('❌ SPLASH ERROR: $e');
+        debugPrint('⚠️ SPLASH FIRESTORE ERROR (trying cache): $e');
+        try {
+          final cacheDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get(const GetOptions(source: Source.cache));
+          if (cacheDoc.exists) {
+            final data = cacheDoc.data() ?? {};
+            final String rawRole = data['role']?.toString().trim() ?? '';
+            role = rawRole.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+          }
+        } catch (_) {}
+      }
+
+      if (role.isEmpty && !confirmedMissingDoc) {
+        role = (await AuthNavPersistence.getRole(forUid: user.uid)) ?? '';
+      }
+
+      debugPrint('🔥 RESOLVED ROLE: $role');
+
+      if (confirmedMissingDoc) {
+        debugPrint('❌ USER DOCUMENT NOT FOUND ON SERVER');
+        await AuthNavPersistence.clearSession();
+        await FirebaseAuth.instance.signOut();
+        navigateAction = _goToLogin;
+      } else if (role == 'admin') {
+        await AuthNavPersistence.saveSession(uid: user.uid, role: 'admin');
+        navigateAction = _restoreAdminPage;
+      } else if (role == 'quizmaster') {
+        await AuthNavPersistence.saveSession(uid: user.uid, role: 'quizmaster');
+        navigateAction = _restoreQuizMasterPage;
+      } else if (role == 'contestant' || role == 'competitor') {
+        await AuthNavPersistence.saveSession(uid: user.uid, role: 'contestant');
+        navigateAction = _restoreContestantPage;
+      } else if (role.isNotEmpty) {
+        await AuthNavPersistence.clearSession();
+        await FirebaseAuth.instance.signOut();
+        navigateAction = _goToLogin;
+      } else {
+        // Role unknown (e.g., offline first boot with empty cache) — keep signed in
+        // and open Login safely without signing out their credentials.
         navigateAction = _goToLogin;
       }
     }
 
-    // 2. Guarantee exactly 2.5 full seconds before navigating away
+    // 3. Guarantee at least 2.5 full seconds on SplashScreen before navigating
     final int elapsedMs = DateTime.now().difference(startTime).inMilliseconds;
     final int remainingMs = 2500 - elapsedMs;
     if (remainingMs > 0) {
@@ -148,8 +181,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    // 3. Execute navigation to destination
-    await navigateAction();
+    // 4. Execute navigation to destination
+    try {
+      await navigateAction();
+    } catch (e) {
+      debugPrint('❌ RESTORE NAVIGATION ERROR: $e');
+      if (mounted) {
+        await _goToLogin();
+      }
+    }
   }
 
   // ==========================================================
@@ -240,18 +280,24 @@ class _SplashScreenState extends State<SplashScreen> {
     if (page == 'quiz_screen' &&
         quizCode != null &&
         quizCode.trim().isNotEmpty) {
-      final quizDoc = await FirebaseFirestore.instance
-          .collection('quiz_sessions')
-          .doc(quizCode.trim())
-          .get();
+      try {
+        final quizDoc = await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(quizCode.trim())
+            .get()
+            .timeout(const Duration(seconds: 5));
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      if (quizDoc.exists) {
-        debugPrint('âœ… RESTORING CONTESTANT QUIZ SCREEN: ');
-
+        if (quizDoc.exists) {
+          debugPrint('✅ RESTORING CONTESTANT QUIZ SCREEN: $quizCode');
+          _replaceWith(QuizScreen(quizCode: quizCode.trim()));
+          return;
+        }
+      } catch (e) {
+        debugPrint('Quiz screen restore query error: $e');
+        if (!mounted) return;
         _replaceWith(QuizScreen(quizCode: quizCode.trim()));
-
         return;
       }
     }
@@ -601,28 +647,41 @@ class _SplashScreenState extends State<SplashScreen> {
           return;
         }
 
-        final DocumentSnapshot<Map<String, dynamic>> questionDoc =
-            await FirebaseFirestore.instance
-                .collection('questions')
-                .doc(questionId)
-                .get();
+        try {
+          final DocumentSnapshot<Map<String, dynamic>> questionDoc =
+              await FirebaseFirestore.instance
+                  .collection('questions')
+                  .doc(questionId)
+                  .get()
+                  .timeout(const Duration(seconds: 5));
 
-        if (!mounted) return;
+          if (!mounted) return;
 
-        if (!questionDoc.exists) {
-          await prefs.setString(_adminLastPageKey, 'question_list');
-          _replaceWith(const QuestionListScreen());
+          if (!questionDoc.exists) {
+            await prefs.setString(_adminLastPageKey, 'question_list');
+            _replaceWith(const QuestionListScreen());
+            return;
+          }
+
+          debugPrint('✅ RESTORING EDIT QUESTION: $questionId');
+          _replaceWith(
+            EditQuestionScreen(
+              questionId: questionId,
+              questionData: questionDoc.data() ?? <String, dynamic>{},
+            ),
+          );
+          return;
+        } catch (e) {
+          debugPrint('⚠️ EDIT QUESTION RESTORE ERROR: $e');
+          if (!mounted) return;
+          _replaceWith(
+            EditQuestionScreen(
+              questionId: questionId,
+              questionData: const <String, dynamic>{},
+            ),
+          );
           return;
         }
-
-        debugPrint('✅ RESTORING EDIT QUESTION: $questionId');
-        _replaceWith(
-          EditQuestionScreen(
-            questionId: questionId,
-            questionData: questionDoc.data() ?? <String, dynamic>{},
-          ),
-        );
-        return;
 
       // ======================================================
 
@@ -664,37 +723,49 @@ class _SplashScreenState extends State<SplashScreen> {
           return;
         }
 
-        final DocumentSnapshot<Map<String, dynamic>> quizDoc =
-            await FirebaseFirestore.instance
-                .collection('quiz_sessions')
-                .doc(quizCode)
-                .get();
+        try {
+          final DocumentSnapshot<Map<String, dynamic>> quizDoc =
+              await FirebaseFirestore.instance
+                  .collection('quiz_sessions')
+                  .doc(quizCode)
+                  .get()
+                  .timeout(const Duration(seconds: 5));
 
-        if (!mounted) return;
+          if (!mounted) return;
 
-        if (!quizDoc.exists) {
-          debugPrint('⚠️ SAVED QUIZ NO LONGER EXISTS');
+          if (!quizDoc.exists) {
+            debugPrint('⚠️ SAVED QUIZ NO LONGER EXISTS');
 
-          await prefs.setString(_adminLastPageKey, 'quiz_sessions');
+            await prefs.setString(_adminLastPageKey, 'quiz_sessions');
 
-          await prefs.remove(_adminDetailQuizCodeKey);
+            await prefs.remove(_adminDetailQuizCodeKey);
 
-          _replaceWith(const ManageQuizSessionsScreen());
+            _replaceWith(const ManageQuizSessionsScreen());
+
+            return;
+          }
+
+          debugPrint('✅ RESTORING QUIZ DETAIL: $quizCode');
+
+          _replaceWith(
+            QuizSessionDetailScreen(
+              quizCode: quizCode,
+              quizData: quizDoc.data() ?? <String, dynamic>{},
+            ),
+          );
 
           return;
+        } catch (e) {
+          debugPrint('⚠️ QUIZ DETAIL RESTORE ERROR: $e');
+          if (!mounted) return;
+          _replaceWith(
+            QuizSessionDetailScreen(
+              quizCode: quizCode,
+              quizData: const <String, dynamic>{},
+            ),
+          );
+          return;
         }
-
-        debugPrint('✅ RESTORING QUIZ DETAIL: $quizCode');
-
-        _replaceWith(
-          QuizSessionDetailScreen(
-            quizCode: quizCode,
-
-            quizData: quizDoc.data() ?? <String, dynamic>{},
-          ),
-        );
-
-        return;
 
       // ======================================================
 

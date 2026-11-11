@@ -137,6 +137,7 @@ class AdminNavPersistence {
       await prefs.remove(editQuestionIdKey);
       await prefs.remove(leaderboardQuizCodeKey);
     } catch (_) {}
+    await AuthNavPersistence.clearSession();
   }
 }
 
@@ -194,6 +195,7 @@ class CompetitorNavPersistence {
       await prefs.remove(quizLevelKey);
       await prefs.remove(currentLeaderboardSessionKey);
     } catch (_) {}
+    await AuthNavPersistence.clearSession();
   }
 }
 
@@ -282,6 +284,59 @@ class QuizMasterNavPersistence {
       await prefs.remove(rankingIsFinalKey);
       await prefs.remove(readinessLevelKey);
       await prefs.remove(submittedQuestionIndexKey);
+    } catch (_) {}
+    await AuthNavPersistence.clearSession();
+  }
+}
+
+/// Persists the signed-in user's UID and normalized role across browser reloads
+/// and restarts so transient storage/network delays during Splash never bounce
+/// an authenticated user back to LoginScreen. Cleared strictly on logout.
+class AuthNavPersistence {
+  static const String uidKey = 'technowiz_auth_uid';
+  static const String roleKey = 'technowiz_auth_role';
+
+  static Future<void> saveSession({
+    required String uid,
+    required String role,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(uidKey, uid);
+      await prefs.setString(roleKey, role);
+    } catch (_) {}
+  }
+
+  static Future<String?> getUid() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final value = prefs.getString(uidKey)?.trim();
+      return (value == null || value.isEmpty) ? null : value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> getRole({String? forUid}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      if (forUid != null && prefs.getString(uidKey) != forUid) {
+        return null;
+      }
+      final role = prefs.getString(roleKey)?.trim();
+      return (role == null || role.isEmpty) ? null : role;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> clearSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(uidKey);
+      await prefs.remove(roleKey);
     } catch (_) {}
   }
 }

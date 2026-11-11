@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'admin/admin_dashboard.dart';
 import 'quizmaster/quizmaster_dashboard.dart';
 import 'competitor/competitor_dashboard.dart';
+import '../navigation_persistence.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -519,21 +520,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (normalizedRole == "admin") {
+        await AuthNavPersistence.saveSession(uid: uid, role: 'admin');
+        await AdminNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
           (route) => false,
         );
       } else if (normalizedRole == "quizmaster") {
+        await AuthNavPersistence.saveSession(uid: uid, role: 'quizmaster');
+        await QuizMasterNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
           (route) => false,
         );
       } else {
+        await AuthNavPersistence.saveSession(uid: uid, role: 'contestant');
+        await CompetitorNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const CompetitorDashboard()),
+          MaterialPageRoute(
+            builder: (_) =>
+                const CompetitorDashboard(initialPage: 'dashboard'),
+          ),
           (route) => false,
         );
       }

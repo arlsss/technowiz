@@ -550,11 +550,11 @@ class _ManageQuizScreenState extends State<ManageQuizScreen> {
           icon: const Icon(Icons.arrow_back_rounded, color: textDark),
           tooltip: 'Back to Dashboard',
           onPressed: () {
+            AdminNavPersistence.savePage('dashboard');
             final navigator = Navigator.of(context);
             if (navigator.canPop()) {
               navigator.pop();
             } else {
-              AdminNavPersistence.savePage('dashboard');
               navigator.pushReplacement(
                 adminPageRoute(
                   const AdminDashboard(restoreLastPage: false),

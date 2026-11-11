@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'my_score_screen.dart';
+import '../../navigation_persistence.dart';
 
 /// Unified Contestant Quiz History View with Emerald Arena styling.
 /// Displays completed quizzes, scores, ranks, and allows deleting history items.
@@ -662,13 +663,18 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          await CompetitorNavPersistence.savePage('my_score', quizCode: code);
+          if (!context.mounted) return;
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => MyScoreScreen(quizCode: code),
             ),
           );
+          if (mounted) {
+            await CompetitorNavPersistence.savePage('history');
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(16),

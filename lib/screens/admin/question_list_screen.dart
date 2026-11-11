@@ -524,14 +524,18 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
     );
   }
 
-  void _openAddQuestion(BuildContext context) {
-    AdminNavPersistence.savePage('add_question');
-    Navigator.push(
+  Future<void> _openAddQuestion(BuildContext context) async {
+    await AdminNavPersistence.savePage('add_question');
+    if (!context.mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => const AddQuestionScreen(),
       ),
     );
+    if (mounted) {
+      await AdminNavPersistence.savePage('question_list');
+    }
   }
 
   // ============================================================
@@ -1065,18 +1069,20 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
 
                 onSelected: (value) async {
                   if (value == 'edit') {
-                    AdminNavPersistence.savePage('edit_question', editQuestionId: doc.id);
-                    Navigator.push(
+                    await AdminNavPersistence.savePage('edit_question', editQuestionId: doc.id);
+                    if (!context.mounted) return;
+                    await Navigator.push(
                       context,
-
                       MaterialPageRoute(
                         builder: (_) => EditQuestionScreen(
                           questionId: doc.id,
-
                           questionData: data,
                         ),
                       ),
                     );
+                    if (mounted) {
+                      await AdminNavPersistence.savePage('question_list');
+                    }
                   }
 
                   if (value == 'delete') {

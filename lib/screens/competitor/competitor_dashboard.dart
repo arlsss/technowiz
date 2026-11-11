@@ -104,14 +104,6 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       _showLeaderboard = false;
       _showBadges = true;
       _showHistory = false;
-    } else if (page == 'profile') {
-      _showLeaderboard = false;
-      _showBadges = false;
-      _showHistory = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        showProfileDrawer(context, savePage: false);
-      });
     } else {
       _showLeaderboard = false;
       _showBadges = false;
@@ -1711,8 +1703,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       _pageBeforeProfile = _showLeaderboard
           ? 'leaderboard'
           : _showBadges
-          ? 'badges'
-          : 'dashboard';
+              ? 'badges'
+              : _showHistory
+                  ? 'history'
+                  : 'dashboard';
 
       _saveCurrentPage('profile');
     }
@@ -1755,7 +1749,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
         return SlideTransition(position: slide, child: child);
       },
-    );
+    ).then((_) {
+      if (!mounted || FirebaseAuth.instance.currentUser == null) return;
+      _saveCurrentPage(_pageBeforeProfile);
+    });
   }
 
   Future<void> _closeProfileDrawer(BuildContext context) async {

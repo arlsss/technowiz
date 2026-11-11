@@ -218,7 +218,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 if (mounted) setState(() => showHistory = false);
               },
 
-              onOpenNavigation: () {
+              onOpenNavigation: () async {
+                await _savePage('leaderboard', quizCode: _activeQuizCode);
                 if (mounted) setState(() => showHistory = false);
               },
 

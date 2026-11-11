@@ -19,8 +19,12 @@ Future<void> main() async {
 
   // Configure web persistence before creating the app's auth listener.
   if (kIsWeb) {
-    await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
-    debugPrint('WEB AUTH PERSISTENCE SET TO LOCAL');
+    try {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+      debugPrint('WEB AUTH PERSISTENCE SET TO LOCAL');
+    } catch (e) {
+      debugPrint('WEB AUTH PERSISTENCE WARNING: $e');
+    }
   } else {
     debugPrint('MOBILE AUTH PERSISTENCE HANDLED BY FIREBASE');
   }

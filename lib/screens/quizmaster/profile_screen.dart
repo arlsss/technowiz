@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../login_screen.dart';
 import 'quizmaster_dashboard.dart';
 import 'quizmaster_theme.dart';
+import '../../navigation_persistence.dart';
 
 /// Shows the Quiz Master profile as a smooth slide-out side panel from the right
 void showQuizMasterProfileSideSheet(BuildContext context) {
@@ -67,11 +67,7 @@ class QuizMasterProfileScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 440),
             child: QuizMasterProfilePanel(
               onClose: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString(
-                  'technowiz_quizmaster_last_page',
-                  'dashboard',
-                );
+                await QuizMasterNavPersistence.savePage('dashboard');
                 if (!context.mounted) return;
                 final nav = Navigator.of(context);
                 if (nav.canPop()) {
@@ -112,15 +108,11 @@ class _QuizMasterProfilePanelState extends State<QuizMasterProfilePanel> {
   static const Color darkBlue = Color(0xFF1E293B);
   static const Color borderColor = Color(0xFFDCEAF8);
   static const Color textMuted = Color(0xFF64748B);
-  static const String _lastPageKey = 'technowiz_quizmaster_last_page';
-  static const String _quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
 
   User? get _user => FirebaseAuth.instance.currentUser;
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_lastPageKey);
-    await prefs.remove(_quizCodeKey);
+    await QuizMasterNavPersistence.clearAll();
     await LoginScreen.clearSavedCredentials();
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;

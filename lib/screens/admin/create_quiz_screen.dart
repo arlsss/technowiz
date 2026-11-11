@@ -914,11 +914,11 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
             onPressed: () {
               Navigator.of(dialogContext, rootNavigator: true).pop();
               if (mounted) {
+                AdminNavPersistence.savePage('quiz_sessions');
                 final navigator = Navigator.of(context);
                 if (navigator.canPop()) {
                   navigator.pop();
                 } else {
-                  AdminNavPersistence.savePage('quiz_sessions');
                   navigator.pushReplacement(
                     MaterialPageRoute<void>(
                       builder: (_) => const ManageQuizSessionsScreen(),

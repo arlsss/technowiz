@@ -22,7 +22,6 @@ class LoginScreen extends StatefulWidget {
       await storage.delete(key: 'saved_login_accounts');
       await storage.delete(key: 'saved_login_email');
       await storage.delete(key: 'saved_login_password');
-      await storage.deleteAll();
     } catch (e) {
       debugPrint("Error clearing saved login credentials: $e");
     }
@@ -310,20 +309,26 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (normalizedRole == "admin") {
-        AdminNavPersistence.savePage('dashboard');
+        await AuthNavPersistence.saveSession(uid: uid, role: 'admin');
+        await AdminNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
       } else if (normalizedRole == "quizmaster") {
-        QuizMasterNavPersistence.savePage('dashboard');
+        await AuthNavPersistence.saveSession(uid: uid, role: 'quizmaster');
+        await QuizMasterNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
         );
       } else if (normalizedRole == "competitor" ||
           normalizedRole == "contestant") {
-        CompetitorNavPersistence.savePage('dashboard');
+        await AuthNavPersistence.saveSession(uid: uid, role: 'contestant');
+        await CompetitorNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'dashboard')),
@@ -580,19 +585,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (normalizedRole == "admin") {
-        AdminNavPersistence.savePage('dashboard');
+        await AuthNavPersistence.saveSession(uid: uid, role: 'admin');
+        await AdminNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
       } else if (normalizedRole == "quizmaster") {
-        QuizMasterNavPersistence.savePage('dashboard');
+        await AuthNavPersistence.saveSession(uid: uid, role: 'quizmaster');
+        await QuizMasterNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
         );
       } else {
-        CompetitorNavPersistence.savePage('dashboard');
+        await AuthNavPersistence.saveSession(uid: uid, role: 'contestant');
+        await CompetitorNavPersistence.savePage('dashboard');
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'dashboard')),
