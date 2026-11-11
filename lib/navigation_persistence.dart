@@ -139,3 +139,61 @@ class AdminNavPersistence {
     } catch (_) {}
   }
 }
+
+/// Centralized navigation state persistence for all Competitor screens and tabs.
+/// Ensures that when the browser is refreshed or reloaded, the exact Competitor
+/// tab or sub-screen is restored seamlessly without jumping back to Dashboard.
+class CompetitorNavPersistence {
+  static const String lastPageKey = 'contestant_last_page';
+  static const String quizCodeKey = 'contestant_current_quiz_code';
+  static const String quizTitleKey = 'contestant_current_quiz_title';
+  static const String quizLevelKey = 'contestant_current_quiz_level';
+  static const String currentLeaderboardSessionKey =
+      'contestant_current_leaderboard_session';
+
+  /// Saves the current Competitor page and any optional quiz parameters.
+  static Future<void> savePage(
+    String pageKey, {
+    String? quizCode,
+    String? quizTitle,
+    int? level,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(lastPageKey, pageKey);
+      if (quizCode != null && quizCode.isNotEmpty) {
+        await prefs.setString(quizCodeKey, quizCode);
+      }
+      if (quizTitle != null && quizTitle.isNotEmpty) {
+        await prefs.setString(quizTitleKey, quizTitle);
+      }
+      if (level != null) {
+        await prefs.setInt(quizLevelKey, level);
+      }
+    } catch (_) {}
+  }
+
+  /// Retrieves the last recorded Competitor page key.
+  static Future<String?> getPage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      return prefs.getString(lastPageKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Completely clears all Competitor navigation state (used during logout).
+  static Future<void> clearAll() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(lastPageKey);
+      await prefs.remove(quizCodeKey);
+      await prefs.remove(quizTitleKey);
+      await prefs.remove(quizLevelKey);
+      await prefs.remove(currentLeaderboardSessionKey);
+    } catch (_) {}
+  }
+}
+

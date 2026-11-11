@@ -322,9 +322,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else if (normalizedRole == "competitor" ||
           normalizedRole == "contestant") {
+        CompetitorNavPersistence.savePage('dashboard');
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CompetitorDashboard()),
+          MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'dashboard')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -589,9 +590,10 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
         );
       } else {
+        CompetitorNavPersistence.savePage('dashboard');
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CompetitorDashboard()),
+          MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'dashboard')),
         );
       }
     } on FirebaseAuthException catch (e) {

@@ -428,7 +428,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
               } else {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const CompetitorDashboard()),
+                  MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'history')),
                 );
               }
             },

@@ -168,6 +168,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _restoreContestantPage() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
 
     final String? page = prefs.getString(_contestantLastPageKey);
 
@@ -192,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen> {
         page == 'history' ||
         page == 'profile') {
       debugPrint('✅ RESTORING CONTESTANT DASHBOARD TAB: $page');
-      _replaceWith(const CompetitorDashboard());
+      _replaceWith(CompetitorDashboard(initialPage: page));
       return;
     }
 
@@ -279,12 +280,12 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    await prefs.setString(_contestantLastPageKey, 'dashboard');
+    await CompetitorNavPersistence.savePage('dashboard');
     await prefs.remove(_contestantQuizCodeKey);
     await prefs.remove(_contestantQuizTitleKey);
     await prefs.remove(_contestantQuizLevelKey);
 
-    _replaceWith(const CompetitorDashboard());
+    _replaceWith(const CompetitorDashboard(initialPage: 'dashboard'));
   }
 
   // RESTORE QUIZ MASTER PAGE

@@ -71,7 +71,7 @@ class _MyScoreScreenState extends State<MyScoreScreen> {
               } else {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const CompetitorDashboard()),
+                  MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'history')),
                 );
               }
             },

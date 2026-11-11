@@ -10,6 +10,7 @@ import 'quiz_instructions_screen.dart';
 import 'quiz_preparation_screen.dart';
 import 'quiz_countdown_screen.dart';
 import 'technowiz_theme.dart';
+import '../../navigation_persistence.dart';
 
 class QuizScreen extends StatefulWidget {
   final String quizCode;
@@ -7355,7 +7356,7 @@ class _QuizScreenState extends State<QuizScreen> {
 // ANNOUNCE controls here. Those stay on the Quiz Master side.
 // ============================================================
 
-class PartialRankingScreen extends StatelessWidget {
+class PartialRankingScreen extends StatefulWidget {
   final String quizCode;
   final bool isFinal;
 
@@ -7365,6 +7366,11 @@ class PartialRankingScreen extends StatelessWidget {
     this.isFinal = false,
   });
 
+  @override
+  State<PartialRankingScreen> createState() => _PartialRankingScreenState();
+}
+
+class _PartialRankingScreenState extends State<PartialRankingScreen> {
   static const Color primaryGreen = Color(0xFF16A34A);
   static const Color darkGreen = Color(0xFF166534);
   static const Color lightGreen = Color(0xFFF0FDF4);
@@ -7373,7 +7379,17 @@ class PartialRankingScreen extends StatelessWidget {
   static const Color textDark = Color(0xFF172033);
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.isFinal) {
+      CompetitorNavPersistence.savePage('final_ranking', quizCode: widget.quizCode);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final quizCode = widget.quizCode;
+    final isFinal = widget.isFinal;
     final myUid = FirebaseAuth.instance.currentUser?.uid;
 
     final session = FirebaseFirestore.instance

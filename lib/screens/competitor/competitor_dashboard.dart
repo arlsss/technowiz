@@ -7,15 +7,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'my_score_screen.dart';
+import 'quiz_history_score_screen.dart';
 import 'technowiz_theme.dart';
 import 'contestant_profile_panel.dart';
 import 'badges_screen.dart';
 import 'contestant_history_screen.dart';
 import 'waiting_room_screen.dart';
 import '../login_screen.dart';
+import '../../navigation_persistence.dart';
 
 class CompetitorDashboard extends StatefulWidget {
-  const CompetitorDashboard({super.key});
+  final String? initialPage;
+
+  const CompetitorDashboard({super.key, this.initialPage});
 
   @override
   State<CompetitorDashboard> createState() => _CompetitorDashboardState();
@@ -87,9 +91,39 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     await prefs.setString(_currentLeaderboardSessionKey, normalized);
   }
 
+  void _applyTabSelection(String page) {
+    if (page == 'history') {
+      _showLeaderboard = false;
+      _showBadges = false;
+      _showHistory = true;
+    } else if (page == 'leaderboard') {
+      _showLeaderboard = true;
+      _showBadges = false;
+      _showHistory = false;
+    } else if (page == 'badges') {
+      _showLeaderboard = false;
+      _showBadges = true;
+      _showHistory = false;
+    } else if (page == 'profile') {
+      _showLeaderboard = false;
+      _showBadges = false;
+      _showHistory = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showProfileDrawer(context, savePage: false);
+      });
+    } else {
+      _showLeaderboard = false;
+      _showBadges = false;
+      _showHistory = false;
+    }
+  }
+
   Future<void> _restoreLastPage() async {
     final prefs = await SharedPreferences.getInstance();
-    final lastPage = prefs.getString(_lastPageKey);
+    await prefs.reload();
+    final lastPage =
+        widget.initialPage ?? prefs.getString(_lastPageKey) ?? 'dashboard';
 
     if (!mounted) return;
 
@@ -97,6 +131,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       setState(() {
         _showLeaderboard = false;
         _showBadges = false;
+        _showHistory = false;
       });
 
       // Re-open My Profile automatically after refresh/restart.
@@ -113,6 +148,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
         _showBadges = false;
         _showHistory = true;
       });
+      await _saveCurrentPage('history');
       return;
     }
 
@@ -121,10 +157,13 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     // temporary Dashboard flash during browser refresh.
     if (lastPage == 'waiting_room' ||
         lastPage == 'quiz_screen' ||
-        lastPage == 'my_score') {
+        lastPage == 'my_score' ||
+        lastPage == 'quiz_history_score' ||
+        lastPage == 'final_ranking') {
       setState(() {
         _showLeaderboard = false;
         _showBadges = false;
+        _showHistory = false;
       });
       return;
     }
@@ -132,12 +171,13 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     setState(() {
       _showLeaderboard = lastPage == 'leaderboard';
       _showBadges = lastPage == 'badges';
+      _showHistory = false;
     });
+    await _saveCurrentPage(lastPage);
   }
 
   Future<void> _saveCurrentPage(String page) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastPageKey, page);
+    await CompetitorNavPersistence.savePage(page);
   }
 
   void _closeSidebarDrawer(BuildContext pageContext) {
@@ -258,12 +298,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   // =========================================================
 
   Future<void> logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_lastPageKey);
-    await prefs.remove(_currentLeaderboardSessionKey);
-    await prefs.remove('contestant_current_quiz_code');
-    await prefs.remove('contestant_current_quiz_title');
-    await prefs.remove('contestant_current_quiz_level');
+    await CompetitorNavPersistence.clearAll();
 
     await LoginScreen.clearSavedCredentials();
     await FirebaseAuth.instance.signOut();
@@ -317,6 +352,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     } else if (page is MyScoreScreen) {
       // Keep My Score refresh-safe as well.
       await _rememberQuizPage(page: 'my_score', quizCode: page.quizCode);
+    } else if (page is QuizHistoryScoreScreen) {
+      await _rememberQuizPage(
+        page: 'quiz_history_score',
+        quizCode: page.quizCode,
+        quizTitle: page.quizTitle,
+      );
     }
 
     if (!context.mounted) return;
@@ -336,11 +377,17 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       ),
     );
 
-    // Returning from a child page means the contestant is back on Dashboard.
+    // Returning from a child page restores the contestant to their previous tab.
     if (!context.mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastPageKey, 'dashboard');
+    final String returnPage = _showHistory
+        ? 'history'
+        : _showLeaderboard
+            ? 'leaderboard'
+            : _showBadges
+                ? 'badges'
+                : 'dashboard';
+    await _saveCurrentPage(returnPage);
   }
 
   // =========================================================
@@ -3266,7 +3313,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
               child: Image.asset(
                 trophyAsset,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Icon(
+                errorBuilder: (_, _, _) => Icon(
                   rank == 1
                       ? Icons.emoji_events_rounded
                       : (rank == 2
@@ -4211,7 +4258,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                 ? Image.asset(
                     trophyAsset,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                       Icons.emoji_events_rounded,
                       size: isFirst ? 30 : 24,
                       color: rankColor,
@@ -4960,7 +5007,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             _sidebarItem(
               icon: Icons.dashboard_rounded,
               title: 'Dashboard',
-              active: !_showLeaderboard && !_showBadges,
+              active: !_showLeaderboard && !_showBadges && !_showHistory,
               onTap: () => _openDashboard(actionContext),
             ),
             _sidebarItem(
@@ -5540,6 +5587,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialPage != null) {
+      _applyTabSelection(widget.initialPage!);
+    }
     loadProfile();
     _restoreLastPage();
     _restoreCurrentLeaderboardSession();
