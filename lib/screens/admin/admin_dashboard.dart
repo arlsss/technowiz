@@ -78,6 +78,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> notifications = [];
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   notificationSubscription;
 
@@ -423,7 +425,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final navigator = Navigator.of(context);
       if (!ModalRoute.of(context)!.isCurrent) return;
       // Push only the saved page once; do not overwrite the saved key here.
-      navigator.push(MaterialPageRoute<void>(builder: (_) => page!));
+      navigator.pushReplacement(adminPageRoute(page));
     } catch (error, stackTrace) {
       debugPrint('TECHNOWIZ ADMIN PAGE RESTORE ERROR: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -476,34 +478,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Future<void> openPage(
+  void openPage(
     BuildContext context,
     Widget page,
     String pageKey,
-  ) async {
-    // Always persist and verify the destination before navigating.
-    try {
-      await _saveLastAdminPage(pageKey);
-    } catch (error, stackTrace) {
-      debugPrint('TECHNOWIZ ADMIN PAGE SAVE ERROR: $error');
-      debugPrintStack(stackTrace: stackTrace);
-
-      if (context.mounted) {
-        AdminNotification.error(
-          context,
-          'Could not save this page for refresh. Please try again.',
-        );
-      }
-      return;
-    }
-
+  ) {
+    unawaited(_saveLastAdminPage(pageKey));
     if (!context.mounted) return;
 
     debugPrint('TECHNOWIZ ADMIN NAVIGATING TO: $pageKey');
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    if (context.mounted) {
-      await _saveLastAdminPage('dashboard');
-    }
+    Navigator.of(context).pushReplacement(adminPageRoute(page));
   }
 
   // =========================================================
@@ -2178,8 +2162,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             );
             await Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => AdminFinishedQuizResultsScreen(
+              adminPageRoute(
+                AdminFinishedQuizResultsScreen(
                   quizCode: quizCode,
                   quizTitle: title,
                   quizDate: dateText,
@@ -2510,23 +2494,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: backgroundColor,
-
+      appBar: buildAdminStandardAppBar(
+        context: context,
+        badgeText: 'Dashboard',
+        subtitle: 'Admin Command Center',
+        onMenuPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+      ),
       endDrawer: sidebar,
       endDrawerEnableOpenDragGesture: true,
-
       body: AdminCircuitBackground(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final double width = constraints.maxWidth;
-            final bool isMobile = width < 900;
-
-            return Column(
-              children: [
-                topBar(context, isMobile),
-                Expanded(child: dashboardContent(context, width)),
-              ],
-            );
+            return dashboardContent(context, width);
           },
         ),
       ),
@@ -3069,6 +3051,8 @@ class _AdminFinishedQuizResultsScreenState
       backgroundColor: AdminThemeColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: kAdminAppBarHeight,
         foregroundColor: _dark,
         elevation: 0,
         automaticallyImplyLeading: false,
@@ -3082,8 +3066,8 @@ class _AdminFinishedQuizResultsScreenState
             } else {
               AdminNavPersistence.savePage('quiz_history');
               navigator.pushAndRemoveUntil<void>(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AdminQuizHistoryScreen(),
+                adminPageRoute<void>(
+                  const AdminQuizHistoryScreen(),
                 ),
                 (route) => false,
               );
@@ -4735,6 +4719,8 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
       backgroundColor: AdminThemeColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: kAdminAppBarHeight,
         foregroundColor: _textDark,
         elevation: 0,
         automaticallyImplyLeading: false,
@@ -4748,8 +4734,8 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
             } else {
               AdminNavPersistence.savePage('dashboard');
               navigator.pushAndRemoveUntil<void>(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AdminDashboard(restoreLastPage: false),
+                adminPageRoute<void>(
+                  const AdminDashboard(restoreLastPage: false),
                 ),
                 (route) => false,
               );

@@ -26,8 +26,6 @@ import '../../navigation_persistence.dart';
 class _ResponsiveUI {
   static double width(BuildContext context) => MediaQuery.sizeOf(context).width;
 
-  static bool isPhone(BuildContext context) => width(context) < 600;
-
   static double dialogWidth(BuildContext context, double desktopWidth) {
     final w = width(context);
     if (w < 600) return w - 28;
@@ -696,9 +694,9 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
     }
   }
 
-  Future<void> _navigateFromAdminSidebar(String destination) async {
+  void _navigateFromAdminSidebar(String destination) {
     // Preserve the existing saved-page key and clear stale detail restoration.
-    await _saveAdminPage(destination);
+    unawaited(_saveAdminPage(destination));
     if (!mounted) return;
 
     // Do not navigate to another copy of the page already open.
@@ -731,11 +729,7 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
     if (page == null || !mounted) return;
 
     Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => page!,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
+      adminPageRoute(page),
     );
   }
 
@@ -803,7 +797,7 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
                       try {
                         await LoginScreen.clearSavedCredentials();
                         await FirebaseAuth.instance.signOut();
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         Navigator.of(
                           context,
                           rootNavigator: true,
@@ -814,7 +808,7 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
                           (route) => false,
                         );
                       } catch (e) {
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         AdminNotification.error(context, 'Logout failed: $e');
                       }
                     },
@@ -855,129 +849,10 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
         onDestinationSelected: _navigateFromAdminSidebar,
         onProfileTap: () => _showProfileMenu(context),
       ),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            // Purple TechNoWiz Brand Icon Badge (Shield)
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    AdminThemeColors.primary,
-                    AdminThemeColors.primaryDark,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(11),
-                boxShadow: [
-                  BoxShadow(
-                    color: AdminThemeColors.primary.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.admin_panel_settings_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 11),
-
-            // TechNoWiz Brand & Screen Subtitle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'TechNoWiz',
-                        style: TextStyle(
-                          color: AdminThemeColors.primaryDark,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AdminThemeColors.pillBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AdminThemeColors.primary
-                                .withValues(alpha: 0.22),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Text(
-                          'Quiz Sessions',
-                          style: TextStyle(
-                            color: AdminThemeColors.primary,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Manage and monitor all quiz sessions',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Color(0xFF7B8198),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // 3 Lines Navigation Menu on the RIGHT side
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Builder(
-                builder: (scaffoldContext) => IconButton(
-                  tooltip: 'Open navigation menu',
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.menu_rounded,
-                    color: textDark,
-                    size: 24,
-                  ),
-                  onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    Scaffold.of(scaffoldContext).openEndDrawer();
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
+      appBar: buildAdminStandardAppBar(
+        context: context,
+        badgeText: 'Quiz Sessions',
+        subtitle: 'Manage and monitor all quiz sessions',
       ),
       body: SafeArea(
         top: false,
@@ -1460,8 +1335,8 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
     // Safe fallback when this detail page is the root route.
     navigator.pushAndRemoveUntil<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => const ManageQuizSessionsScreen(),
+      adminPageRoute<void>(
+        const ManageQuizSessionsScreen(),
       ),
       (route) => false,
     );
@@ -2650,7 +2525,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        toolbarHeight: _ResponsiveUI.isPhone(context) ? 60 : 68,
+        toolbarHeight: kAdminAppBarHeight,
         leading: IconButton(
           onPressed: _handleDetailBack,
           icon: const Icon(Icons.arrow_back_rounded, color: textDark),
@@ -3517,7 +3392,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
                             // QUESTION TYPE
                             DropdownButtonFormField<String>(
-                              value: const [
+                              initialValue: const [
                                 'Multiple Choice',
                                 'Identification',
                                 'True/False',

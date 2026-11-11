@@ -266,12 +266,21 @@ class AdminSidebar extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
+            final scaffold = Scaffold.maybeOf(context);
+            final bool hasDrawer = (scaffold?.isDrawerOpen ?? false) ||
+                (scaffold?.isEndDrawerOpen ?? false);
+
+            if (selected) {
+              if (hasDrawer) {
+                Navigator.of(context).pop();
+              }
+              return;
+            }
+
+            if (hasDrawer) {
               Navigator.of(context).pop();
             }
-            if (!selected) {
-              onDestinationSelected(item.keyName);
-            }
+            onDestinationSelected(item.keyName);
           },
           child: Container(
             decoration: BoxDecoration(

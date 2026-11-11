@@ -105,11 +105,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     if (page == null || !mounted) return;
 
     Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => page!,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
+      adminPageRoute(page),
     );
   }
 
@@ -1326,7 +1322,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        toolbarHeight: 62,
+        toolbarHeight: kAdminAppBarHeight,
         title: Row(
           children: [
             Container(

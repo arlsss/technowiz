@@ -1548,11 +1548,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
     if (page == null || !context.mounted) return;
 
     Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        pageBuilder: (context, animation, secondaryAnimation) => page!,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
+      adminPageRoute(page),
     );
   }
 
@@ -1567,135 +1563,14 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   }
 
   PreferredSizeWidget buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: Colors.white,
-
-      elevation: 0,
-
-      scrolledUnderElevation: 0,
-
-      surfaceTintColor: Colors.transparent,
-
-      automaticallyImplyLeading: false,
-
-      titleSpacing: 16,
-
-      title: Row(
-        children: [
-          // Purple TechNoWiz Brand Icon Badge (Shield)
-          Container(
-            width: 38,
-
-            height: 38,
-
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  AdminThemeColors.primary,
-                  AdminThemeColors.primaryDark,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(11),
-              boxShadow: [
-                BoxShadow(
-                  color: AdminThemeColors.primary.withValues(alpha: 0.35),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.admin_panel_settings_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-
-          const SizedBox(width: 11),
-
-          // TechNoWiz Brand & Screen Subtitle
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'TechNoWiz',
-                      style: TextStyle(
-                        color: AdminThemeColors.primaryDark,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AdminThemeColors.pillBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AdminThemeColors.primary.withValues(alpha: 0.22),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Text(
-                        'Question Bank',
-                        style: TextStyle(
-                          color: AdminThemeColors.primary,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 2),
-
-                const Text(
-                  'Your quiz question bank',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textGrey,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: IconButton(
-              tooltip: 'Open navigation menu',
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.menu_rounded, color: textDark, size: 24),
-              onPressed: () {
-                FocusScope.of(context).unfocus();
-                _scaffoldKey.currentState?.openEndDrawer();
-              },
-            ),
-          ),
-        ),
-      ],
+    return buildAdminStandardAppBar(
+      context: context,
+      badgeText: 'Question Bank',
+      subtitle: 'Your quiz question bank',
+      onMenuPressed: () {
+        FocusScope.of(context).unfocus();
+        _scaffoldKey.currentState?.openEndDrawer();
+      },
     );
   }
 

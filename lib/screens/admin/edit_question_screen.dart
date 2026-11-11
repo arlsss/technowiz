@@ -58,7 +58,7 @@ class _EditQuestionScreenState extends State<EditQuestionScreen> {
       navigator.pop();
     } else {
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const QuestionListScreen()),
+        adminPageRoute(const QuestionListScreen()),
       );
     }
   }
@@ -853,10 +853,9 @@ class _EditQuestionScreenState extends State<EditQuestionScreen> {
 
       appBar: AppBar(
         backgroundColor: Colors.white,
-
         surfaceTintColor: Colors.transparent,
-
         elevation: 0,
+        toolbarHeight: kAdminAppBarHeight,
 
         automaticallyImplyLeading: false,
 

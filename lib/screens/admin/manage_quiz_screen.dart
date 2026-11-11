@@ -545,6 +545,7 @@ class _ManageQuizScreenState extends State<ManageQuizScreen> {
       // APP BAR
       // ========================================================
       appBar: AppBar(
+        toolbarHeight: kAdminAppBarHeight,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: textDark),
           tooltip: 'Back to Dashboard',
@@ -555,8 +556,8 @@ class _ManageQuizScreenState extends State<ManageQuizScreen> {
             } else {
               AdminNavPersistence.savePage('dashboard');
               navigator.pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => const AdminDashboard(restoreLastPage: false),
+                adminPageRoute(
+                  const AdminDashboard(restoreLastPage: false),
                 ),
               );
             }

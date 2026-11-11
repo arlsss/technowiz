@@ -2242,7 +2242,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
     Navigator.of(
       context,
-    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => destination!));
+    ).pushReplacement(adminPageRoute<void>(destination));
   }
 
   Future<void> _showProfileMenu(BuildContext context) async {
@@ -2370,11 +2370,9 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
       appBar: AppBar(
         backgroundColor: Colors.white,
-
         elevation: 0,
-
         surfaceTintColor: Colors.transparent,
-
+        toolbarHeight: kAdminAppBarHeight,
         leading: IconButton(
           tooltip: 'Back to Question Bank',
           onPressed: () {
@@ -2383,8 +2381,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
               Navigator.of(context).pop();
             } else {
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute<void>(
-                  builder: (_) => const QuestionListScreen(),
+                adminPageRoute<void>(
+                  const QuestionListScreen(),
                 ),
               );
             }

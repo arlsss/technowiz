@@ -94,11 +94,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     if (page == null || !context.mounted) return;
 
     Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => page!,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
+      adminPageRoute(page),
     );
   }
 
@@ -231,10 +227,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         titleSpacing: showHistory ? 0 : 16,
-        toolbarHeight: 62,
+        toolbarHeight: kAdminAppBarHeight,
         leading: showHistory
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded, color: AdminThemeColors.textPrimary),

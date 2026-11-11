@@ -1320,7 +1320,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
     Navigator.of(
       context,
-    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => page));
+    ).pushReplacement(adminPageRoute<void>(page));
   }
 
   void _showProfileMenu(BuildContext context) {
@@ -1442,19 +1442,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-
       backgroundColor: background,
-
-      drawer: _buildNavigationDrawer(context),
-
+      appBar: buildAdminStandardAppBar(
+        context: context,
+        badgeText: 'Manage Users',
+        subtitle: 'View and manage registered users and their account types.',
+        onMenuPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+      ),
       endDrawer: _buildNavigationDrawer(context),
-
-      drawerEnableOpenDragGesture: true,
-
       endDrawerEnableOpenDragGesture: true,
-
-      body: SafeArea(
-        child: AdminCircuitBackground(
+      body: AdminCircuitBackground(
           child: LayoutBuilder(
             builder: (context, constraints) {
               final double width = constraints.maxWidth;
@@ -1570,180 +1567,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
 
                           children: [
-                            // =================================================
-
-                            // CLEAN WHITE HEADER
-
-                            // =================================================
-                            Container(
-                              width: double.infinity,
-
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isMobile ? 14 : 18,
-
-                                vertical: isMobile ? 12 : 14,
-                              ),
-
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-
-                                borderRadius: BorderRadius.circular(16),
-
-                                border: Border.all(
-                                  color: AdminThemeColors.primary.withValues(
-                                    alpha: 0.12,
-                                  ),
-                                  width: 1,
-                                ),
-
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AdminThemeColors.primary.withValues(
-                                      alpha: 0.05,
-                                    ),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-
-                                children: [
-                                  // Purple TechNoWiz Brand Icon Badge (Shield)
-                                  Container(
-                                    width: 38,
-
-                                    height: 38,
-
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          AdminThemeColors.primary,
-                                          AdminThemeColors.primaryDark,
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      borderRadius: BorderRadius.circular(11),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AdminThemeColors.primary
-                                              .withValues(alpha: 0.35),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.admin_panel_settings_rounded,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 11),
-
-                                  // TechNoWiz Brand & Screen Subtitle
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-
-                                      mainAxisSize: MainAxisSize.min,
-
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Text(
-                                              'TechNoWiz',
-                                              style: TextStyle(
-                                                color: AdminThemeColors
-                                                    .primaryDark,
-                                                fontSize: 17,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 0.2,
-                                              ),
-                                            ),
-
-                                            const SizedBox(width: 8),
-
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: AdminThemeColors.pillBg,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: AdminThemeColors
-                                                      .primary
-                                                      .withValues(alpha: 0.22),
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: const Text(
-                                                'Manage Users',
-                                                style: TextStyle(
-                                                  color:
-                                                      AdminThemeColors.primary,
-                                                  fontSize: 10.5,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
-                                        const SizedBox(height: 2),
-
-                                        const Text(
-                                          "View and manage registered users and their account types.",
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: textGrey,
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 8),
-
-                                  // 3 Lines Navigation Menu on the RIGHT side
-                                  SizedBox(
-                                    width: 40,
-
-                                    height: 40,
-
-                                    child: IconButton(
-                                      tooltip: 'Open navigation menu',
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(
-                                        Icons.menu_rounded,
-                                        size: 24,
-                                        color: textDark,
-                                      ),
-                                      onPressed: () {
-                                        FocusScope.of(context).unfocus();
-                                        _scaffoldKey.currentState
-                                            ?.openEndDrawer();
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
                             // =================================================
 
                             // STATISTICS
@@ -2296,7 +2119,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             },
           ),
         ),
-      ),
     );
   }
 }

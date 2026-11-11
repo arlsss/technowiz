@@ -109,8 +109,8 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
     // Return to Quiz Sessions / Admin Dashboard safely
     AdminNavPersistence.savePage('quiz_sessions');
     navigator.pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => const ManageQuizSessionsScreen(),
+      adminPageRoute<void>(
+        const ManageQuizSessionsScreen(),
       ),
     );
   }
@@ -1562,12 +1562,10 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
       // =======================================================
       appBar: AppBar(
         backgroundColor: Colors.white,
-
-        surfaceTintColor: Colors.white,
-
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-
         scrolledUnderElevation: 0,
+        toolbarHeight: kAdminAppBarHeight,
 
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: textDark, size: 21),
@@ -1633,8 +1631,6 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
           ),
           const SizedBox(width: 8),
         ],
-
-        toolbarHeight: 62,
 
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
