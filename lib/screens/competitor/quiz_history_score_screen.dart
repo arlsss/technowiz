@@ -461,28 +461,33 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                         ),
                       ),
                     )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-                      children: [
-                        // LEVEL SELECTOR PILLS
-                        if (uniqueLevels.length > 1) ...[
-                          _buildLevelSelectorBar(uniqueLevels),
-                          const SizedBox(height: 12),
-                        ],
+                  : Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 920),
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                          children: [
+                            // LEVEL SELECTOR PILLS
+                            if (uniqueLevels.length > 1) ...[
+                              _buildLevelSelectorBar(uniqueLevels),
+                              const SizedBox(height: 12),
+                            ],
 
-                        // SUMMARY HERO CARD (Separated per Level or Overall)
-                        _buildSummaryCard(title, uniqueLevels),
+                            // SUMMARY HERO CARD (Separated per Level or Overall)
+                            _buildSummaryCard(title, uniqueLevels),
 
-                        const SizedBox(height: 14),
+                            const SizedBox(height: 14),
 
-                        // STATUS FILTER CHIPS (All, Correct, Wrong)
-                        _buildFilterChips(),
+                            // STATUS FILTER CHIPS (All, Correct, Wrong)
+                            _buildFilterChips(),
 
-                        const SizedBox(height: 16),
+                            const SizedBox(height: 16),
 
-                        // QUESTIONS CONTENT (Separated by Level Sections or Selected Level)
-                        _buildQuestionsContent(uniqueLevels),
-                      ],
+                            // QUESTIONS CONTENT (Separated by Level Sections or Selected Level)
+                            _buildQuestionsContent(uniqueLevels),
+                          ],
+                        ),
+                      ),
                     ),
         ),
       ),
@@ -677,37 +682,45 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                   ],
                 ),
               ),
-              if (isSingleLevel)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedLevel = null;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white30),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.close_rounded, color: Colors.white, size: 14),
-                        SizedBox(width: 4),
-                        Text(
-                          'View All',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+              if (isSingleLevel) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  flex: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedLevel = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white30),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.close_rounded, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'View All',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
+              ],
             ],
           ),
 
@@ -715,42 +728,65 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
 
           // STATS ROW: CORRECT • WRONG • SCORE
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white24),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSummaryStat(
-                  icon: Icons.check_circle_rounded,
-                  iconColor: Colors.greenAccent.shade400,
-                  value: '${currentStats['correct']}',
-                  label: isSingleLevel ? 'Level Correct' : 'Total Correct',
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildSummaryStat(
+                        icon: Icons.check_circle_rounded,
+                        iconColor: Colors.greenAccent.shade400,
+                        value: '${currentStats['correct']}',
+                        label: isSingleLevel ? 'Level Correct' : 'Total Correct',
+                      ),
+                    ),
+                  ),
                 ),
                 Container(
                   width: 1,
                   height: 34,
                   color: Colors.white24,
                 ),
-                _buildSummaryStat(
-                  icon: Icons.cancel_rounded,
-                  iconColor: Colors.redAccent.shade100,
-                  value: '${currentStats['wrong']}',
-                  label: isSingleLevel ? 'Level Wrong' : 'Total Wrong',
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildSummaryStat(
+                        icon: Icons.cancel_rounded,
+                        iconColor: Colors.redAccent.shade100,
+                        value: '${currentStats['wrong']}',
+                        label: isSingleLevel ? 'Level Wrong' : 'Total Wrong',
+                      ),
+                    ),
+                  ),
                 ),
                 Container(
                   width: 1,
                   height: 34,
                   color: Colors.white24,
                 ),
-                _buildSummaryStat(
-                  icon: Icons.stars_rounded,
-                  iconColor: Colors.amberAccent.shade400,
-                  value: '${currentStats['score']} pts',
-                  label: isSingleLevel ? 'Level Score' : 'Final Score',
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildSummaryStat(
+                        icon: Icons.stars_rounded,
+                        iconColor: Colors.amberAccent.shade400,
+                        value: '${currentStats['score']} pts',
+                        label: isSingleLevel ? 'Level Score' : 'Final Score',
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -925,7 +961,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
           decoration: BoxDecoration(
             color: isSelected ? activeColor : Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -943,13 +979,19 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                   ]
                 : null,
           ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : textDark,
-              fontSize: 12.5,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : textDark,
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ),
@@ -1050,6 +1092,8 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
               children: [
                 Text(
                   title.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
                     fontSize: 13,
@@ -1069,25 +1113,29 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.3),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+          const SizedBox(width: 8),
+          Flexible(
+            flex: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '$score pts',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
                 ),
-              ],
-            ),
-            child: Text(
-              '$score pts',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w900,
               ),
             ),
           ),
@@ -1173,14 +1221,16 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // CARD HEADER: NUMBER + LEVEL + STATUS PILL
-          Row(
-            children: [
-              Container(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final qPill = Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: _getLevelColor(level).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _getLevelColor(level).withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: _getLevelColor(level).withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   'Q#$questionNumber • Level $level',
@@ -1190,35 +1240,79 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
+              );
+
+              final typeText = Text(
                 questionType,
                 style: const TextStyle(
                   color: Colors.black45,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+              );
+
+              final statusBadge = Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4.5,
+                ),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                 ),
-                child: Text(
-                  statusLabel,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    statusLabel,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              );
+
+              if (constraints.maxWidth < 250) {
+                return SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [qPill, typeText],
+                      ),
+                      statusBadge,
+                    ],
+                  ),
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 5,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [qPill, typeText],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(flex: 0, child: statusBadge),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 12),
