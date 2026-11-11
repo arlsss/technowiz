@@ -3232,6 +3232,102 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return result;
   }
 
+  Widget _buildRankTrophyBadge(int rank) {
+    if (rank <= 3) {
+      final trophyAsset = rank == 1
+          ? 'assets/trophies/gold_trophy_3d.jpg'
+          : (rank == 2
+              ? 'assets/trophies/silver_trophy_3d.jpg'
+              : 'assets/trophies/bronze_trophy_3d.jpg');
+
+      final rankColor = rank == 1
+          ? const Color(0xFFF59E0B)
+          : (rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+
+      return Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                trophyAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  rank == 1
+                      ? Icons.emoji_events_rounded
+                      : (rank == 2
+                          ? Icons.workspace_premium_rounded
+                          : Icons.military_tech_rounded),
+                  size: 18,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: rank <= 10 ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+        border: Border.all(
+          color: rank <= 10 ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$rank',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+          color: rank <= 10 ? primaryGreen : const Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+
   Widget _leaderboardRows(List<Map<String, dynamic>> rows) {
     if (rows.isEmpty) {
       return const Padding(
@@ -3253,7 +3349,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           child: const Row(
             children: [
               SizedBox(
-                width: 30,
+                width: 42,
                 child: Text(
                   '#',
                   style: TextStyle(
@@ -3288,13 +3384,6 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           final row = rows[index];
           final score = _scoreToInt(row['score']);
           final rank = index + 1;
-          final medal = rank == 1
-              ? Icons.emoji_events_rounded
-              : rank == 2
-              ? Icons.workspace_premium_rounded
-              : rank == 3
-              ? Icons.military_tech_rounded
-              : null;
 
           final currentUid = FirebaseAuth.instance.currentUser?.uid;
           final isCurrentUser = currentUid != null &&
@@ -3304,22 +3393,24 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: isCurrentUser ? const Color(0xFFF0FDF4) : Colors.transparent,
+              color: isCurrentUser
+                  ? const Color(0xFFF0FDF4)
+                  : (rank == 1
+                      ? const Color(0xFFFFFDF5)
+                      : (rank == 2
+                          ? const Color(0xFFFAFBFC)
+                          : (rank == 3
+                              ? const Color(0xFFFFFBF7)
+                              : Colors.transparent))),
               border: const Border(top: BorderSide(color: softBorder)),
             ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 30,
-                  child: medal != null
-                      ? Icon(medal, size: 19, color: primaryGreen)
-                      : Text(
-                          '$rank',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black54,
-                          ),
-                        ),
+                  width: 42,
+                  child: Center(
+                    child: _buildRankTrophyBadge(rank),
+                  ),
                 ),
                 Expanded(
                   child: Row(
@@ -3328,14 +3419,36 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                         width: 34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: lightGreen,
+                          color: rank == 1
+                              ? const Color(0xFFFEF3C7)
+                              : (rank == 2
+                                  ? const Color(0xFFF1F5F9)
+                                  : (rank == 3
+                                      ? const Color(0xFFFFEDD5)
+                                      : lightGreen)),
                           borderRadius: BorderRadius.circular(10),
+                          border: rank <= 3
+                              ? Border.all(
+                                  color: rank == 1
+                                      ? const Color(0xFFFDE68A)
+                                      : (rank == 2
+                                          ? const Color(0xFFCBD5E1)
+                                          : const Color(0xFFFED7AA)),
+                                  width: 1,
+                                )
+                              : null,
                         ),
                         child: Icon(
                           row['isTeam'] == true
                               ? Icons.groups_rounded
                               : Icons.person_rounded,
-                          color: primaryGreen,
+                          color: rank == 1
+                              ? const Color(0xFFD97706)
+                              : (rank == 2
+                                  ? const Color(0xFF64748B)
+                                  : (rank == 3
+                                      ? const Color(0xFFB45309)
+                                      : primaryGreen)),
                           size: 19,
                         ),
                       ),
@@ -3956,6 +4069,240 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     );
   }
 
+  Widget _buildPodiumCard(List<Map<String, dynamic>> rows) {
+    final first = rows.isNotEmpty ? rows[0] : null;
+    final second = rows.length > 1 ? rows[1] : null;
+    final third = rows.length > 2 ? rows[2] : null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: softBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: primaryGreen,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Top Performers',
+                  style: TextStyle(
+                    color: darkGreen,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: lightGreen,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Text(
+                  'TOP 3 PODIUM',
+                  style: TextStyle(
+                    color: primaryGreen,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: _buildPodiumPerson(entry: second, rank: 2, height: 95),
+              ),
+              Expanded(
+                child: _buildPodiumPerson(entry: first, rank: 1, height: 125),
+              ),
+              Expanded(
+                child: _buildPodiumPerson(entry: third, rank: 3, height: 80),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPodiumPerson({
+    required Map<String, dynamic>? entry,
+    required int rank,
+    required double height,
+  }) {
+    final bool isFirst = rank == 1;
+    final trophyAsset = rank == 1
+        ? 'assets/trophies/gold_trophy_3d.jpg'
+        : (rank == 2
+            ? 'assets/trophies/silver_trophy_3d.jpg'
+            : 'assets/trophies/bronze_trophy_3d.jpg');
+
+    final rankColor = rank == 1
+        ? const Color(0xFFF59E0B)
+        : (rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+
+    final pedestalGradient = rank == 1
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+          )
+        : (rank == 2
+            ? const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+              )
+            : const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA)],
+              ));
+
+    final name = entry?['displayName']?.toString() ?? '---';
+    final score = entry != null ? _scoreToInt(entry['score']) : 0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 3D Trophy Circle Avatar
+        Container(
+          width: isFirst ? 58 : 50,
+          height: isFirst ? 58 : 50,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: rankColor, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: rankColor.withValues(alpha: isFirst ? 0.35 : 0.22),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: entry != null
+                ? Image.asset(
+                    trophyAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.emoji_events_rounded,
+                      size: isFirst ? 30 : 24,
+                      color: rankColor,
+                    ),
+                  )
+                : Container(
+                    color: const Color(0xFFF1F5F9),
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      size: 24,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Contestant / Team Name
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: darkGreen,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+
+        // Score
+        Text(
+          entry != null ? '$score pts' : '-',
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: primaryGreen,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Pedestal
+        Container(
+          height: height,
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            gradient: pedestalGradient,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            border: Border.all(
+              color: rankColor.withValues(alpha: 0.4),
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Container(
+              width: isFirst ? 38 : 32,
+              height: isFirst ? 38 : 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(color: rankColor, width: 1.5),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x10000000),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  '$rank',
+                  style: TextStyle(
+                    fontSize: isFirst ? 18 : 15,
+                    fontWeight: FontWeight.w900,
+                    color: rankColor,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLeaderboardCardContainer({
     required List<Map<String, dynamic>> rows,
     required bool isLive,
@@ -3995,74 +4342,83 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       );
     }
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: softBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (rows.isNotEmpty) ...[
+          _buildPodiumCard(rows),
+          const SizedBox(height: 16),
         ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF7FAF8),
-              border: Border(bottom: BorderSide(color: softBorder)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isLive
-                      ? Icons.sensors_rounded
-                      : Icons.leaderboard_rounded,
-                  size: 16,
-                  color: isLive ? primaryGreen : const Color(0xFF64748B),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: softBorder),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08000000),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF7FAF8),
+                  border: Border(bottom: BorderSide(color: softBorder)),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '$levelTitle Ranking (${rows.length} Contestants)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: darkGreen,
-                  ),
-                ),
-                const Spacer(),
-                if (isLive)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
+                child: Row(
+                  children: [
+                    Icon(
+                      isLive
+                          ? Icons.sensors_rounded
+                          : Icons.leaderboard_rounded,
+                      size: 16,
+                      color: isLive ? primaryGreen : const Color(0xFF64748B),
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Text(
-                      'REAL-TIME',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF15803D),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$levelTitle Ranking (${rows.length} Contestants)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: darkGreen,
                       ),
                     ),
-                  ),
-              ],
-            ),
+                    const Spacer(),
+                    if (isLive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'REAL-TIME',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF15803D),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _leaderboardRows(rows),
+            ],
           ),
-          _leaderboardRows(rows),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

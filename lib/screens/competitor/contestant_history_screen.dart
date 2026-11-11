@@ -635,6 +635,7 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
     Color? rankBgColor;
     Color? rankTextColor;
     IconData rankIcon = Icons.leaderboard_rounded;
+    String? trophyAsset;
 
     if (rank != null) {
       final rankInt = int.tryParse(rank.toString()) ?? 0;
@@ -642,14 +643,17 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
         rankBgColor = const Color(0xFFFEF3C7);
         rankTextColor = const Color(0xFFB45309);
         rankIcon = Icons.emoji_events_rounded;
+        trophyAsset = 'assets/trophies/gold_trophy_3d.jpg';
       } else if (rankInt == 2) {
         rankBgColor = const Color(0xFFF1F5F9);
         rankTextColor = const Color(0xFF475569);
         rankIcon = Icons.military_tech_rounded;
+        trophyAsset = 'assets/trophies/silver_trophy_3d.jpg';
       } else if (rankInt == 3) {
         rankBgColor = const Color(0xFFFFEDD5);
         rankTextColor = const Color(0xFFC2410C);
         rankIcon = Icons.workspace_premium_rounded;
+        trophyAsset = 'assets/trophies/bronze_trophy_3d.jpg';
       }
     }
 
@@ -684,15 +688,37 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(
-                  color: lightGreen,
+                decoration: BoxDecoration(
+                  color: rankBgColor ?? lightGreen,
                   shape: BoxShape.circle,
+                  border: trophyAsset != null
+                      ? Border.all(
+                          color: (int.tryParse(rank.toString()) ?? 0) == 1
+                              ? const Color(0xFFF59E0B)
+                              : ((int.tryParse(rank.toString()) ?? 0) == 2
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFFD97706)),
+                          width: 1.8,
+                        )
+                      : null,
                 ),
-                child: const Icon(
-                  Icons.emoji_events_rounded,
-                  color: primaryGreen,
-                  size: 26,
-                ),
+                child: trophyAsset != null
+                    ? ClipOval(
+                        child: Image.asset(
+                          trophyAsset,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            rankIcon,
+                            color: rankTextColor ?? primaryGreen,
+                            size: 26,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        rankIcon,
+                        color: rankTextColor ?? primaryGreen,
+                        size: 26,
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(
