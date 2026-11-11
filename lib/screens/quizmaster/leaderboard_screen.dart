@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +8,7 @@ import 'quiz_sessions_screen.dart';
 import 'manage_participants_screen.dart';
 import 'profile_screen.dart';
 import 'quizmaster_theme.dart';
+import '../../navigation_persistence.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   final String quizCode;
@@ -2438,8 +2438,14 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
               widget.onBack!();
             } else if (widget.onOpenNavigation != null) {
               widget.onOpenNavigation!();
+            } else if (Navigator.canPop(context)) {
+              Navigator.pop(context);
             } else {
-              Navigator.maybePop(context);
+              QuizMasterNavPersistence.savePage('dashboard');
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
+              );
             }
           },
         ),

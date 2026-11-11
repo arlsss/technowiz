@@ -9,6 +9,7 @@ import 'quiz_sessions_screen.dart';
 import 'leaderboard_screen.dart';
 import 'profile_screen.dart';
 import 'quizmaster_theme.dart';
+import '../../navigation_persistence.dart';
 
 class ManageParticipantsScreen extends StatefulWidget {
   final String quizCode;
@@ -1944,8 +1945,14 @@ class _ParticipantsHistoryScreenState extends State<ParticipantsHistoryScreen> {
           onPressed: () {
             if (widget.onBack != null) {
               widget.onBack!();
+            } else if (Navigator.canPop(context)) {
+              Navigator.pop(context);
             } else {
-              Navigator.maybePop(context);
+              QuizMasterNavPersistence.savePage('dashboard');
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
+              );
             }
           },
         ),

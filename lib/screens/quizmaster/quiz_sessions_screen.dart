@@ -15,6 +15,7 @@ import 'quizmaster_dashboard.dart';
 import 'manage_participants_screen.dart';
 import 'profile_screen.dart';
 import 'quizmaster_theme.dart';
+import '../../navigation_persistence.dart';
 
 class QuizSessionsScreen extends StatefulWidget {
   final String? resultMode;
@@ -46,7 +47,6 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
   // Always initialize hover state; avoids null Set runtime errors.
   final Set<int> _hoveredBottomItems = <int>{};
 
-  bool _restoringSavedPage = false;
   bool _navigationInProgress = false;
   bool _readyCheckActivationInProgress = false;
   bool _levelOneStartInProgress = false;
@@ -54,97 +54,10 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
   @override
   void initState() {
     super.initState();
-    _restoreSavedPage();
-  }
-
-  Future<void> _restoreSavedPage() async {
-    if (_restoringSavedPage || widget.resultMode != null) {
-      await _saveCurrentPage();
-      return;
-    }
-
-    _restoringSavedPage = true;
-    final prefs = await SharedPreferences.getInstance();
-    final savedPage = prefs.getString(_lastPageKey);
-    final savedQuizCode = prefs.getString(_quizCodeKey);
-
-    if (!mounted) return;
-
-    // Restore the last saved page after a browser refresh. This change is
-    // intentionally limited to page restoration; other quiz behavior remains
-    // unchanged.
-    Widget? destination;
-
-    if (savedPage == 'dashboard') {
-      destination = const QuizMasterDashboard();
-    } else if (savedPage == 'profile') {
-      destination = const QuizMasterDashboard();
-    } else if (savedQuizCode != null && savedQuizCode.trim().isNotEmpty) {
-      switch (savedPage) {
-        case 'quizmaster_overview':
-          destination = ParticipantReadinessPage(
-            quizCode: savedQuizCode,
-            onStartQuiz: () =>
-                _startLevelOneFromSession(context, savedQuizCode),
-            onBeginQuizEvent: () =>
-                _activateParticipantReadyCheck(context, savedQuizCode),
-          );
-          break;
-        case 'participant_readiness':
-          destination = ContestantReadinessPage(
-            quizCode: savedQuizCode,
-            onStartQuiz: () => openQuiz(context, savedQuizCode),
-            onReturnToSessions: () async {
-              if (!context.mounted) return;
-              Navigator.of(context).pushReplacement(
-                PageRouteBuilder<void>(
-                  pageBuilder: (_, _, _) => const QuizSessionsScreen(),
-                  transitionDuration: Duration.zero,
-                  reverseTransitionDuration: Duration.zero,
-                  transitionsBuilder:
-                      (_, animation, secondaryAnimation, child) => child,
-                ),
-              );
-            },
-          );
-          break;
-        case 'quiz_control':
-          destination = QuizControlScreen(quizCode: savedQuizCode);
-          break;
-        case 'leaderboard':
-          destination = LeaderboardScreen(quizCode: savedQuizCode);
-          break;
-        case 'ranking':
-          destination = FinalRankingScreen(
-            quizCode: savedQuizCode,
-            isFinal: true,
-          );
-          break;
-        case 'contestant':
-          destination = ManageParticipantsScreen(quizCode: savedQuizCode);
-          break;
-      }
-    }
-
-    if (destination != null) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder<void>(
-          pageBuilder: (_, _, _) => destination!,
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-          transitionsBuilder: (_, animation, secondaryAnimation, child) =>
-              child,
-        ),
-      );
-      return;
-    }
-
-    await _saveCurrentPage();
+    _saveCurrentPage();
   }
 
   Future<void> _saveCurrentPage() async {
-    final prefs = await SharedPreferences.getInstance();
-
     String page = 'quiz_sessions';
 
     if (widget.resultMode == 'leaderboard') {
@@ -153,23 +66,15 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
       page = 'ranking';
     }
 
-    await prefs.setString(_lastPageKey, page);
+    await QuizMasterNavPersistence.savePage(page);
   }
 
   Future<void> _saveChildPage(String page, String quizCode) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString(_lastPageKey, page);
-
-    await prefs.setString(_quizCodeKey, quizCode);
+    await QuizMasterNavPersistence.savePage(page, quizCode: quizCode);
   }
 
   Future<void> _saveDashboardPage() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString(_lastPageKey, 'dashboard');
-
-    await prefs.remove(_quizCodeKey);
+    await QuizMasterNavPersistence.savePage('dashboard');
   }
 
   String get pageTitle {

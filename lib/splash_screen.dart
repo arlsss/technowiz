@@ -294,6 +294,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _restoreQuizMasterPage() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
 
     const String lastPageKey = 'technowiz_quizmaster_last_page';
     const String quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
@@ -436,6 +437,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     // Safe fallback
+    await QuizMasterNavPersistence.savePage('dashboard');
     _replaceWith(const QuizMasterDashboard());
   }
 

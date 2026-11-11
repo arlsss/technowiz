@@ -6,8 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'quiz_sessions_screen.dart';
 
 import 'leaderboard_screen.dart';
@@ -15,6 +13,7 @@ import 'leaderboard_screen.dart';
 import 'manage_participants_screen.dart';
 
 import '../login_screen.dart';
+import '../../navigation_persistence.dart';
 
 class QuizMasterDashboard extends StatefulWidget {
   const QuizMasterDashboard({super.key});
@@ -43,10 +42,6 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   int selectedMenu = 0;
   final Set<int> _hoveredMenuItems = <int>{};
   bool _navigationInProgress = false;
-
-  static const String _lastPageKey = 'technowiz_quizmaster_last_page';
-  static const String _quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
-  static const String _resultModeKey = 'technowiz_quizmaster_result_mode';
 
   @override
   void initState() {
@@ -96,34 +91,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   // ============================================================
 
   Future<void> _saveLastPage(String page, {String? resultMode}) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setString(_lastPageKey, page);
-      if (page == 'dashboard') {
-        await prefs.remove(_quizCodeKey);
-      }
-
-      if (resultMode != null) {
-        await prefs.setString(_resultModeKey, resultMode);
-      } else {
-        await prefs.remove(_resultModeKey);
-      }
-    } catch (e) {
-      debugPrint("Quiz Master navigation save error: $e");
-    }
+    await QuizMasterNavPersistence.savePage(page, resultMode: resultMode);
   }
 
   Future<void> _clearLastPage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      await prefs.remove(_lastPageKey);
-
-      await prefs.remove(_resultModeKey);
-    } catch (e) {
-      debugPrint("Quiz Master navigation clear error: $e");
-    }
+    await QuizMasterNavPersistence.clearAll();
   }
 
   Future<void> logout(BuildContext context) async {

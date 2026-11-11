@@ -316,6 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
       } else if (normalizedRole == "quizmaster") {
+        QuizMasterNavPersistence.savePage('dashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
@@ -585,6 +586,7 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
       } else if (normalizedRole == "quizmaster") {
+        QuizMasterNavPersistence.savePage('dashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),

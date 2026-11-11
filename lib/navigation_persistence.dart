@@ -197,3 +197,93 @@ class CompetitorNavPersistence {
   }
 }
 
+/// Centralized navigation state persistence for all Quiz Master screens and tabs.
+/// Ensures that when the browser is refreshed or reloaded, the exact Quiz Master
+/// screen is restored seamlessly without jumping back to Dashboard or another quiz.
+class QuizMasterNavPersistence {
+  static const String lastPageKey = 'technowiz_quizmaster_last_page';
+  static const String quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
+  static const String resultModeKey = 'technowiz_quizmaster_result_mode';
+  static const String leaderboardLevelKey =
+      'technowiz_quizmaster_leaderboard_level';
+  static const String rankingLevelKey = 'technowiz_quizmaster_ranking_level';
+  static const String rankingIsFinalKey =
+      'technowiz_quizmaster_ranking_is_final';
+  static const String readinessLevelKey =
+      'technowiz_quizmaster_readiness_level';
+  static const String submittedQuestionIndexKey =
+      'technowiz_quizmaster_submitted_question_index';
+
+  /// Saves the current Quiz Master page and any optional contextual identifiers.
+  static Future<void> savePage(
+    String pageKey, {
+    String? quizCode,
+    String? resultMode,
+    String? leaderboardLevel,
+    int? rankingLevel,
+    bool? rankingIsFinal,
+    int? readinessLevel,
+    int? submittedQuestionIndex,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(lastPageKey, pageKey);
+
+      if (quizCode != null && quizCode.trim().isNotEmpty) {
+        await prefs.setString(quizCodeKey, quizCode.trim());
+      } else if (pageKey == 'dashboard') {
+        await prefs.remove(quizCodeKey);
+      }
+
+      if (resultMode != null) {
+        await prefs.setString(resultModeKey, resultMode);
+      } else {
+        await prefs.remove(resultModeKey);
+      }
+
+      if (leaderboardLevel != null) {
+        await prefs.setString(leaderboardLevelKey, leaderboardLevel);
+      }
+      if (rankingLevel != null) {
+        await prefs.setInt(rankingLevelKey, rankingLevel);
+      }
+      if (rankingIsFinal != null) {
+        await prefs.setBool(rankingIsFinalKey, rankingIsFinal);
+      }
+      if (readinessLevel != null) {
+        await prefs.setInt(readinessLevelKey, readinessLevel);
+      }
+      if (submittedQuestionIndex != null) {
+        await prefs.setInt(submittedQuestionIndexKey, submittedQuestionIndex);
+      }
+    } catch (_) {}
+  }
+
+  /// Retrieves the last recorded Quiz Master page key.
+  static Future<String?> getPage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      return prefs.getString(lastPageKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Completely clears all Quiz Master navigation state (used during logout).
+  static Future<void> clearAll() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(lastPageKey);
+      await prefs.remove(quizCodeKey);
+      await prefs.remove(resultModeKey);
+      await prefs.remove(leaderboardLevelKey);
+      await prefs.remove(rankingLevelKey);
+      await prefs.remove(rankingIsFinalKey);
+      await prefs.remove(readinessLevelKey);
+      await prefs.remove(submittedQuestionIndexKey);
+    } catch (_) {}
+  }
+}
+
+
