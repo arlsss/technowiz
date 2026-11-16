@@ -244,6 +244,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }) async {
     final pdf = document ?? pw.Document();
 
+    final effectiveName = teamName.trim().isNotEmpty
+        ? teamName.trim()
+        : (contestantName.trim().isNotEmpty ? contestantName.trim() : 'Contestant');
+
     final String darkCorner;
     final String midCorner;
     final String lightCorner;
@@ -613,11 +617,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                         ],
                       ),
 
-                      // Contestant Name & Underline
+                      // Contestant / Team Name & Underline
                       pw.Column(
                         children: [
                           pw.Text(
-                            contestantName.toUpperCase(),
+                            effectiveName.toUpperCase(),
                             textAlign: pw.TextAlign.center,
                             style: pw.TextStyle(
                               fontSize: 25,
@@ -709,7 +713,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     );
 
     if (printAfter) {
-      final safeName = contestantName.replaceAll(' ', '_').replaceAll(RegExp(r'[^\w\.-]'), '');
+      final safeName = effectiveName.replaceAll(' ', '_').replaceAll(RegExp(r'[^\w\.-]'), '');
       await Printing.layoutPdf(
         onLayout: (format) async => pdf.save(),
         name: 'TechNoWiz_Certificate_Rank${rank}_$safeName.pdf',
@@ -727,8 +731,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final topContestants = contestants.take(3).toList();
     for (var index = 0; index < topContestants.length; index++) {
       final c = topContestants[index];
+      final displayName = c.teamName.isNotEmpty ? c.teamName : c.name;
       await _printCertificate(
-        contestantName: c.name,
+        contestantName: displayName,
         quizTitle: quizTitle,
         rank: index + 1,
         teamName: c.teamName,
@@ -2310,20 +2315,25 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           ),
           const SizedBox(height: 6),
           InkWell(
-            onTap: () => _printCertificate(
-              contestantName: contestant.name,
-              quizTitle: quizTitle,
-              rank: rank,
-              teamName: contestant.teamName,
-              school: contestant.school,
-              totalScore: contestant.totalScore,
-              level1Score: contestant.level1Score,
-              level2Score: contestant.level2Score,
-              level3Score: contestant.level3Score,
-              quizCode: selectedQuizCode ?? '',
-              quizDate: _dateText(),
-              eliminated: false,
-            ),
+            onTap: () {
+              final displayName = contestant.teamName.isNotEmpty
+                  ? contestant.teamName
+                  : contestant.name;
+              _printCertificate(
+                contestantName: displayName,
+                quizTitle: quizTitle,
+                rank: rank,
+                teamName: contestant.teamName,
+                school: contestant.school,
+                totalScore: contestant.totalScore,
+                level1Score: contestant.level1Score,
+                level2Score: contestant.level2Score,
+                level3Score: contestant.level3Score,
+                quizCode: selectedQuizCode ?? '',
+                quizDate: _dateText(),
+                eliminated: false,
+              );
+            },
             borderRadius: BorderRadius.circular(8),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3.5),
@@ -2520,7 +2530,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             tooltip: 'Print / Download Certificate',
             icon: const Icon(Icons.workspace_premium_rounded, size: 20, color: AdminThemeColors.primary),
             onPressed: () => _printCertificate(
-              contestantName: c.name,
+              contestantName: displayName,
               quizTitle: quizTitle,
               rank: rank,
               teamName: c.teamName,
