@@ -1011,9 +1011,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                                 ? '2nd Runner-Up'
                                 : 'Finalist')));
 
+                final displayName = c.teamName.isNotEmpty ? c.teamName : c.name;
+
                 return [
                   '$rank',
-                  c.name,
+                  displayName,
                   schoolText.isNotEmpty ? schoolText : '-',
                   '${c.level1Score}',
                   '${c.level2Score}',
@@ -1057,13 +1059,18 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             )
           else
             pw.Table.fromTextArray(
-              headers: ['#', 'Contestant Name', 'Team Name', 'School Name', 'Status'],
+              headers: ['#', 'Contestant / Team', 'Members', 'School Name', 'Status'],
               data: participants.asMap().entries.map((entry) {
                 final p = entry.value;
+                final isTeam = p.teamName.isNotEmpty;
+                final displayName = isTeam ? p.teamName : p.name;
+                final memberList = p.members.isNotEmpty
+                    ? p.members
+                    : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
                 return [
                   '${entry.key + 1}',
-                  p.name,
-                  p.teamName.isNotEmpty ? p.teamName : '-',
+                  displayName,
+                  memberList.isNotEmpty ? memberList.join(', ') : '-',
                   p.school.isNotEmpty ? p.school : '-',
                   p.isEliminated ? 'ELIMINATED' : p.status.toUpperCase(),
                 ];
@@ -1171,6 +1178,25 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  List<String> _teamMembers(dynamic raw) {
+    if (raw is List) {
+      return raw
+          .map((e) => e is Map
+              ? (e['name'] ?? '').toString().trim()
+              : e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      return raw
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return <String>[];
+  }
+
   // =========================================================
   // DATA PARSER FOR PARTICIPANTS, SCORES & RANKINGS
   // =========================================================
@@ -1192,6 +1218,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           .toString()
           .trim();
       final team = (d['teamName'] ?? '').toString().trim();
+      final members = _teamMembers(d['teamMembers'] ?? d['members']);
       final school = (d['school'] ?? d['schoolName'] ?? '').toString().trim();
       final isElim = status == 'eliminated' || d['isEliminated'] == true;
 
@@ -1204,6 +1231,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         id: doc.id,
         name: name.isEmpty ? 'Contestant' : name,
         teamName: team,
+        members: members,
         school: school,
         totalScore: 0,
         isEliminated: isElim,
@@ -1219,15 +1247,18 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           .toString()
           .trim();
       final team = (d['teamName'] ?? '').toString().trim();
+      final members = _teamMembers(d['teamMembers'] ?? d['members']);
       final school = (d['school'] ?? d['schoolName'] ?? '').toString().trim();
       final isElim = (d['status'] ?? '').toString().toLowerCase() == 'eliminated' ||
           d['isEliminated'] == true;
 
       final existing = map[doc.id];
+      final mergedMembers = {...existing?.members ?? <String>[], ...members}.toList();
       map[doc.id] = ReportContestant(
         id: doc.id,
         name: name.isNotEmpty ? name : (existing?.name ?? 'Contestant'),
         teamName: team.isNotEmpty ? team : (existing?.teamName ?? ''),
+        members: mergedMembers,
         school: school.isNotEmpty ? school : (existing?.school ?? ''),
         totalScore: existing?.totalScore ?? 0,
         isEliminated: isElim || (existing?.isEliminated ?? false),
@@ -1244,6 +1275,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           .toString()
           .trim();
       final team = (d['teamName'] ?? '').toString().trim();
+      final members = _teamMembers(d['teamMembers'] ?? d['members']);
       final school = (d['school'] ?? d['schoolName'] ?? '').toString().trim();
       final isElim = (d['status'] ?? '').toString().toLowerCase() == 'eliminated' ||
           d['isEliminated'] == true ||
@@ -1264,10 +1296,12 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       if (rawTime is Timestamp) timeMs = rawTime.millisecondsSinceEpoch;
 
       final existing = map[uid];
+      final mergedMembers = {...existing?.members ?? <String>[], ...members}.toList();
       map[uid] = ReportContestant(
         id: uid,
         name: name.isNotEmpty ? name : (existing?.name ?? 'Contestant'),
         teamName: team.isNotEmpty ? team : (existing?.teamName ?? ''),
+        members: mergedMembers,
         school: school.isNotEmpty ? school : (existing?.school ?? ''),
         totalScore: finalTotal,
         level1Score: l1,
@@ -2251,7 +2285,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Text(
-              contestant.name,
+              contestant.teamName.isNotEmpty ? contestant.teamName : contestant.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -2325,6 +2359,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
   Widget _buildRankRowCard(int rank, ReportContestant c, String quizTitle) {
     final bool isTop3 = rank <= 3;
+    final isTeam = c.teamName.isNotEmpty;
+    final displayName = isTeam ? c.teamName : c.name;
+    final memberList = c.members.isNotEmpty
+        ? c.members
+        : (isTeam && c.name.isNotEmpty && c.name != c.teamName ? [c.name] : <String>[]);
+    final membersText = memberList.isNotEmpty ? 'Members: ${memberList.join(', ')}' : '';
+
     Color badgeBg;
     Color badgeBorder;
     Color badgeText;
@@ -2390,7 +2431,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        c.name,
+                        displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -2418,11 +2459,20 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       ),
                   ],
                 ),
-                if (c.teamName.isNotEmpty || c.school.isNotEmpty)
+                if (membersText.isNotEmpty)
                   Text(
-                    c.teamName.isNotEmpty
-                        ? (c.school.isNotEmpty ? '${c.teamName} • ${c.school}' : c.teamName)
-                        : c.school,
+                    c.school.isNotEmpty ? '$membersText • ${c.school}' : membersText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AdminThemeColors.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                else if (c.school.isNotEmpty)
+                  Text(
+                    c.school,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2791,7 +2841,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       return p.name.toLowerCase().contains(q) ||
           p.teamName.toLowerCase().contains(q) ||
           p.school.toLowerCase().contains(q) ||
-          p.id.toLowerCase().contains(q);
+          p.members.any((m) => m.toLowerCase().contains(q));
     }).toList();
 
     return Column(
@@ -2883,6 +2933,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   Widget _buildParticipantRecordCard(int index, ReportContestant p) {
+    final isTeam = p.teamName.isNotEmpty;
+    final displayName = isTeam ? p.teamName : p.name;
+    final memberList = p.members.isNotEmpty
+        ? p.members
+        : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
+    final membersText = memberList.isNotEmpty ? 'Members: ${memberList.join(', ')}' : '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2911,7 +2968,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  p.name,
+                  displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -2920,11 +2977,20 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                if (p.teamName.isNotEmpty || p.school.isNotEmpty)
+                if (membersText.isNotEmpty)
                   Text(
-                    p.teamName.isNotEmpty
-                        ? (p.school.isNotEmpty ? '${p.teamName} • ${p.school}' : p.teamName)
-                        : p.school,
+                    p.school.isNotEmpty ? '$membersText • ${p.school}' : membersText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AdminThemeColors.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                else if (p.school.isNotEmpty)
+                  Text(
+                    p.school,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2933,10 +2999,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                Text(
-                  'ID: ${p.id}',
-                  style: const TextStyle(fontSize: 8.5, color: AdminThemeColors.textSubtle),
-                ),
               ],
             ),
           ),
@@ -3052,6 +3114,7 @@ class ReportContestant {
   final String id;
   final String name;
   final String teamName;
+  final List<String> members;
   final String school;
   final int totalScore;
   final int level1Score;
@@ -3067,6 +3130,7 @@ class ReportContestant {
     required this.id,
     required this.name,
     this.teamName = '',
+    this.members = const [],
     this.school = '',
     this.totalScore = 0,
     this.level1Score = 0,

@@ -1792,7 +1792,27 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
 
     Widget leadingWidget;
 
-    if (isTop3) {
+    if (entry.eliminated) {
+      // Eliminated contestant uses soft-red rank indicator
+      leadingWidget = Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFFCA5A5), width: 1.2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$rank',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFDC2626),
+          ),
+        ),
+      );
+    } else if (isTop3) {
       final trophyAsset = isFirst
           ? 'assets/trophies/gold_trophy_3d.jpg'
           : (isSecond
@@ -2425,6 +2445,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
 
     final result = grouped.values.toList();
     result.sort((a, b) {
+      // Active contestants always rank above eliminated contestants
+      if (a.eliminated != b.eliminated) {
+        return a.eliminated ? 1 : -1;
+      }
       final scoreCompare = b.score.compareTo(a.score);
       if (scoreCompare != 0) return scoreCompare;
       if (a.lastSubmissionTime != null && b.lastSubmissionTime != null) {
