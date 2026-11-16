@@ -1153,20 +1153,28 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
         child: Row(
           children: [
             if (showLetter) ...[
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isCorrect ? successColor : lightPurple,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  letter,
-                  style: TextStyle(
-                    color: isCorrect ? Colors.white : primaryPurple,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+              InkWell(
+                borderRadius: BorderRadius.circular(17),
+                onTap: () {
+                  setState(() {
+                    correctAnswer = letter;
+                  });
+                },
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isCorrect ? successColor : lightPurple,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    letter,
+                    style: TextStyle(
+                      color: isCorrect ? Colors.white : primaryPurple,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
@@ -1178,26 +1186,6 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                 controller: controller,
 
                 hint: 'Enter option $letter',
-              ),
-            ),
-
-            const SizedBox(width: 7),
-
-            InkWell(
-              borderRadius: BorderRadius.circular(20),
-
-              onTap: () {
-                setState(() {
-                  correctAnswer = letter;
-                });
-              },
-
-              child: Icon(
-                isCorrect ? Icons.check_circle : Icons.radio_button_unchecked,
-
-                color: isCorrect ? successColor : textGrey,
-
-                size: 21,
               ),
             ),
           ],
@@ -1733,8 +1721,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                   ? 'Blank Answer Choices'
                   : 'Answer Choices',
               subtitle: questionType == 'Fill in the Blank'
-                  ? 'Enter choices for the blank and select the correct one.'
-                  : 'Select the circle beside the correct answer.',
+                  ? 'Enter choices for the blank and select the correct one below.'
+                  : 'Enter answer choices and select the correct answer below.',
               child: Column(
                 children: [
                   optionCard(
