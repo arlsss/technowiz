@@ -144,12 +144,35 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
               .get();
 
           if (!scoreSnapshot.exists) return null;
-          final scoreData = scoreSnapshot.data() ?? {};
+          final scoreData = Map<String, dynamic>.from(scoreSnapshot.data() ?? {});
           if (scoreData['hiddenFromHistory'] == true) {
             _deletedIds.add(quiz.id);
             _deletedIds.add(code);
             return null;
           }
+
+          try {
+            final joinSnapshot = await quiz.reference
+                .collection('join_requests')
+                .doc(uid)
+                .get();
+            if (joinSnapshot.exists) {
+              final joinData = joinSnapshot.data() ?? {};
+              final isJoinEliminated = joinData['eliminated'] == true ||
+                  joinData['isEliminated'] == true ||
+                  (joinData['status'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+                  (joinData['decision'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+                  (joinData['contestantDecision'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+                  joinData['eliminatedLevel'] != null;
+
+              if (isJoinEliminated) {
+                scoreData['eliminated'] = true;
+              }
+              if (scoreData['rank'] == null && joinData['rank'] != null) {
+                scoreData['rank'] = joinData['rank'];
+              }
+            }
+          } catch (_) {}
 
           scoresMap[quiz.id] = scoreData;
 
@@ -633,6 +656,13 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
     final rank = scoreData['rank'];
     final updatedAt = scoreData['updatedAt'];
 
+    final bool isEliminated = scoreData['eliminated'] == true ||
+        scoreData['isEliminated'] == true ||
+        (scoreData['status'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+        (scoreData['decision'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+        (scoreData['contestantDecision'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+        scoreData['eliminatedLevel'] != null;
+
     Color? rankBgColor;
     Color? rankTextColor;
     IconData rankIcon = Icons.leaderboard_rounded;
@@ -655,7 +685,21 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
         rankTextColor = const Color(0xFFC2410C);
         rankIcon = Icons.workspace_premium_rounded;
         trophyAsset = 'assets/trophies/bronze_trophy_3d.jpg';
+      } else if (rankInt >= 4 && rankInt <= 10) {
+        rankBgColor = const Color(0xFFF0FDF4);
+        rankTextColor = const Color(0xFF16A34A);
+        rankIcon = Icons.workspace_premium_rounded;
+        trophyAsset = 'assets/trophies/top10_badge_3d.jpg';
+      } else if (rankInt > 10) {
+        rankBgColor = const Color(0xFFF3F4F6);
+        rankTextColor = const Color(0xFF4B5563);
+        rankIcon = Icons.leaderboard_rounded;
+        trophyAsset = null;
       }
+    } else if (isEliminated) {
+      rankBgColor = const Color(0xFFFEE2E2);
+      rankTextColor = const Color(0xFFDC2626);
+      rankIcon = Icons.cancel_rounded;
     }
 
     return Material(
@@ -680,7 +724,9 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: softBorder),
+            border: Border.all(
+              color: isEliminated ? const Color(0xFFFECACA) : softBorder,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.035),
@@ -703,10 +749,17 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
                               ? const Color(0xFFF59E0B)
                               : ((int.tryParse(rank.toString()) ?? 0) == 2
                                   ? const Color(0xFF94A3B8)
-                                  : const Color(0xFFD97706)),
+                                  : ((int.tryParse(rank.toString()) ?? 0) == 3
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFF22C55E))),
                           width: 1.8,
                         )
-                      : null,
+                      : (isEliminated && rank == null
+                          ? Border.all(
+                              color: const Color(0xFFEF4444),
+                              width: 1.8,
+                            )
+                          : null),
                 ),
                 child: trophyAsset != null
                     ? ClipOval(
@@ -720,27 +773,70 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
                           ),
                         ),
                       )
-                    : Icon(
-                        rankIcon,
-                        color: rankTextColor ?? primaryGreen,
-                        size: 26,
-                      ),
+                    : ((rank != null && (int.tryParse(rank.toString()) ?? 0) > 10)
+                        ? Center(
+                            child: Text(
+                              '#$rank',
+                              style: TextStyle(
+                                color: rankTextColor ?? const Color(0xFF4B5563),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            rankIcon,
+                            color: rankTextColor ?? primaryGreen,
+                            size: 26,
+                          )),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: darkGreen,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: darkGreen,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                        if (isEliminated) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFCA5A5),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Text(
+                              'ELIMINATED',
+                              style: TextStyle(
+                                color: Color(0xFFDC2626),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -792,6 +888,13 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
                             text: 'Rank: #$rank',
                             chipColor: rankBgColor,
                             textColor: rankTextColor,
+                          ),
+                        if (isEliminated)
+                          _historyChip(
+                            icon: Icons.cancel_rounded,
+                            text: 'Eliminated',
+                            chipColor: const Color(0xFFFEE2E2),
+                            textColor: const Color(0xFFDC2626),
                           ),
                       ],
                     ),
