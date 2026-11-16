@@ -93,9 +93,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
 
     if (page == null || !context.mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      adminPageRoute(page),
-    );
+    Navigator.of(context).pushReplacement(adminPageRoute(page));
   }
 
   void _showProfileMenu(BuildContext context) {
@@ -144,7 +142,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 Text(
                   user?.email ?? 'No email available',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: AdminThemeColors.textMuted),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AdminThemeColors.textMuted,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 const Divider(color: AdminThemeColors.border),
@@ -169,7 +170,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                           rootNavigator: true,
                         ).pushAndRemoveUntil<void>(
                           MaterialPageRoute<void>(
-                            builder: (_) => const LoginScreen(clearCredentials: true),
+                            builder: (_) =>
+                                const LoginScreen(clearCredentials: true),
                           ),
                           (route) => false,
                         );
@@ -233,7 +235,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         toolbarHeight: kAdminAppBarHeight,
         leading: showHistory
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: AdminThemeColors.textPrimary),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AdminThemeColors.textPrimary,
+                ),
                 tooltip: 'Back',
                 onPressed: () {
                   setState(() => showHistory = false);
@@ -268,7 +273,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                       borderRadius: BorderRadius.circular(11),
                       boxShadow: [
                         BoxShadow(
-                          color: AdminThemeColors.primary.withValues(alpha: 0.35),
+                          color: AdminThemeColors.primary.withValues(
+                            alpha: 0.35,
+                          ),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -313,8 +320,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                                   color: AdminThemeColors.pillBg,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: AdminThemeColors.primary
-                                        .withValues(alpha: 0.22),
+                                    color: AdminThemeColors.primary.withValues(
+                                      alpha: 0.22,
+                                    ),
                                     width: 1,
                                   ),
                                 ),
@@ -355,7 +363,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               height: 40,
               child: Builder(
                 builder: (drawerContext) => IconButton(
-                  icon: const Icon(Icons.menu_rounded, color: AdminThemeColors.textPrimary, size: 24),
+                  icon: const Icon(
+                    Icons.menu_rounded,
+                    color: AdminThemeColors.textPrimary,
+                    size: 24,
+                  ),
                   tooltip: 'Open navigation menu',
                   padding: EdgeInsets.zero,
                   onPressed: () {
@@ -369,7 +381,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AdminThemeColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: AdminThemeColors.border,
+          ),
         ),
       ),
 
@@ -458,8 +474,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                         _selectedQuizCode!.trim().isNotEmpty) {
                       final target = _selectedQuizCode!.trim();
                       for (final d in allSessions) {
-                        final code =
-                            (d.data()['quizCode'] ?? d.id).toString().trim();
+                        final code = (d.data()['quizCode'] ?? d.id)
+                            .toString()
+                            .trim();
                         if (code == target || d.id.trim() == target) {
                           chosenDoc = d;
                           isViewingHistoryQuiz = true;
@@ -485,7 +502,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                               ),
                               const SizedBox(height: 16),
                               _buildLevelSelectorTabs(const {
-                                'levels': ['Level 1', 'Level 2', 'Level 3']
+                                'levels': ['Level 1', 'Level 2', 'Level 3'],
                               }),
                               const SizedBox(height: 16),
                               _noActiveQuizCard(),
@@ -500,8 +517,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                           _selectedQuizCode!.trim().isNotEmpty) {
                         final target = _selectedQuizCode!.trim();
                         for (final d in activeSessions) {
-                          final code =
-                              (d.data()['quizCode'] ?? d.id).toString().trim();
+                          final code = (d.data()['quizCode'] ?? d.id)
+                              .toString()
+                              .trim();
                           if (code == target || d.id.trim() == target) {
                             chosenDoc = d;
                             break;
@@ -526,7 +544,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                             ),
                             const SizedBox(height: 16),
                             _buildLevelSelectorTabs(const {
-                              'levels': ['Level 1', 'Level 2', 'Level 3']
+                              'levels': ['Level 1', 'Level 2', 'Level 3'],
                             }),
                             const SizedBox(height: 16),
                             _noActiveQuizCard(),
@@ -540,12 +558,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                             .toString()
                             .trim();
                     final quizData = chosenDoc.data();
-                    final quizTitle = (quizData['title'] ??
-                            quizData['quizName'] ??
-                            quizData['name'] ??
-                            'Untitled Quiz')
-                        .toString()
-                        .trim();
+                    final quizTitle =
+                        (quizData['title'] ??
+                                quizData['quizName'] ??
+                                quizData['name'] ??
+                                'Untitled Quiz')
+                            .toString()
+                            .trim();
                     final rawStatus = (quizData['status'] ?? 'waiting')
                         .toString()
                         .trim()
@@ -559,7 +578,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                           .collection('join_requests')
                           .snapshots(),
                       builder: (context, requestSnap) {
-                        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        return StreamBuilder<
+                          QuerySnapshot<Map<String, dynamic>>
+                        >(
                           stream: FirebaseFirestore.instance
                               .collection('quiz_sessions')
                               .doc(effectiveCode)
@@ -594,8 +615,12 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                             );
 
                             return SingleChildScrollView(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 14, 16, 30),
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                14,
+                                16,
+                                30,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -709,25 +734,24 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     required List<_LeaderboardEntry> entries,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> allSessions,
   }) {
-    final isLive = status == 'live' ||
+    final isLive =
+        status == 'live' ||
         status == 'started' ||
         status == 'ongoing' ||
         status == 'in progress' ||
         status == 'inprogress';
 
     final topLeader = entries.isNotEmpty ? entries.first : null;
-    final topLeaderName =
-        topLeader != null ? topLeader.name : 'Waiting for contestants...';
+    final topLeaderName = topLeader != null
+        ? topLeader.name
+        : 'Waiting for contestants...';
     final topScore = topLeader != null ? '${topLeader.score} pts' : '0 pts';
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            AdminThemeColors.primaryDark,
-            AdminThemeColors.primary,
-          ],
+          colors: [AdminThemeColors.primaryDark, AdminThemeColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -763,7 +787,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.sensors_rounded, color: Colors.white, size: 13),
+                      Icon(
+                        Icons.sensors_rounded,
+                        color: Colors.white,
+                        size: 13,
+                      ),
                       SizedBox(width: 5),
                       Text(
                         'LIVE RANKING',
@@ -903,22 +931,29 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                       Icons.arrow_drop_down_rounded,
                       color: Colors.white,
                     ),
-                    value: allSessions.any((d) =>
-                            (d.data()['quizCode'] ?? d.id).toString().trim() ==
-                            quizCode)
+                    value:
+                        allSessions.any(
+                          (d) =>
+                              (d.data()['quizCode'] ?? d.id)
+                                  .toString()
+                                  .trim() ==
+                              quizCode,
+                        )
                         ? quizCode
                         : (allSessions.first.data()['quizCode'] ??
-                                allSessions.first.id)
-                            .toString()
-                            .trim(),
+                                  allSessions.first.id)
+                              .toString()
+                              .trim(),
                     items: allSessions.map((doc) {
-                      final code =
-                          (doc.data()['quizCode'] ?? doc.id).toString().trim();
-                      final title = (doc.data()['title'] ??
-                              doc.data()['quizName'] ??
-                              'Quiz')
+                      final code = (doc.data()['quizCode'] ?? doc.id)
                           .toString()
                           .trim();
+                      final title =
+                          (doc.data()['title'] ??
+                                  doc.data()['quizName'] ??
+                                  'Quiz')
+                              .toString()
+                              .trim();
                       return DropdownMenuItem<String>(
                         value: code,
                         child: Text(
@@ -1168,10 +1203,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
           const Text(
             'Live rankings and standings will appear here once an active quiz begins.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AdminThemeColors.textMuted,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: AdminThemeColors.textMuted, fontSize: 13),
           ),
         ],
       ),
@@ -1205,8 +1237,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         final numericLevel = int.tryParse(
           rawLabel.replaceFirst(RegExp(r'^level\s*', caseSensitive: false), ''),
         );
-        final normalizedLabel =
-            numericLevel != null ? 'Level $numericLevel' : rawLabel;
+        final normalizedLabel = numericLevel != null
+            ? 'Level $numericLevel'
+            : rawLabel;
         if (!configuredLevels.contains(normalizedLabel)) {
           configuredLevels.add(normalizedLabel);
         }
@@ -1214,10 +1247,12 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     }
 
     if (configuredLevels.isEmpty) {
-      final int highestAvailableLevel =
-          completedLevel > currentLevel ? completedLevel : currentLevel;
-      final int levelCount =
-          highestAvailableLevel > 1 ? highestAvailableLevel : 1;
+      final int highestAvailableLevel = completedLevel > currentLevel
+          ? completedLevel
+          : currentLevel;
+      final int levelCount = highestAvailableLevel > 1
+          ? highestAvailableLevel
+          : 1;
       for (var number = 1; number <= levelCount; number++) {
         configuredLevels.add('Level $number');
       }
@@ -1459,9 +1494,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               Expanded(
                 child: _podiumPerson(entry: first, rank: 1, height: 135),
               ),
-              Expanded(
-                child: _podiumPerson(entry: third, rank: 3, height: 90),
-              ),
+              Expanded(child: _podiumPerson(entry: third, rank: 3, height: 90)),
             ],
           ),
         ],
@@ -1489,18 +1522,18 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     colors: [Color(0xFFFFD76A), Color(0xFFF59E0B)],
                   )
                 : rank == 2
-                    ? const LinearGradient(
-                        colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
-                      )
-                    : const LinearGradient(
-                        colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
-                      ),
+                ? const LinearGradient(
+                    colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+                  ),
             border: Border.all(
               color: rank == 1
                   ? const Color(0xFFD97706)
                   : rank == 2
-                      ? const Color(0xFF94A3B8)
-                      : const Color(0xFFD97706),
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFFD97706),
               width: 2,
             ),
           ),
@@ -1513,8 +1546,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 color: rank == 1
                     ? const Color(0xFF78350F)
                     : rank == 2
-                        ? const Color(0xFF334155)
-                        : const Color(0xFF7C2D12),
+                    ? const Color(0xFF334155)
+                    : const Color(0xFF7C2D12),
               ),
             ),
           ),
@@ -1562,16 +1595,16 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
                   )
                 : rank == 2
-                    ? const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
-                      )
-                    : const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA)],
-                      ),
+                ? const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA)],
+                  ),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
           ),
           child: Center(
@@ -1585,8 +1618,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   color: rank == 1
                       ? const Color(0xFFFCD34D)
                       : rank == 2
-                          ? const Color(0xFFCBD5E1)
-                          : const Color(0xFFFDBA74),
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFFFDBA74),
                   width: 2,
                 ),
                 boxShadow: const [
@@ -1602,8 +1635,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   rank == 1
                       ? 'assets/trophies/gold_trophy_3d.jpg'
                       : rank == 2
-                          ? 'assets/trophies/silver_trophy_3d.jpg'
-                          : 'assets/trophies/bronze_trophy_3d.jpg',
+                      ? 'assets/trophies/silver_trophy_3d.jpg'
+                      : 'assets/trophies/bronze_trophy_3d.jpg',
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Icon(
                     Icons.emoji_events_rounded,
@@ -1611,8 +1644,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     color: rank == 1
                         ? const Color(0xFFD97706)
                         : rank == 2
-                            ? const Color(0xFF64748B)
-                            : const Color(0xFFB45309),
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFFB45309),
                   ),
                 ),
               ),
@@ -1632,6 +1665,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       return const SizedBox.shrink();
     }
 
+    final rank4AndAbove = entries.length > 3
+        ? entries.sublist(3)
+        : <_LeaderboardEntry>[];
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1647,46 +1684,192 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          for (int i = 0; i < entries.length; i++)
-            _rankingItem(entries[i], i + 1),
-        ],
-      ),
+      child: rank4AndAbove.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.emoji_events_outlined,
+                      size: 28,
+                      color: AdminThemeColors.textMuted,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'All current contestants are in the Top 3 podium above.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AdminThemeColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                for (int i = 3; i < entries.length; i++)
+                  _rankingItem(entries[i], i + 1),
+              ],
+            ),
     );
   }
 
   Widget _rankingItem(_LeaderboardEntry entry, int rank) {
     final bool isFirst = rank == 1;
     final bool isSecond = rank == 2;
-    final bool isThird = rank == 3;
     final bool isTop3 = rank <= 3;
     final bool isTop10 = rank >= 4 && rank <= 10;
 
-    Color badgeBg;
-    Color badgeBorder;
-    Color badgeTextColor;
+    Widget leadingWidget;
 
-    if (isFirst) {
-      badgeBg = const Color(0xFFFEF3C7);
-      badgeBorder = const Color(0xFFF59E0B);
-      badgeTextColor = const Color(0xFFB45309);
-    } else if (isSecond) {
-      badgeBg = const Color(0xFFF1F5F9);
-      badgeBorder = const Color(0xFF94A3B8);
-      badgeTextColor = const Color(0xFF475569);
-    } else if (isThird) {
-      badgeBg = const Color(0xFFFFEDD5);
-      badgeBorder = const Color(0xFFFB923C);
-      badgeTextColor = const Color(0xFFC2410C);
+    if (isTop3) {
+      final trophyAsset = isFirst
+          ? 'assets/trophies/gold_trophy_3d.jpg'
+          : (isSecond
+                ? 'assets/trophies/silver_trophy_3d.jpg'
+                : 'assets/trophies/bronze_trophy_3d.jpg');
+      final rankColor = isFirst
+          ? const Color(0xFFF59E0B)
+          : (isSecond ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+
+      leadingWidget = Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.28),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                trophyAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Icon(
+                  Icons.emoji_events_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     } else if (isTop10) {
-      badgeBg = const Color(0xFFF3E8FF);
-      badgeBorder = const Color(0xFFDDD6FE);
-      badgeTextColor = AdminThemeColors.primary;
+      const badgeAsset = 'assets/trophies/top10_badge_3d.jpg';
+      const rankColor = Color(0xFF22C55E);
+
+      leadingWidget = Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.28),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                badgeAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     } else {
-      badgeBg = AdminThemeColors.pillBg;
-      badgeBorder = AdminThemeColors.border;
-      badgeTextColor = AdminThemeColors.primary;
+      leadingWidget = Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$rank',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF475569),
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -1696,19 +1879,23 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       decoration: BoxDecoration(
         color: isFirst
             ? const Color(0xFFFFFDF5)
-            : (isTop3 ? const Color(0xFFFAF7FF) : Colors.white),
+            : (isTop3
+                  ? const Color(0xFFFAF7FF)
+                  : (isTop10 ? const Color(0xFFF0FDF4) : Colors.white)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isFirst
               ? const Color(0xFFFDE68A)
-              : (isTop3 ? const Color(0xFFDDD6FE) : AdminThemeColors.border),
-          width: isTop3 ? 1.4 : 1.0,
+              : (isTop3
+                    ? const Color(0xFFDDD6FE)
+                    : (isTop10
+                          ? const Color(0xFF86EFAC)
+                          : AdminThemeColors.border)),
+          width: (isTop3 || isTop10) ? 1.2 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: isFirst
-                ? const Color(0x12F59E0B)
-                : const Color(0x0517245A),
+            color: isFirst ? const Color(0x12F59E0B) : const Color(0x0517245A),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1716,25 +1903,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       ),
       child: Row(
         children: [
-          // Rank Badge
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: badgeBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: badgeBorder, width: isTop3 ? 1.4 : 1),
-            ),
-            child: Text(
-              '$rank',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                color: badgeTextColor,
-              ),
-            ),
-          ),
+          leadingWidget,
           const SizedBox(width: 12),
 
           // Contestant Details
@@ -1779,7 +1948,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     ],
                   ],
                 ),
-                if (entry.teamName.isNotEmpty && entry.teamName != entry.name) ...[
+                if (entry.teamName.isNotEmpty &&
+                    entry.teamName != entry.name) ...[
                   const SizedBox(height: 2),
                   Text(
                     entry.school.isNotEmpty
@@ -1830,12 +2000,16 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
             decoration: BoxDecoration(
               color: isFirst
                   ? const Color(0xFFFEF3C7)
-                  : const Color(0xFFF0EBFF),
+                  : (isTop10
+                        ? const Color(0xFFDCFCE7)
+                        : const Color(0xFFF0EBFF)),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isFirst
                     ? const Color(0xFFF59E0B)
-                    : const Color(0xFFDDD6FE),
+                    : (isTop10
+                          ? const Color(0xFF4ADE80)
+                          : const Color(0xFFDDD6FE)),
                 width: 1,
               ),
             ),
@@ -1846,7 +2020,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 fontWeight: FontWeight.w900,
                 color: isFirst
                     ? const Color(0xFFB45309)
-                    : AdminThemeColors.primary,
+                    : (isTop10
+                          ? const Color(0xFF15803D)
+                          : AdminThemeColors.primary),
               ),
             ),
           ),
@@ -1936,10 +2112,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final name = data['displayName']?.toString().trim().isNotEmpty == true
           ? data['displayName'].toString().trim()
           : (data['name']?.toString().trim().isNotEmpty == true
-              ? data['name'].toString().trim()
-              : 'Contestant');
-      final school =
-          (data['school'] ?? data['schoolName'] ?? '').toString().trim();
+                ? data['name'].toString().trim()
+                : 'Contestant');
+      final school = (data['school'] ?? data['schoolName'] ?? '')
+          .toString()
+          .trim();
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
@@ -1980,32 +2157,36 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final name = data['displayName']?.toString().trim().isNotEmpty == true
           ? data['displayName'].toString().trim()
           : (data['name']?.toString().trim().isNotEmpty == true
-              ? data['name'].toString().trim()
-              : 'Contestant');
-      final school =
-          (data['school'] ?? data['schoolName'] ?? '').toString().trim();
+                ? data['name'].toString().trim()
+                : 'Contestant');
+      final school = (data['school'] ?? data['schoolName'] ?? '')
+          .toString()
+          .trim();
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
-      final isEliminated = data['eliminated'] == true ||
+      final isEliminated =
+          data['eliminated'] == true ||
           data['isEliminated'] == true ||
           (data['status'] ?? '').toString().toLowerCase() == 'eliminated';
       final status = (data['status'] ?? '').toString();
       final lastSubTime = data['lastSubmissionTime'] is Timestamp
           ? data['lastSubmissionTime'] as Timestamp
           : (data['updatedAt'] is Timestamp
-              ? data['updatedAt'] as Timestamp
-              : null);
+                ? data['updatedAt'] as Timestamp
+                : null);
 
       // Score based on selected level
       int contestantScore = 0;
       if (selectedLevel == 'Overall') {
-        contestantScore =
-            _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
+        contestantScore = _toInt(
+          data['score'] ?? data['totalScore'] ?? data['points'] ?? 0,
+        );
       } else {
         final levelMatch = RegExp(r'\d+').firstMatch(selectedLevel);
-        final levelNum =
-            levelMatch != null ? int.tryParse(levelMatch.group(0)!) ?? 1 : 1;
+        final levelNum = levelMatch != null
+            ? int.tryParse(levelMatch.group(0)!) ?? 1
+            : 1;
         final levelKey = 'level${levelNum}Score';
         final altKey = 'level_$levelNum';
         if (data.containsKey(levelKey)) {
@@ -2013,8 +2194,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         } else if (data.containsKey(altKey)) {
           contestantScore = _toInt(data[altKey]);
         } else {
-          final currentLevel =
-              _toInt(data['currentLevel'] ?? data['level'] ?? 1);
+          final currentLevel = _toInt(
+            data['currentLevel'] ?? data['level'] ?? 1,
+          );
           if (currentLevel == levelNum) {
             contestantScore = _toInt(data['score'] ?? data['points'] ?? 0);
           } else if (levelNum == 1) {
@@ -2061,8 +2243,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final scoreCompare = b.score.compareTo(a.score);
       if (scoreCompare != 0) return scoreCompare;
       if (a.lastSubmissionTime != null && b.lastSubmissionTime != null) {
-        final timeCompare =
-            a.lastSubmissionTime!.compareTo(b.lastSubmissionTime!);
+        final timeCompare = a.lastSubmissionTime!.compareTo(
+          b.lastSubmissionTime!,
+        );
         if (timeCompare != 0) return timeCompare;
       }
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
@@ -2253,7 +2436,9 @@ class _AdminLeaderboardHistoryViewState
                 final title = (data['title'] ?? data['quizName'] ?? '')
                     .toString()
                     .toLowerCase();
-                final code = (data['quizCode'] ?? doc.id).toString().toLowerCase();
+                final code = (data['quizCode'] ?? doc.id)
+                    .toString()
+                    .toLowerCase();
                 if (_searchQuery.isEmpty) return true;
                 final q = _searchQuery.toLowerCase();
                 return title.contains(q) || code.contains(q);
@@ -2313,8 +2498,9 @@ class _AdminLeaderboardHistoryViewState
                       (data['title'] ?? data['quizName'] ?? 'Untitled Quiz')
                           .toString()
                           .trim();
-                  final quizCode =
-                      (data['quizCode'] ?? quiz.id).toString().trim();
+                  final quizCode = (data['quizCode'] ?? quiz.id)
+                      .toString()
+                      .trim();
                   final statusStr = _friendlyQuizStatus(data['status']);
                   final isFinished = statusStr == 'FINISHED';
 

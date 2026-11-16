@@ -1486,7 +1486,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
               child: Image.asset(
                 trophyAsset,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Icon(
+                errorBuilder: (_, _, _) => Icon(
                   Icons.emoji_events_rounded,
                   size: 20,
                   color: rankColor,
@@ -1547,7 +1547,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
               child: Image.asset(
                 badgeAsset,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
+                errorBuilder: (_, _, _) => const Icon(
                   Icons.workspace_premium_rounded,
                   size: 20,
                   color: rankColor,

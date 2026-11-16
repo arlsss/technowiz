@@ -766,7 +766,7 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
                         child: Image.asset(
                           trophyAsset,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
+                          errorBuilder: (_, _, _) => Icon(
                             rankIcon,
                             color: rankTextColor ?? primaryGreen,
                             size: 26,

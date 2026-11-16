@@ -172,7 +172,7 @@ class _MyResultScreenState extends State<MyResultScreen> {
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events, size: 90, color: Colors.orange),
+                errorBuilder: (_, _, _) => const Icon(Icons.emoji_events, size: 90, color: Colors.orange),
               ),
             ),
             const SizedBox(height: 20),

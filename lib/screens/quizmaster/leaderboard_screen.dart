@@ -1742,6 +1742,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       return const SizedBox.shrink();
     }
 
+    final rank4AndAbove =
+        entries.length > 3 ? entries.sublist(3) : <_LeaderboardEntry>[];
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1757,12 +1760,38 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          for (int i = 0; i < entries.length; i++)
-            _rankingItem(entries[i], i + 1),
-        ],
-      ),
+      child: rank4AndAbove.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.emoji_events_outlined,
+                      size: 28,
+                      color: textMuted.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'All current contestants are in the Top 3 podium above.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                for (int i = 3; i < entries.length; i++)
+                  _rankingItem(entries[i], i + 1),
+              ],
+            ),
     );
   }
 
@@ -1773,34 +1802,154 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   Widget _rankingItem(_LeaderboardEntry entry, int rank) {
     final bool isFirst = rank == 1;
     final bool isSecond = rank == 2;
-    final bool isThird = rank == 3;
     final bool isTop3 = rank <= 3;
     final bool isTop10 = rank >= 4 && rank <= 10;
 
-    Color badgeBg;
-    Color badgeBorder;
-    Color badgeTextColor;
+    Widget leadingWidget;
 
-    if (isFirst) {
-      badgeBg = const Color(0xFFFEF3C7);
-      badgeBorder = const Color(0xFFF59E0B);
-      badgeTextColor = const Color(0xFFB45309);
-    } else if (isSecond) {
-      badgeBg = const Color(0xFFF1F5F9);
-      badgeBorder = const Color(0xFF94A3B8);
-      badgeTextColor = const Color(0xFF475569);
-    } else if (isThird) {
-      badgeBg = const Color(0xFFFFEDD5);
-      badgeBorder = const Color(0xFFFB923C);
-      badgeTextColor = const Color(0xFFC2410C);
+    if (isTop3) {
+      final trophyAsset = isFirst
+          ? 'assets/trophies/gold_trophy_3d.jpg'
+          : (isSecond
+              ? 'assets/trophies/silver_trophy_3d.jpg'
+              : 'assets/trophies/bronze_trophy_3d.jpg');
+      final rankColor = isFirst
+          ? const Color(0xFFF59E0B)
+          : (isSecond ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+
+      leadingWidget = Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.28),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                trophyAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Icon(
+                  Icons.emoji_events_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     } else if (isTop10) {
-      badgeBg = const Color(0xFFE0F2FE);
-      badgeBorder = const Color(0xFF7DD3FC);
-      badgeTextColor = const Color(0xFF0369A1);
+      const badgeAsset = 'assets/trophies/top10_badge_3d.jpg';
+      const rankColor = Color(0xFF22C55E);
+
+      leadingWidget = Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.28),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                badgeAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     } else {
-      badgeBg = lightPurple;
-      badgeBorder = borderColor;
-      badgeTextColor = primaryPurple;
+      leadingWidget = Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$rank',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF475569),
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -1809,43 +1958,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       decoration: BoxDecoration(
         color: isFirst
             ? const Color(0xFFFFFDF5)
-            : (isTop3 ? const Color(0xFFFAFCFF) : backgroundColor),
+            : (isTop3
+                ? const Color(0xFFFAFCFF)
+                : (isTop10 ? const Color(0xFFF0FDF4) : backgroundColor)),
         borderRadius: BorderRadius.circular(13),
         border: Border.all(
           color: isFirst
               ? const Color(0xFFFDE68A)
-              : (isTop3 ? const Color(0xFFBAE6FD) : borderColor),
-          width: isTop3 ? 1.4 : 1,
+              : (isTop3
+                  ? const Color(0xFFBAE6FD)
+                  : (isTop10 ? const Color(0xFF86EFAC) : borderColor)),
+          width: (isTop3 || isTop10) ? 1.2 : 1,
         ),
       ),
       child: Row(
         children: [
-          // Rank Badge
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: badgeBg,
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: badgeBorder, width: 1.2),
-            ),
-            child: Center(
-              child: isTop3
-                  ? Icon(
-                      Icons.emoji_events_rounded,
-                      size: 17,
-                      color: badgeTextColor,
-                    )
-                  : Text(
-                      '$rank',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                        color: badgeTextColor,
-                      ),
-                    ),
-            ),
-          ),
+          leadingWidget,
           const SizedBox(width: 10),
 
           // Name & Details
@@ -1956,12 +2084,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             decoration: BoxDecoration(
               color: isFirst
                   ? const Color(0xFFFEF3C7)
-                  : (isTop3 ? const Color(0xFFE0F2FE) : lightPurple),
+                  : (isTop3
+                      ? const Color(0xFFE0F2FE)
+                      : (isTop10 ? const Color(0xFFDCFCE7) : lightPurple)),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isFirst
                     ? const Color(0xFFF59E0B)
-                    : (isTop3 ? const Color(0xFF38BDF8) : const Color(0xFFBAE6FD)),
+                    : (isTop3
+                        ? const Color(0xFF38BDF8)
+                        : (isTop10
+                            ? const Color(0xFF4ADE80)
+                            : const Color(0xFFBAE6FD))),
                 width: 1,
               ),
             ),
@@ -1970,7 +2104,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
-                color: isFirst ? const Color(0xFFB45309) : primaryPurple,
+                color: isFirst
+                    ? const Color(0xFFB45309)
+                    : (isTop10 ? const Color(0xFF15803D) : primaryPurple),
               ),
             ),
           ),
