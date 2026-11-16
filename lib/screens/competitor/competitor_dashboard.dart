@@ -3547,6 +3547,15 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
     final result = grouped.values.toList();
     result.sort((a, b) {
+      final aElim = a['eliminated'] == true ||
+          a['isEliminated'] == true ||
+          (a['status'] ?? '').toString().toLowerCase() == 'eliminated';
+      final bElim = b['eliminated'] == true ||
+          b['isEliminated'] == true ||
+          (b['status'] ?? '').toString().toLowerCase() == 'eliminated';
+      if (aElim != bElim) {
+        return aElim ? 1 : -1;
+      }
       final scoreCompare = _scoreToInt(
         b['score'],
       ).compareTo(_scoreToInt(a['score']));
@@ -3559,7 +3568,31 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return result;
   }
 
-  Widget _buildRankTrophyBadge(int rank) {
+  Widget _buildRankTrophyBadge(int rank, {bool isEliminated = false}) {
+    if (isEliminated) {
+      return Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFFEE2E2),
+          border: Border.all(
+            color: const Color(0xFFFCA5A5),
+            width: 1.2,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$rank',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFDC2626),
+          ),
+        ),
+      );
+    }
+
     if (rank <= 3) {
       final trophyAsset = rank == 1
           ? 'assets/trophies/gold_trophy_3d.jpg'
@@ -3729,6 +3762,47 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       );
     }
 
+    // Rank 4 to pataas, plus makita pud ang na-eliminate nga contestant
+    final standingsRows = <MapEntry<int, Map<String, dynamic>>>[];
+    for (int i = 0; i < rows.length; i++) {
+      final rank = i + 1;
+      final row = rows[i];
+      final isEliminated = row['eliminated'] == true ||
+          row['isEliminated'] == true ||
+          (row['status'] ?? '').toString().toLowerCase() == 'eliminated';
+      if (rank >= 4 || isEliminated) {
+        standingsRows.add(MapEntry(rank, row));
+      }
+    }
+
+    if (standingsRows.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.emoji_events_outlined,
+                size: 28,
+                color: Color(0xFF94A3B8),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'All current active contestants are in the Top 3 podium above.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         Container(
@@ -3768,10 +3842,14 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             ],
           ),
         ),
-        ...List.generate(rows.length, (index) {
-          final row = rows[index];
+        ...List.generate(standingsRows.length, (index) {
+          final entry = standingsRows[index];
+          final rank = entry.key;
+          final row = entry.value;
           final score = _scoreToInt(row['score']);
-          final rank = index + 1;
+          final isEliminated = row['eliminated'] == true ||
+              row['isEliminated'] == true ||
+              (row['status'] ?? '').toString().toLowerCase() == 'eliminated';
 
           final currentUid = FirebaseAuth.instance.currentUser?.uid;
           final isCurrentUser = currentUid != null &&
@@ -3781,23 +3859,32 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: isCurrentUser
-                  ? const Color(0xFFF0FDF4)
-                  : (rank == 1
-                      ? const Color(0xFFFFFDF5)
-                      : (rank == 2
-                          ? const Color(0xFFFAFBFC)
-                          : (rank == 3
-                              ? const Color(0xFFFFFBF7)
-                              : Colors.transparent))),
-              border: const Border(top: BorderSide(color: softBorder)),
+              color: isEliminated
+                  ? const Color(0xFFFFF7F7)
+                  : (isCurrentUser
+                      ? const Color(0xFFF0FDF4)
+                      : (rank == 1
+                          ? const Color(0xFFFFFDF5)
+                          : (rank == 2
+                              ? const Color(0xFFFAFBFC)
+                              : (rank == 3
+                                  ? const Color(0xFFFFFBF7)
+                                  : Colors.transparent)))),
+              border: Border(
+                top: BorderSide(
+                  color: isEliminated ? const Color(0xFFFECACA) : softBorder,
+                ),
+              ),
             ),
             child: Row(
               children: [
                 SizedBox(
                   width: 42,
                   child: Center(
-                    child: _buildRankTrophyBadge(rank),
+                    child: _buildRankTrophyBadge(
+                      rank,
+                      isEliminated: isEliminated,
+                    ),
                   ),
                 ),
                 Expanded(
@@ -3807,48 +3894,57 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                         width: 34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: rank == 1
-                              ? const Color(0xFFFEF3C7)
-                              : (rank == 2
-                                  ? const Color(0xFFF1F5F9)
-                                  : (rank == 3
-                                      ? const Color(0xFFFFEDD5)
-                                      : (rank <= 10
-                                          ? lightGreen
-                                          : const Color(0xFFF8FAFC)))),
+                          color: isEliminated
+                              ? const Color(0xFFFEE2E2)
+                              : (rank == 1
+                                  ? const Color(0xFFFEF3C7)
+                                  : (rank == 2
+                                      ? const Color(0xFFF1F5F9)
+                                      : (rank == 3
+                                          ? const Color(0xFFFFEDD5)
+                                          : (rank <= 10
+                                              ? lightGreen
+                                              : const Color(0xFFF8FAFC))))),
                           borderRadius: BorderRadius.circular(10),
-                          border: rank <= 3
+                          border: isEliminated
                               ? Border.all(
-                                  color: rank == 1
-                                      ? const Color(0xFFFDE68A)
-                                      : (rank == 2
-                                          ? const Color(0xFFCBD5E1)
-                                          : const Color(0xFFFED7AA)),
+                                  color: const Color(0xFFFCA5A5),
                                   width: 1,
                                 )
-                              : (rank <= 10
+                              : (rank <= 3
                                   ? Border.all(
-                                      color: const Color(0xFFBBF7D0),
+                                      color: rank == 1
+                                          ? const Color(0xFFFDE68A)
+                                          : (rank == 2
+                                              ? const Color(0xFFCBD5E1)
+                                              : const Color(0xFFFED7AA)),
                                       width: 1,
                                     )
-                                  : Border.all(
-                                      color: const Color(0xFFE2E8F0),
-                                      width: 1,
-                                    )),
+                                  : (rank <= 10
+                                      ? Border.all(
+                                          color: const Color(0xFFBBF7D0),
+                                          width: 1,
+                                        )
+                                      : Border.all(
+                                          color: const Color(0xFFE2E8F0),
+                                          width: 1,
+                                        ))),
                         ),
                         child: Icon(
                           row['isTeam'] == true
                               ? Icons.groups_rounded
                               : Icons.person_rounded,
-                          color: rank == 1
-                              ? const Color(0xFFD97706)
-                              : (rank == 2
-                                  ? const Color(0xFF64748B)
-                                  : (rank == 3
-                                      ? const Color(0xFFB45309)
-                                      : (rank <= 10
-                                          ? primaryGreen
-                                          : const Color(0xFF64748B)))),
+                          color: isEliminated
+                              ? const Color(0xFFDC2626)
+                              : (rank == 1
+                                  ? const Color(0xFFD97706)
+                                  : (rank == 2
+                                      ? const Color(0xFF64748B)
+                                      : (rank == 3
+                                          ? const Color(0xFFB45309)
+                                          : (rank <= 10
+                                              ? primaryGreen
+                                              : const Color(0xFF64748B))))),
                           size: 19,
                         ),
                       ),
@@ -3859,15 +3955,49 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    row['displayName']?.toString() ?? 'Team',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: darkGreen,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          row['displayName']?.toString() ??
+                                              'Team',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: darkGreen,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isEliminated) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 5,
+                                            vertical: 1.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEE2E2),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: const Color(0xFFFCA5A5),
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'ELIMINATED',
+                                            style: TextStyle(
+                                              fontSize: 7.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFFDC2626),
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   if ((row['teamMembers'] as List?)
                                           ?.isNotEmpty ==
@@ -3891,7 +4021,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                 children: [
                                   Flexible(
                                     child: Text(
-                                      row['displayName']?.toString() ?? 'Contestant',
+                                      row['displayName']?.toString() ??
+                                          'Contestant',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -3901,6 +4032,33 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       ),
                                     ),
                                   ),
+                                  if (isEliminated) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEE2E2),
+                                        borderRadius:
+                                            BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: const Color(0xFFFCA5A5),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'ELIMINATED',
+                                        style: TextStyle(
+                                          fontSize: 7.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFFDC2626),
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                   if (isCurrentUser) ...[
                                     const SizedBox(width: 6),
                                     Container(
@@ -3910,7 +4068,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: primaryGreen,
-                                        borderRadius: BorderRadius.circular(6),
+                                        borderRadius:
+                                            BorderRadius.circular(6),
                                       ),
                                       child: const Text(
                                         'YOU',
@@ -3930,10 +4089,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                 ),
                 Text(
                   '$score',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    color: primaryGreen,
+                    color: isEliminated
+                        ? const Color(0xFFDC2626)
+                        : primaryGreen,
                   ),
                 ),
               ],
@@ -4116,6 +4277,15 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     }
 
     levelRows.sort((a, b) {
+      final aElim = a['eliminated'] == true ||
+          a['isEliminated'] == true ||
+          (a['status'] ?? '').toString().toLowerCase() == 'eliminated';
+      final bElim = b['eliminated'] == true ||
+          b['isEliminated'] == true ||
+          (b['status'] ?? '').toString().toLowerCase() == 'eliminated';
+      if (aElim != bElim) {
+        return aElim ? 1 : -1;
+      }
       final scoreCompare =
           _scoreToInt(b['score']).compareTo(_scoreToInt(a['score']));
       if (scoreCompare != 0) return scoreCompare;
@@ -4644,6 +4814,28 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             ),
           ),
         ),
+        if (entry?['eliminated'] == true ||
+            entry?['isEliminated'] == true ||
+            (entry?['status'] ?? '').toString().toLowerCase() == 'eliminated') ...[
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEE2E2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+            ),
+            child: const Text(
+              'ELIMINATED',
+              style: TextStyle(
+                fontSize: 7.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFDC2626),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 2),
 
         // Score
