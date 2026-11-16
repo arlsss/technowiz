@@ -185,16 +185,39 @@ class QuizInstructionsScreen extends StatelessWidget {
     final original = raw.toString().trim();
     if (original.isEmpty) return null;
 
-    final normalized = original.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-    if (normalized.contains('multiplechoice') || normalized == 'mcq') {
+    final normalized =
+        original.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+
+    if (normalized.contains('multiplechoice') ||
+        normalized == 'mcq' ||
+        normalized == 'multiple' ||
+        normalized == 'choice') {
       return 'Multiple Choice';
     }
-    if (normalized.contains('truefalse') || normalized == 'tf') {
+    if (normalized.contains('truefalse') ||
+        normalized.contains('trueorfalse') ||
+        normalized == 'tf' ||
+        normalized == 'boolean') {
       return 'True/False';
     }
-    if (normalized.contains('identification')) return 'Identification';
-    if (normalized.contains('enumeration')) return 'Enumeration';
-    return null;
+    if ((normalized.contains('fill') && normalized.contains('blank')) ||
+        normalized.contains('fillintheblank') ||
+        normalized.contains('fillinblank') ||
+        normalized == 'fillblank' ||
+        normalized == 'fitb' ||
+        normalized == 'blank') {
+      return 'Fill in the Blank';
+    }
+    if (normalized.contains('identification') || normalized == 'ident') {
+      return 'Identification';
+    }
+    if (normalized.contains('enumeration') || normalized == 'enum') {
+      return 'Enumeration';
+    }
+    if (normalized.contains('mixed') || normalized == 'all') {
+      return 'Mixed';
+    }
+    return original;
   }
 
   int? _questionLevel(Map<String, dynamic> question) {
@@ -213,16 +236,93 @@ class QuizInstructionsScreen extends StatelessWidget {
     return match == null ? null : int.tryParse(match.group(1)!);
   }
 
-  Future<String> _loadQuestionTypes(Map<String, dynamic> settings) async {
+  Future<String> _loadQuestionTypes(Map<String, dynamic> fallbackSettings) async {
     final code =
         (quizCode ??
                 quizData['quizCode'] ??
                 quizData['code'] ??
                 quizData['sessionCode'] ??
+                quizData['quizEventCode'] ??
                 '')
             .toString()
             .trim();
 
+    Map<String, dynamic> effectiveSettings =
+        Map<String, dynamic>.from(fallbackSettings);
+    Map<String, dynamic> sessionData = <String, dynamic>{};
+
+    if (code.isNotEmpty) {
+      try {
+        final sessionDoc = await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(code)
+            .get();
+        if (sessionDoc.exists && sessionDoc.data() != null) {
+          sessionData = sessionDoc.data()!;
+          final rawAllSettings =
+              sessionData['levelSettings'] ?? sessionData['levels'];
+          final savedSettings = _findLevelSettings(rawAllSettings, level);
+          if (savedSettings != null) {
+            effectiveSettings = {
+              ...effectiveSettings,
+              ...savedSettings,
+            };
+          }
+        }
+      } catch (error) {
+        debugPrint('Unable to load session settings for question type: $error');
+      }
+    }
+
+    if (effectiveSettings.isEmpty) {
+      final rawQuizSettings = quizData['levelSettings'] ?? quizData['levels'];
+      final quizLevelSettings = _findLevelSettings(rawQuizSettings, level);
+      if (quizLevelSettings != null) {
+        effectiveSettings = {
+          ...effectiveSettings,
+          ...quizLevelSettings,
+        };
+      }
+    }
+
+    // Check if the level has an explicitly configured question type from Admin
+    final rawAdminType =
+        effectiveSettings['questionType'] ??
+        effectiveSettings['questionTypes'] ??
+        effectiveSettings['question_type'] ??
+        effectiveSettings['question_types'] ??
+        effectiveSettings['type'] ??
+        effectiveSettings['types'] ??
+        effectiveSettings['allowedQuestionTypes'] ??
+        sessionData['level${level}QuestionType'] ??
+        sessionData['level${level}QuestionTypes'] ??
+        quizData['level${level}QuestionType'] ??
+        quizData['level${level}QuestionTypes'];
+
+    final adminConfiguredTypes = <String>[];
+    if (rawAdminType is List) {
+      for (final item in rawAdminType) {
+        final t = _normalizeType(item);
+        if (t != null && !adminConfiguredTypes.contains(t)) {
+          adminConfiguredTypes.add(t);
+        }
+      }
+    } else if (rawAdminType is String && rawAdminType.trim().isNotEmpty) {
+      for (final item in rawAdminType.split(',')) {
+        final t = _normalizeType(item);
+        if (t != null && !adminConfiguredTypes.contains(t)) {
+          adminConfiguredTypes.add(t);
+        }
+      }
+    }
+
+    String? singleAdminType;
+    if (adminConfiguredTypes.isNotEmpty && adminConfiguredTypes.length == 1) {
+      singleAdminType = adminConfiguredTypes.first;
+    }
+
+    // Now inspect questions in the session
+    final questionTypes = <String>{};
     if (code.isNotEmpty) {
       try {
         final snapshot = await FirebaseFirestore.instance
@@ -231,7 +331,6 @@ class QuizInstructionsScreen extends StatelessWidget {
             .collection('questions')
             .get();
 
-        final types = <String>{};
         for (final doc in snapshot.docs) {
           final question = doc.data();
           final assignedLevel = _questionLevel(question);
@@ -244,48 +343,27 @@ class QuizInstructionsScreen extends StatelessWidget {
           );
 
           if (type == null) {
-            final options = question['options'];
-            final answer = question['correctAnswer'] ?? question['answer'];
-            if (options is List && options.isNotEmpty) {
-              type = 'Multiple Choice';
-            } else if (answer is List) {
-              type = 'Enumeration';
+            if (singleAdminType != null && singleAdminType != 'Mixed') {
+              type = singleAdminType;
+            } else {
+              final options = question['options'];
+              final answer = question['correctAnswer'] ?? question['answer'];
+              if (options is List && options.isNotEmpty) {
+                type = 'Multiple Choice';
+              } else if (answer is List) {
+                type = 'Enumeration';
+              }
             }
           }
 
-          if (type != null) types.add(type);
+          if (type != null) {
+            questionTypes.add(type);
+          }
         }
-
-        const order = [
-          'Multiple Choice',
-          'True/False',
-          'Identification',
-          'Enumeration',
-        ];
-        final found = order.where(types.contains).toList();
-        if (found.isNotEmpty) return found.join(', ');
       } catch (error) {
-        debugPrint('Unable to load selected question types: $error');
-      }
-    }
-
-    final raw =
-        settings['questionTypes'] ??
-        settings['questionType'] ??
-        settings['question_types'] ??
-        settings['types'] ??
-        settings['allowedQuestionTypes'];
-
-    final values = <String>[];
-    if (raw is List) {
-      for (final item in raw) {
-        final type = _normalizeType(item);
-        if (type != null && !values.contains(type)) values.add(type);
-      }
-    } else if (raw is String) {
-      for (final item in raw.split(',')) {
-        final type = _normalizeType(item);
-        if (type != null && !values.contains(type)) values.add(type);
+        debugPrint(
+          'Unable to load selected question types from questions: $error',
+        );
       }
     }
 
@@ -293,10 +371,33 @@ class QuizInstructionsScreen extends StatelessWidget {
       'Multiple Choice',
       'True/False',
       'Identification',
+      'Fill in the Blank',
       'Enumeration',
     ];
-    final found = order.where(values.contains).toList();
-    return found.isEmpty ? 'Multiple Choice' : found.join(', ');
+
+    if (questionTypes.isNotEmpty) {
+      final ordered = <String>[];
+      for (final t in order) {
+        if (questionTypes.contains(t)) ordered.add(t);
+      }
+      for (final t in questionTypes) {
+        if (!ordered.contains(t)) ordered.add(t);
+      }
+      return ordered.join(', ');
+    }
+
+    if (adminConfiguredTypes.isNotEmpty) {
+      final ordered = <String>[];
+      for (final t in order) {
+        if (adminConfiguredTypes.contains(t)) ordered.add(t);
+      }
+      for (final t in adminConfiguredTypes) {
+        if (!ordered.contains(t)) ordered.add(t);
+      }
+      return ordered.join(', ');
+    }
+
+    return 'Multiple Choice';
   }
 
   @override
