@@ -1681,6 +1681,27 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
         ),
 
+        if (entry?.eliminated == true) ...[
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEE2E2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+            ),
+            child: const Text(
+              'ELIMINATED',
+              style: TextStyle(
+                fontSize: 7.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFDC2626),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
+
         const SizedBox(height: 3),
 
         // ==========================================================
@@ -1782,8 +1803,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       return const SizedBox.shrink();
     }
 
-    final rank4AndAbove =
-        entries.length > 3 ? entries.sublist(3) : <_LeaderboardEntry>[];
+    // Rank 4 to pataas, plus makita pud ang na-eliminate nga contestant
+    final standingsEntries = <MapEntry<int, _LeaderboardEntry>>[];
+    for (int i = 0; i < entries.length; i++) {
+      final rank = i + 1;
+      final entry = entries[i];
+      if (rank >= 4 || entry.eliminated) {
+        standingsEntries.add(MapEntry(rank, entry));
+      }
+    }
 
     return Container(
       width: double.infinity,
@@ -1800,7 +1828,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
         ],
       ),
-      child: rank4AndAbove.isEmpty
+      child: standingsEntries.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
               child: Center(
@@ -1814,7 +1842,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'All current contestants are in the Top 3 podium above.',
+                      'All current active contestants are in the Top 3 podium above.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -1828,8 +1856,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             )
           : Column(
               children: [
-                for (int i = 3; i < entries.length; i++)
-                  _rankingItem(entries[i], i + 1),
+                for (final item in standingsEntries)
+                  _rankingItem(item.value, item.key),
               ],
             ),
     );
@@ -1996,19 +2024,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isFirst
-            ? const Color(0xFFFFFDF5)
-            : (isTop3
-                ? const Color(0xFFFAFCFF)
-                : (isTop10 ? const Color(0xFFF0FDF4) : backgroundColor)),
+        color: entry.eliminated
+            ? const Color(0xFFFFF7F7)
+            : (isFirst
+                ? const Color(0xFFFFFDF5)
+                : (isTop3
+                    ? const Color(0xFFFAFCFF)
+                    : (isTop10 ? const Color(0xFFF0FDF4) : backgroundColor))),
         borderRadius: BorderRadius.circular(13),
         border: Border.all(
-          color: isFirst
-              ? const Color(0xFFFDE68A)
-              : (isTop3
-                  ? const Color(0xFFBAE6FD)
-                  : (isTop10 ? const Color(0xFF86EFAC) : borderColor)),
-          width: (isTop3 || isTop10) ? 1.2 : 1,
+          color: entry.eliminated
+              ? const Color(0xFFFECACA)
+              : (isFirst
+                  ? const Color(0xFFFDE68A)
+                  : (isTop3
+                      ? const Color(0xFFBAE6FD)
+                      : (isTop10 ? const Color(0xFF86EFAC) : borderColor))),
+          width: (entry.eliminated || isTop3 || isTop10) ? 1.2 : 1,
         ),
       ),
       child: Row(
@@ -2040,19 +2072,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1.5,
+                          horizontal: 6,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEE2E2),
                           borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: const Color(0xFFFCA5A5),
+                            width: 0.8,
+                          ),
                         ),
                         child: const Text(
                           'ELIMINATED',
                           style: TextStyle(
                             color: Color(0xFFDC2626),
                             fontSize: 8,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
                           ),
                         ),
                       ),
@@ -2350,6 +2387,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final key = teamName.isNotEmpty ? 'team:$teamName' : 'user:$uid';
       final display = teamName.isNotEmpty ? teamName : name;
 
+      final reqIsEliminated = status == 'eliminated' ||
+          data['eliminated'] == true ||
+          data['isEliminated'] == true;
+
       final current = grouped[key];
       if (current == null) {
         grouped[key] = _LeaderboardEntry(
@@ -2359,7 +2400,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           members: members,
           school: school,
           score: 0,
-          eliminated: status == 'eliminated',
+          eliminated: reqIsEliminated,
           status: status,
         );
       } else {
@@ -2370,7 +2411,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           members: {...current.members, ...members}.toList(),
           school: current.school.isNotEmpty ? current.school : school,
           score: current.score,
-          eliminated: current.eliminated || status == 'eliminated',
+          eliminated: current.eliminated || reqIsEliminated,
           status: current.status.isNotEmpty ? current.status : status,
         );
       }
