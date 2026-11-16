@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1229,340 +1230,568 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             ? descriptionValue.toString().trim()
             : 'No description provided';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFFFF), Color(0xFFEAFBF0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x2E16A34A),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
+    final bool isOngoing =
+        status == 'active' || status == 'ongoing' || status == 'started';
+    final bool isCountdown = status == 'countdown';
+    final bool isLevelPause = status == 'level_pause';
+    final bool isReview = status == 'contest_review';
+
+    final String statusLabel = !published
+        ? 'QUIZ DRAFT'
+        : isOngoing
+        ? 'QUIZ ONGOING'
+        : isCountdown
+        ? 'GET READY'
+        : isLevelPause
+        ? 'WAITING FOR NEXT LEVEL'
+        : isReview
+        ? 'CONTEST REVIEW'
+        : 'QUIZ AVAILABLE';
+
+    final Color statusColor = !published
+        ? Colors.grey
+        : isOngoing
+        ? primaryGreen
+        : isCountdown
+        ? const Color(0xFFD97706)
+        : isLevelPause
+        ? const Color(0xFF0284C7)
+        : isReview
+        ? const Color(0xFF7E22CE)
+        : primaryGreen;
+
+    final Color statusBg = !published
+        ? Colors.grey.shade100
+        : isOngoing
+        ? const Color(0xFFE8FBEF)
+        : isCountdown
+        ? const Color(0xFFFEF3C7)
+        : isLevelPause
+        ? const Color(0xFFE0F2FE)
+        : isReview
+        ? const Color(0xFFF3E8FF)
+        : const Color(0xFFE8FBEF);
+
+    final IconData statusIcon = isOngoing
+        ? Icons.sensors_rounded
+        : isCountdown
+        ? Icons.timer_outlined
+        : isLevelPause
+        ? Icons.pause_circle_outline_rounded
+        : isReview
+        ? Icons.rate_review_outlined
+        : Icons.check_circle_outline_rounded;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 620;
+
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Colors.white, Color(0xFFF8FCFA)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: softBorder, width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1416A34A),
+                blurRadius: 18,
+                offset: Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // STATUS
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top accent header
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+                height: 4,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF34D399), primaryGreen, darkGreen],
+                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                decoration: BoxDecoration(
-                  color: lightGreen,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+
+              Padding(
+                padding: EdgeInsets.all(compact ? 16 : 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color:
-                            status == 'active' ||
-                                status == 'ongoing' ||
-                                status == 'started'
-                            ? Colors.greenAccent
-                            : Colors.white70,
-                        shape: BoxShape.circle,
+                    // TOP ROW: Status badge & Quiz Code
+                    Row(
+                      children: [
+                        // Status badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isOngoing)
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: const BoxDecoration(
+                                    color: primaryGreen,
+                                    shape: BoxShape.circle,
+                                  ),
+                                )
+                              else
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 5),
+                                  child: Icon(
+                                    statusIcon,
+                                    size: 13,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        // Quiz code chip with copy
+                        Tooltip(
+                          message: 'Tap to copy quiz code',
+                          child: InkWell(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: quizCode));
+                              showTopSnackBar(
+                                context,
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text('Quiz Code $quizCode copied!'),
+                                    ],
+                                  ),
+                                  backgroundColor: darkGreen,
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDF4),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFBBF7D0),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.qr_code_rounded,
+                                    size: 13,
+                                    color: primaryGreen,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    quizCode,
+                                    style: const TextStyle(
+                                      color: darkGreen,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.copy_rounded,
+                                    size: 11.5,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // TITLE
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: darkGreen,
+                        fontSize: compact ? 20 : 23,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                        height: 1.25,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      published
-                          ? (status == 'active' ||
-                                    status == 'ongoing' ||
-                                    status == 'started'
-                                ? 'QUIZ ONGOING'
-                                : status == 'countdown'
-                                ? 'GET READY'
-                                : status == 'level_pause'
-                                ? 'WAITING FOR NEXT LEVEL'
-                                : status == 'contest_review'
-                                ? 'CONTEST REVIEW'
-                                : 'QUIZ AVAILABLE')
-                          : 'QUIZ',
-                      style: const TextStyle(
-                        color: darkGreen,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+
+                    if (descriptionValue?.toString().trim().isNotEmpty ==
+                        true) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 13,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7FCF9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE4F6E9)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.format_quote_rounded,
+                                size: 15,
+                                color: primaryGreen,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                descriptionText,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF2E4E38),
+                                  fontSize: 12,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
+
+                    const SizedBox(height: 14),
+
+                    // EVENT DETAILS GRID (Bento Tiles)
+                    if (compact) ...[
+                      _buildEventInfoTile(
+                        icon: Icons.calendar_today_rounded,
+                        label: 'SCHEDULE & TIME',
+                        value: dateText,
+                        subValue: endTimeText == 'Time not set'
+                            ? startTimeText
+                            : '$startTimeText - $endTimeText',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildEventInfoTile(
+                        icon: Icons.location_on_rounded,
+                        label: 'VENUE / ARENA',
+                        value: locationText,
+                        subValue: locationText == 'Location not set'
+                            ? 'Check with Quiz Master'
+                            : 'Official Quiz Venue',
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildEventInfoTile(
+                              icon: Icons.calendar_today_rounded,
+                              label: 'SCHEDULE & TIME',
+                              value: dateText,
+                              subValue: endTimeText == 'Time not set'
+                                  ? startTimeText
+                                  : '$startTimeText - $endTimeText',
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildEventInfoTile(
+                              icon: Icons.location_on_rounded,
+                              label: 'VENUE / ARENA',
+                              value: locationText,
+                              subValue: locationText == 'Location not set'
+                                  ? 'Check with Quiz Master'
+                                  : 'Official Quiz Venue',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 18),
+
+                    // JOIN / APPROVAL / VIEW EVENT BUTTON
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseAuth.instance.currentUser == null
+                          ? null
+                          : FirebaseFirestore.instance
+                                .collection('quiz_sessions')
+                                .doc(quizCode)
+                                .collection('join_requests')
+                                .doc(FirebaseAuth.instance.currentUser!.uid)
+                                .snapshots(),
+                      builder: (context, requestSnapshot) {
+                        final requestData = requestSnapshot.data?.data() ?? {};
+                        final requestStatus =
+                            requestData['status']?.toString().trim().toLowerCase() ?? '';
+
+                        final isEliminated = requestData['eliminated'] == true ||
+                            requestData['isEliminated'] == true ||
+                            requestStatus == 'eliminated' ||
+                            requestData['contestantDecision']
+                                    ?.toString()
+                                    .trim()
+                                    .toLowerCase() ==
+                                'eliminated';
+
+                        if (isEliminated) {
+                          return Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                showTopSnackBar(
+                                  context,
+                                  const SnackBar(
+                                    content: Text(
+                                      'You have been eliminated from this quiz and cannot rejoin.',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: const Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.block_rounded,
+                                      size: 18,
+                                      color: Color(0xFF6B7280),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'ELIMINATED FROM THIS SESSION',
+                                      style: TextStyle(
+                                        color: Color(0xFF4B5563),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12.5,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final bool isApproved = requestStatus == 'approved';
+                        final bool isPending = requestStatus == 'pending';
+
+                        final String buttonLabel = isApproved
+                            ? 'VIEW QUIZ EVENT'
+                            : isPending
+                            ? 'WAITING FOR APPROVAL'
+                            : 'JOIN QUIZ EVENT';
+
+                        final IconData buttonIcon = isApproved
+                            ? Icons.event_available_rounded
+                            : isPending
+                            ? Icons.hourglass_top_rounded
+                            : Icons.rocket_launch_rounded;
+
+                        final List<Color> buttonGradient = isApproved
+                            ? const [Color(0xFF16A34A), Color(0xFF15803D)]
+                            : isPending
+                            ? const [Color(0xFFF59E0B), Color(0xFFD97706)]
+                            : const [Color(0xFF16A34A), Color(0xFF15803D)];
+
+                        final Color shadowColor = isPending
+                            ? const Color(0x40F59E0B)
+                            : const Color(0x4016A34A);
+
+                        return Container(
+                          width: double.infinity,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: buttonGradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: shadowColor,
+                                blurRadius: 14,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              if (isApproved) {
+                                openQuiz(
+                                  context: context,
+                                  quizCode: quizCode,
+                                  quizTitle: title,
+                                );
+                                return;
+                              }
+
+                              joinQuiz(
+                                context: context,
+                                quizCode: quizCode,
+                                quizTitle: title,
+                              );
+                            },
+                            icon: Icon(buttonIcon, size: 20),
+                            label: Text(
+                              buttonLabel,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13.5,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shadowColor: Colors.transparent,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
               ),
             ],
           ),
+        );
+      },
+    );
+  }
 
-          const SizedBox(height: 13),
-
-          // TITLE
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: darkGreen,
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
+  Widget _buildEventInfoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String subValue,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FCFA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: softBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8FBEF),
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Icon(icon, size: 18, color: primaryGreen),
           ),
-
-          const SizedBox(height: 12),
-
-          // WHEN
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.calendar_today_rounded,
-                color: Color(0xB814532D),
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'When: $dateText',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: darkGreen, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 7),
-
-          // TIME
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.access_time_rounded,
-                color: Color(0xB814532D),
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  endTimeText == 'Time not set'
-                      ? 'Time: $startTimeText'
-                      : 'Time: $startTimeText - $endTimeText',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: darkGreen, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 7),
-
-          // WHERE
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                color: Color(0xB814532D),
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Where: $locationText',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: darkGreen, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 7),
-
-          // DESCRIPTION
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.description_outlined,
-                color: Color(0xB814532D),
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Description: $descriptionText',
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
                   style: const TextStyle(
-                    color: darkGreen,
-                    fontSize: 12,
-                    height: 1.35,
+                    color: Color(0xFF64816D),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 7),
-
-          // QUIZ CODE
-          Row(
-            children: [
-              const Icon(Icons.key_rounded, color: Color(0xB814532D), size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Quiz Code: $quizCode',
+                const SizedBox(height: 2),
+                Text(
+                  value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xB814532D),
-                    fontSize: 12,
+                    color: darkGreen,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 15),
-
-          // JOIN / APPROVAL / VIEW EVENT BUTTON
-          // Listen to this contestant's request so the label changes in
-          // real time after the Admin approves or rejects the request.
-          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: FirebaseAuth.instance.currentUser == null
-                ? null
-                : FirebaseFirestore.instance
-                      .collection('quiz_sessions')
-                      .doc(quizCode)
-                      .collection('join_requests')
-                      .doc(FirebaseAuth.instance.currentUser!.uid)
-                      .snapshots(),
-            builder: (context, requestSnapshot) {
-              final requestData = requestSnapshot.data?.data() ?? {};
-              final requestStatus =
-                  requestData['status']?.toString().trim().toLowerCase() ?? '';
-
-              final isEliminated = requestData['eliminated'] == true ||
-                  requestData['isEliminated'] == true ||
-                  requestStatus == 'eliminated' ||
-                  requestData['contestantDecision']
-                          ?.toString()
-                          .trim()
-                          .toLowerCase() ==
-                      'eliminated';
-
-              // Kon na-eliminate ang contestant, dili na sila maka-join pagbalik.
-              // Ilisan ang 'JOIN QUIZ' button og 'ONGOING QUIZ'.
-              if (isEliminated) {
-                return SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      showTopSnackBar(
-                        context,
-                        const SnackBar(
-                          content: Text(
-                            'You have been eliminated from this quiz and cannot rejoin.',
-                          ),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.play_circle_outline_rounded,
-                      size: 20,
-                    ),
-                    label: const Text(
-                      'ONGOING QUIZ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade600,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              final buttonLabel = requestStatus == 'approved'
-                  ? 'VIEW QUIZ EVENT'
-                  : (requestStatus == 'pending'
-                        ? 'WAITING FOR APPROVAL'
-                        : 'JOIN QUIZ');
-
-              final buttonIcon = requestStatus == 'approved'
-                  ? Icons.event_available_rounded
-                  : (requestStatus == 'pending'
-                        ? Icons.hourglass_top_rounded
-                        : Icons.login_rounded);
-
-              return SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    if (requestStatus == 'approved') {
-                      // Approved contestants can open the Waiting Room directly.
-                      openQuiz(
-                        context: context,
-                        quizCode: quizCode,
-                        quizTitle: title,
-                      );
-                      return;
-                    }
-
-                    // Send the join request directly for this quiz card.
-                    // No quiz-code input or extra confirmation dialog is needed.
-                    // The existing joinQuiz flow shows the Waiting for Approval
-                    // dialog and automatically opens the Waiting Room if approved.
-                    joinQuiz(
-                      context: context,
-                      quizCode: quizCode,
-                      quizTitle: title,
-                    );
-                  },
-                  icon: Icon(buttonIcon, size: 20),
-                  label: Text(
-                    buttonLabel,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                Text(
+                  subValue,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF4B6354),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              );
-            },
+              ],
+            ),
           ),
         ],
       ),
@@ -1649,31 +1878,125 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   Widget welcomeQuizMessage() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 34),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: softBorder),
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFF7FCF9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: softBorder, width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1016A34A),
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.emoji_events_outlined, color: primaryGreen, size: 48),
-          SizedBox(height: 14),
-          Text(
-            'Welcome to the Quiz!',
+          const TechArenaBadge(
+            label: 'ARENA STANDBY',
+            icon: Icons.radar_rounded,
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8FBEF),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: primaryGreen.withValues(alpha: 0.16),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Image.asset(
+                'assets/images/brand_trophy.png',
+                width: 44,
+                height: 44,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.emoji_events_rounded,
+                  color: primaryGreen,
+                  size: 38,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'No Active Quiz Right Now',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: darkGreen,
-              fontSize: 18,
+              fontSize: 19,
               fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
             ),
           ),
-          SizedBox(height: 7),
-          Text(
-            'There is no quiz available right now.\r\n'
-            'Please wait for the Admin to publish a quiz.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.5),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: const Text(
+              'Please standby! When the Quiz Master or Admin publishes a new quiz session, it will automatically appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF4B6354),
+                fontSize: 12.5,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _openLeaderboard(),
+                icon: const Icon(Icons.leaderboard_rounded, size: 16),
+                label: const Text('View Leaderboard'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  side: const BorderSide(color: softBorder),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openBadges(),
+                icon: const Icon(Icons.workspace_premium_rounded, size: 16),
+                label: const Text('Check Badges'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  side: const BorderSide(color: softBorder),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -5168,10 +5491,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final compact = width < 600;
-        final horizontalPadding = compact ? 14.0 : 24.0;
-        final verticalPadding = compact ? 10.0 : 22.0;
-        final titleSize = compact ? 19.0 : 24.0;
-        final memberSize = compact ? 11.0 : 13.0;
+        final horizontalPadding = compact ? 16.0 : 26.0;
+        final verticalPadding = compact ? 16.0 : 24.0;
+        final titleSize = compact ? 20.0 : 25.0;
+        final memberSize = compact ? 11.0 : 12.5;
 
         return Container(
           width: double.infinity,
@@ -5181,85 +5504,382 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFFE9FBEF), Color(0xFFD4F7DF)],
+              colors: [
+                Color(0xFF093E22),
+                Color(0xFF14532D),
+                Color(0xFF15803D),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(compact ? 16 : 20),
-            boxShadow: [
+            borderRadius: BorderRadius.circular(compact ? 20 : 24),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.16),
+              width: 1.2,
+            ),
+            boxShadow: const [
               BoxShadow(
-                color: Color(0x1A16A34A),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
+                color: Color(0x3514532D),
+                blurRadius: 18,
+                offset: Offset(0, 7),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (participation == 'Team') ...[
-                Text(
-                  teamName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: darkGreen,
-                    fontSize: titleSize,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
-                ),
-                SizedBox(height: compact ? 4 : 8),
-                Text(
-                  'Team Members',
-                  style: TextStyle(
-                    color: Color(0xC714532D),
-                    fontSize: memberSize,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                if (teamMembers.isEmpty)
-                  Text(
-                    'No team members yet',
-                    style: TextStyle(
-                      color: Color(0xC714532D),
-                      fontSize: memberSize,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TechArenaBadge(
+                      label: participation == 'Team'
+                          ? 'TECHNOWIZ • TEAM ARENA'
+                          : 'TECHNOWIZ • CONTESTANT PORTAL',
+                      icon: participation == 'Team'
+                          ? Icons.groups_rounded
+                          : Icons.sports_esports_rounded,
+                      darkTheme: true,
                     ),
-                  )
-                else
-                  ...teamMembers.map(
-                    (member) => Padding(
-                      padding: const EdgeInsets.only(bottom: 1),
-                      child: Text(
-                        '• $member',
-                        maxLines: 1,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Text(
+                          'WELCOME BACK,',
+                          style: TextStyle(
+                            color: Color(0xFFA7F3D0),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF4ADE80),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    if (participation == 'Team') ...[
+                      Text(
+                        teamName,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: darkGreen,
-                          fontSize: memberSize,
-                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                          letterSpacing: -0.3,
                         ),
                       ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Team Roster (${teamMembers.length})',
+                        style: TextStyle(
+                          color: const Color(0xFFD1FAE5),
+                          fontSize: memberSize,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      if (teamMembers.isEmpty)
+                        Text(
+                          'No team members registered yet',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: memberSize,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: teamMembers.map(
+                            (member) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.22),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.person_rounded,
+                                    size: 11.5,
+                                    color: Color(0xFFA7F3D0),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    member,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: memberSize,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ).toList(),
+                        ),
+                    ] else ...[
+                      Text(
+                        personalName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Profile Avatar / Mascot
+              GestureDetector(
+                onTap: () => showProfileDrawer(context),
+                child: Tooltip(
+                  message: 'View Profile',
+                  child: Container(
+                    width: compact ? 56 : 68,
+                    height: compact ? 56 : 68,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4ADE80), Color(0xFF10B981)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF4ADE80).withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(2.5),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF0F5132),
+                        shape: BoxShape.circle,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: profileImageProvider != null
+                          ? Image(
+                              image: profileImageProvider!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Image.asset(
+                                'assets/images/robot_avatar_clean.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(
+                                  Icons.person_rounded,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                            )
+                          : Image.asset(
+                              'assets/images/robot_avatar_clean.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.person_rounded,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                            ),
                     ),
                   ),
-              ] else ...[
-                Text(
-                  personalName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: darkGreen,
-                    fontSize: titleSize,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
                 ),
-              ],
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDashboardQuickActions({required bool mobile}) {
+    final actions = [
+      (
+        title: 'Leaderboard',
+        subtitle: 'Live rankings & podium',
+        icon: Icons.leaderboard_rounded,
+        color: const Color(0xFF16A34A),
+        bgColor: const Color(0xFFE8FBEF),
+        onTap: () => _openLeaderboard(),
+      ),
+      (
+        title: 'Badges & Trophies',
+        subtitle: 'View achievements',
+        icon: Icons.workspace_premium_rounded,
+        color: const Color(0xFFD97706),
+        bgColor: const Color(0xFFFEF3C7),
+        onTap: () => _openBadges(),
+      ),
+      (
+        title: 'Quiz History',
+        subtitle: 'Past scores & answers',
+        icon: Icons.history_rounded,
+        color: const Color(0xFF2563EB),
+        bgColor: const Color(0xFFEFF6FF),
+        onTap: () => _openHistory(),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 16,
+              decoration: BoxDecoration(
+                color: primaryGreen,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'QUICK ARENA ACCESS',
+              style: TextStyle(
+                color: darkGreen,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 680;
+            if (isWide) {
+              return Row(
+                children: actions.map((act) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: _quickActionCard(act),
+                    ),
+                  );
+                }).toList(),
+              );
+            }
+
+            return Column(
+              children: actions.map((act) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _quickActionCard(act),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _quickActionCard(({
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    Color bgColor,
+    VoidCallback onTap,
+  }) act) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: act.onTap,
+        borderRadius: BorderRadius.circular(16),
+        hoverColor: lightGreen.withValues(alpha: 0.5),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: softBorder),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: act.bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(act.icon, color: act.color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      act.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: darkGreen,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      act.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64816D),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 13,
+                color: Color(0xFF9EBAA5),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -5291,7 +5911,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   _welcomeHero(),
                   const SizedBox(height: 18),
                   publishedQuizSection(mobile: mobile),
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 24),
+                  _buildDashboardQuickActions(mobile: mobile),
+                  const SizedBox(height: 30),
                   const Center(
                     child: Text(
                       'TechNoWiz • Contestant Dashboard',
