@@ -193,10 +193,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
               automaticallyImplyLeading: false,
 
+              centerTitle: false,
+
               leading: const SizedBox.shrink(),
-              leadingWidth: 12,
+              leadingWidth: 0,
               toolbarHeight: 62,
-              titleSpacing: 0,
+              titleSpacing: 16,
               title: const QuizMasterBrandTitle(subtitle: 'Leaderboard'),
               bottom: const PreferredSize(
                 preferredSize: Size.fromHeight(1),

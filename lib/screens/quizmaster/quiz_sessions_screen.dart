@@ -478,6 +478,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
       bottomNavigationBar: _buildBottomNavigation(),
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        centerTitle: false,
         leading: widget.resultMode != null
             ? IconButton(
                 tooltip: 'Back to Dashboard',
@@ -494,8 +495,8 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                 },
               )
             : const SizedBox.shrink(),
-        leadingWidth: widget.resultMode != null ? 48 : 12,
-        titleSpacing: 0,
+        leadingWidth: widget.resultMode != null ? 48 : 0,
+        titleSpacing: widget.resultMode != null ? 0 : 16,
         backgroundColor: Colors.white,
         foregroundColor: darkBlue,
         elevation: 0,
