@@ -190,6 +190,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
   bool _isEliminated(Map<String, dynamic> data) =>
       data['eliminated'] == true ||
+      data['isEliminated'] == true ||
       data['status']?.toString().toLowerCase() == 'eliminated';
 
   bool _isProceededForCurrentLevel(Map<String, dynamic> data) {
@@ -530,6 +531,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
       batch.set(sessionRef.collection('scores').doc(contestantId), {
         'status': 'eliminated',
         'eliminated': true,
+        'isEliminated': true,
+        'proceeded': false,
+        'proceededFromLevel': FieldValue.delete(),
+        'proceededAt': FieldValue.delete(),
         'eliminatedLevel': level,
         'eliminatedAt': FieldValue.serverTimestamp(),
         'rankAtElimination': rank,
@@ -624,6 +629,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
         'proceeded': true,
         'eliminated': false,
         'isEliminated': false,
+        'eliminatedLevel': FieldValue.delete(),
+        'eliminatedAt': FieldValue.delete(),
         'proceededFromLevel': level,
         'nextLevel': level + 1,
         'proceededAt': FieldValue.serverTimestamp(),
@@ -640,6 +647,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
           'status': 'approved',
           'eliminated': false,
           'isEliminated': false,
+          'eliminatedAfterLevel': FieldValue.delete(),
+          'eliminatedScore': FieldValue.delete(),
+          'eliminationReason': FieldValue.delete(),
+          'eliminatedAt': FieldValue.delete(),
+          'eliminatedLevel': FieldValue.delete(),
           'ready': false,
           'readyResponded': false,
           'contestantDecision': 'proceeding',
@@ -653,6 +665,31 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
               'Congratulations! You will be proceeding to Level ${level + 1}!',
           'decisionAt': FieldValue.serverTimestamp(),
           'eliminationConfirmed': false,
+        },
+        SetOptions(merge: true),
+      );
+
+      batch.set(
+        db
+            .collection('quiz_reports')
+            .doc(quizCode)
+            .collection('levels')
+            .doc('level_$level')
+            .collection('contestants')
+            .doc(contestantId),
+        {
+          'contestantId': contestantId,
+          'name': contestantName,
+          'score': score,
+          'rank': rank,
+          'level': level,
+          'quizCode': quizCode,
+          'status': 'proceeding',
+          'eliminated': false,
+          'isEliminated': false,
+          'eliminatedLevel': FieldValue.delete(),
+          'eliminatedAt': FieldValue.delete(),
+          'proceededAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
       );
@@ -1598,23 +1635,141 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'PROCEED',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.green.shade300,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 13,
+                            color: Colors.green.shade700,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'PROCEEDING',
+                            style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Icon(
-                      Icons.check_circle_rounded,
-                      color: Colors.green.shade700,
-                      size: 24,
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () => _eliminateContestant(
+                        context: context,
+                        contestantId: playerId,
+                        contestantName: playerName,
+                        score: score,
+                        rank: rank,
+                      ),
+                      child: const Text(
+                        'ELIMINATE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 )
-              else if (!eliminated)
+              else if (eliminated)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.red.shade300,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.cancel_rounded,
+                            size: 13,
+                            color: Colors.red.shade700,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'ELIMINATED',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () => _proceedContestant(
+                        context: context,
+                        contestantId: playerId,
+                        contestantName: playerName,
+                        score: score,
+                        rank: rank,
+                      ),
+                      child: const Text(
+                        'PROCEED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1626,6 +1781,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 8,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       onPressed: () => _proceedContestant(
@@ -1653,6 +1813,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                           horizontal: 10,
                           vertical: 8,
                         ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () => _eliminateContestant(
                         context: context,
@@ -1670,39 +1835,6 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                       ),
                     ),
                   ],
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.red.shade300,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.cancel_rounded,
-                        size: 13,
-                        color: Colors.red.shade700,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ELIMINATED',
-                        style: TextStyle(
-                          color: Colors.red.shade700,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
             ],
           ),

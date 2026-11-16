@@ -990,11 +990,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     ScaffoldMessenger.of(context).clearSnackBars();
 
-    // Apply this level's configured elimination, then open Final Ranking.
-    // Keep the quiz session status/current question unchanged so contestants
-    // remain on their existing screen until the Quiz Master explicitly starts
-    // the next level from Final Ranking.
-    await _applyLevelElimination(_currentLevel);
+    // Auto-elimination disabled: The Quiz Master manually clicks
+    // Proceed or Eliminate on the Final Ranking screen.
 
     if (!mounted) return;
     await _openFinalRanking();
@@ -1676,7 +1673,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                         Padding(
                                           padding: const EdgeInsets.only(top: 3),
                                           child: Text(
-                                            'Members: ' + teamMembers.join(', '),
+                                            'Members: ${teamMembers.join(', ')}',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: Colors.grey.shade600,
@@ -1881,174 +1878,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   }
 
   // ============================================================
-  // LEVEL ELIMINATION SETTINGS
-  //
-  // Reads the elimination count configured by Admin in:
-  // quiz_sessions/{quizCode}.levelSettings["Level X"].eliminateCount
-  // ============================================================
-
-  Future<int> _getLevelEliminateCount(int level) async {
-    try {
-      final quizDoc = await _getQuizSession();
-
-      if (quizDoc == null) return 0;
-
-      final data = quizDoc.data() ?? {};
-      final rawSettings = data['levelSettings'];
-
-      if (rawSettings is! Map) return 0;
-
-      final rawLevelSettings = rawSettings['Level $level'];
-
-      if (rawLevelSettings is! Map) return 0;
-
-      final value = rawLevelSettings['eliminateCount'];
-
-      final count = _asInt(value) ?? 0;
-
-      return count < 0 ? 0 : count;
-    } catch (e) {
-      debugPrint('GET LEVEL ELIMINATION ERROR: $e');
-      return 0;
-    }
-  }
-
-  // ============================================================
-  // APPLY LEVEL ELIMINATION
-  //
-  // Called after the last question of a level and BEFORE the next
-  // level starts.
-  //
-  // The lowest-scoring approved contestants are marked as
-  // eliminated. At least one contestant is always kept.
-  // ============================================================
-
-  Future<int> _applyLevelElimination(int level) async {
-    try {
-      final quizDoc = await _getQuizSession();
-
-      if (quizDoc == null) return 0;
-
-      final eliminateCount = await _getLevelEliminateCount(level);
-
-      if (eliminateCount <= 0) {
-        await quizDoc.reference.set({
-          'lastEliminationLevel': level,
-          'lastEliminationCount': 0,
-          'eliminationPublished': false,
-        }, SetOptions(merge: true));
-
-        return 0;
-      }
-
-      final requestsSnapshot = await quizDoc.reference
-          .collection('join_requests')
-          .where('status', isEqualTo: 'approved')
-          .get();
-
-      final contestants = requestsSnapshot.docs;
-
-      if (contestants.length <= 1) {
-        await quizDoc.reference.set({
-          'lastEliminationLevel': level,
-          'lastEliminationCount': 0,
-          'eliminationPublished': false,
-        }, SetOptions(merge: true));
-
-        return 0;
-      }
-
-      final scoresSnapshot = await quizDoc.reference.collection('scores').get();
-
-      final scoreById = <String, Map<String, dynamic>>{
-        for (final doc in scoresSnapshot.docs) doc.id: doc.data(),
-      };
-
-      final rows = contestants.map((doc) {
-        final data = doc.data();
-        final scoreData = scoreById[doc.id];
-
-        final score = _asInt(scoreData?['score']) ?? 0;
-
-        final name =
-            (data['displayName'] ??
-                    data['name'] ??
-                    scoreData?['name'] ??
-                    data['email'] ??
-                    doc.id)
-                .toString();
-
-        return {'doc': doc, 'score': score, 'name': name};
-      }).toList();
-
-      // Lowest score first because these are the contestants to eliminate.
-      rows.sort((a, b) {
-        final scoreCompare = (a['score'] as int).compareTo(b['score'] as int);
-
-        if (scoreCompare != 0) return scoreCompare;
-
-        return (a['name'] as String).compareTo(b['name'] as String);
-      });
-
-      // Never eliminate everyone.
-      final maxEliminate = rows.length - 1;
-      final actualEliminateCount = eliminateCount
-          .clamp(0, maxEliminate)
-          .toInt();
-
-      if (actualEliminateCount <= 0) {
-        await quizDoc.reference.set({
-          'lastEliminationLevel': level,
-          'lastEliminationCount': 0,
-          'eliminationPublished': false,
-        }, SetOptions(merge: true));
-
-        return 0;
-      }
-
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (int i = 0; i < actualEliminateCount; i++) {
-        final row = rows[i];
-        final doc = row['doc'] as QueryDocumentSnapshot<Map<String, dynamic>>;
-        final score = row['score'] as int;
-
-        batch.update(doc.reference, {
-          'status': 'eliminated',
-          'eliminated': true,
-          'eliminatedAfterLevel': level,
-          'eliminatedScore': score,
-          'eliminationReason': 'Lowest score after Level $level',
-          'eliminatedAt': FieldValue.serverTimestamp(),
-          'ready': false,
-          'readyResponded': false,
-          'readyAt': null,
-          'resultConfirmed': false,
-        });
-      }
-
-      batch.set(quizDoc.reference, {
-        'lastEliminationLevel': level,
-        'lastEliminationCount': actualEliminateCount,
-        'eliminationPublished': true,
-        'eliminationPublishedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      await batch.commit();
-
-      return actualEliminateCount;
-    } catch (e) {
-      debugPrint('APPLY LEVEL ELIMINATION ERROR: $e');
-
-      if (mounted) {
-        _showMessage('Unable to apply Level $level elimination.');
-      }
-
-      return 0;
-    }
-  }
-
-  // ============================================================
   // NEXT QUESTION
   //
   // Detects the actual last selected question of the current level
@@ -2112,9 +1941,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           _currentQuestion >= lastQuestionOfCurrentLevel) {
         _timer?.cancel();
 
-        // Apply the elimination configured for this level before
-        // allowing the next level to start.
-        final eliminatedCount = await _applyLevelElimination(currentLevel);
+        // Auto-elimination disabled: The Quiz Master manually clicks
+        // Proceed or Eliminate on the Final Ranking screen.
 
         final nextLevel = currentLevel + 1;
 
@@ -2149,19 +1977,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         });
 
         if (showLevelFinishedMessage) {
-          if (eliminatedCount > 0) {
-            _showMessage(
-              'Level $currentLevel finished. '
-              '$eliminatedCount contestant(s) eliminated. '
-              'Press START LEVEL $nextLevel to continue.',
-            );
-          } else {
-            _showMessage(
-              'Level $currentLevel finished. '
-              'No contestants were eliminated. '
-              'Press START LEVEL $nextLevel to continue.',
-            );
-          }
+          _showMessage(
+            'Level $currentLevel finished. '
+            'Press START LEVEL $nextLevel to continue.',
+          );
         }
 
         return;
@@ -3446,7 +3265,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                       Padding(
                                         padding: const EdgeInsets.only(top: 3),
                                         child: Text(
-                                          'Members: ' + teamMembers.join(', '),
+                                          'Members: ${teamMembers.join(', ')}',
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: Colors.grey.shade600,
@@ -5344,7 +5163,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   ),
                                   if ((row['teamMembers'] as List).isNotEmpty)
                                     Text(
-                                      'Members: ' + (row['teamMembers'] as List).join(', '),
+                                      'Members: ${(row['teamMembers'] as List).join(', ')}',
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Color(0xFF5B7A9C),
