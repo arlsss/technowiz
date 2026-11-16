@@ -3831,31 +3831,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             Row(
                               children: [
                                 const Icon(
-                                  Icons.checklist_rounded,
-                                  color: primaryBlue,
-                                  size: 23,
-                                ),
-                                const SizedBox(width: 9),
-                                const Expanded(
-                                  child: Text(
-                                    'Participant Answers',
-                                    style: TextStyle(
-                                      color: darkBlue,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _participantAnswersView(),
-                            const SizedBox(height: 22),
-                            const Divider(height: 1),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                const Icon(
                                   Icons.leaderboard_outlined,
                                   color: primaryBlue,
                                   size: 23,
@@ -3875,6 +3850,31 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             ),
                             const SizedBox(height: 10),
                             _currentStandingsView(),
+                            const SizedBox(height: 22),
+                            const Divider(height: 1),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.checklist_rounded,
+                                  color: primaryBlue,
+                                  size: 23,
+                                ),
+                                const SizedBox(width: 9),
+                                const Expanded(
+                                  child: Text(
+                                    'Participant Answers',
+                                    style: TextStyle(
+                                      color: darkBlue,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _participantAnswersView(),
                           ],
                         ),
                       ),
