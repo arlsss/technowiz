@@ -3632,24 +3632,85 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       );
     }
 
+    if (rank >= 4 && rank <= 10) {
+      const badgeAsset = 'assets/trophies/top10_badge_3d.jpg';
+      const rankColor = Color(0xFF16A34A);
+
+      return Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                badgeAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 18,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Container(
       width: 26,
       height: 26,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: rank <= 10 ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+        color: const Color(0xFFF8FAFC),
         border: Border.all(
-          color: rank <= 10 ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
+          color: const Color(0xFFE2E8F0),
           width: 1.2,
         ),
       ),
       alignment: Alignment.center,
       child: Text(
         '$rank',
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-          color: rank <= 10 ? primaryGreen : const Color(0xFF64748B),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF64748B),
         ),
       ),
     );
@@ -3752,7 +3813,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                   ? const Color(0xFFF1F5F9)
                                   : (rank == 3
                                       ? const Color(0xFFFFEDD5)
-                                      : lightGreen)),
+                                      : (rank <= 10
+                                          ? lightGreen
+                                          : const Color(0xFFF8FAFC)))),
                           borderRadius: BorderRadius.circular(10),
                           border: rank <= 3
                               ? Border.all(
@@ -3763,7 +3826,15 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                           : const Color(0xFFFED7AA)),
                                   width: 1,
                                 )
-                              : null,
+                              : (rank <= 10
+                                  ? Border.all(
+                                      color: const Color(0xFFBBF7D0),
+                                      width: 1,
+                                    )
+                                  : Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                      width: 1,
+                                    )),
                         ),
                         child: Icon(
                           row['isTeam'] == true
@@ -3775,7 +3846,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                   ? const Color(0xFF64748B)
                                   : (rank == 3
                                       ? const Color(0xFFB45309)
-                                      : primaryGreen)),
+                                      : (rank <= 10
+                                          ? primaryGreen
+                                          : const Color(0xFF64748B)))),
                           size: 19,
                         ),
                       ),
