@@ -1958,46 +1958,6 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _openLeaderboard(),
-                icon: const Icon(Icons.leaderboard_rounded, size: 16),
-                label: const Text('View Leaderboard'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryGreen,
-                  side: const BorderSide(color: softBorder),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _openBadges(),
-                icon: const Icon(Icons.workspace_premium_rounded, size: 16),
-                label: const Text('Check Badges'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryGreen,
-                  side: const BorderSide(color: softBorder),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -5525,361 +5485,132 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
               ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TechArenaBadge(
-                      label: participation == 'Team'
-                          ? 'TECHNOWIZ • TEAM ARENA'
-                          : 'TECHNOWIZ • CONTESTANT PORTAL',
-                      icon: participation == 'Team'
-                          ? Icons.groups_rounded
-                          : Icons.sports_esports_rounded,
-                      darkTheme: true,
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Text(
-                          'WELCOME BACK,',
-                          style: TextStyle(
-                            color: Color(0xFFA7F3D0),
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF4ADE80),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    if (participation == 'Team') ...[
-                      Text(
-                        teamName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: titleSize,
-                          fontWeight: FontWeight.w900,
-                          height: 1.2,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Team Roster (${teamMembers.length})',
-                        style: TextStyle(
-                          color: const Color(0xFFD1FAE5),
-                          fontSize: memberSize,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      if (teamMembers.isEmpty)
-                        Text(
-                          'No team members registered yet',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: memberSize,
-                          ),
-                        )
-                      else
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: teamMembers.map(
-                            (member) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.22),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.person_rounded,
-                                    size: 11.5,
-                                    color: Color(0xFFA7F3D0),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    member,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: memberSize,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ).toList(),
-                        ),
-                    ] else ...[
-                      Text(
-                        personalName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: titleSize,
-                          fontWeight: FontWeight.w900,
-                          height: 1.2,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              TechArenaBadge(
+                label: participation == 'Team'
+                    ? 'TECHNOWIZ • TEAM ARENA'
+                    : 'TECHNOWIZ • CONTESTANT PORTAL',
+                icon: participation == 'Team'
+                    ? Icons.groups_rounded
+                    : Icons.sports_esports_rounded,
+                darkTheme: true,
               ),
-              const SizedBox(width: 14),
-              // Profile Avatar / Mascot
-              GestureDetector(
-                onTap: () => showProfileDrawer(context),
-                child: Tooltip(
-                  message: 'View Profile',
-                  child: Container(
-                    width: compact ? 56 : 68,
-                    height: compact ? 56 : 68,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF4ADE80), Color(0xFF10B981)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF4ADE80).withValues(alpha: 0.35),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(2.5),
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF0F5132),
-                        shape: BoxShape.circle,
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: profileImageProvider != null
-                          ? Image(
-                              image: profileImageProvider!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Image.asset(
-                                'assets/images/robot_avatar_clean.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => const Icon(
-                                  Icons.person_rounded,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ),
-                            )
-                          : Image.asset(
-                              'assets/images/robot_avatar_clean.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const Icon(
-                                Icons.person_rounded,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                            ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Text(
+                    'WELCOME BACK,',
+                    style: TextStyle(
+                      color: Color(0xFFA7F3D0),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4ADE80),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 4),
+              if (participation == 'Team') ...[
+                Text(
+                  teamName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Team Roster (${teamMembers.length})',
+                  style: TextStyle(
+                    color: const Color(0xFFD1FAE5),
+                    fontSize: memberSize,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                if (teamMembers.isEmpty)
+                  Text(
+                    'No team members registered yet',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: memberSize,
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: teamMembers.map(
+                      (member) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.person_rounded,
+                              size: 11.5,
+                              color: Color(0xFFA7F3D0),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              member,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: memberSize,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ).toList(),
+                  ),
+              ] else ...[
+                Text(
+                  personalName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildDashboardQuickActions({required bool mobile}) {
-    final actions = [
-      (
-        title: 'Leaderboard',
-        subtitle: 'Live rankings & podium',
-        icon: Icons.leaderboard_rounded,
-        color: const Color(0xFF16A34A),
-        bgColor: const Color(0xFFE8FBEF),
-        onTap: () => _openLeaderboard(),
-      ),
-      (
-        title: 'Badges & Trophies',
-        subtitle: 'View achievements',
-        icon: Icons.workspace_premium_rounded,
-        color: const Color(0xFFD97706),
-        bgColor: const Color(0xFFFEF3C7),
-        onTap: () => _openBadges(),
-      ),
-      (
-        title: 'Quiz History',
-        subtitle: 'Past scores & answers',
-        icon: Icons.history_rounded,
-        color: const Color(0xFF2563EB),
-        bgColor: const Color(0xFFEFF6FF),
-        onTap: () => _openHistory(),
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 4,
-              height: 16,
-              decoration: BoxDecoration(
-                color: primaryGreen,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'QUICK ARENA ACCESS',
-              style: TextStyle(
-                color: darkGreen,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 680;
-            if (isWide) {
-              return Row(
-                children: actions.map((act) {
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      child: _quickActionCard(act),
-                    ),
-                  );
-                }).toList(),
-              );
-            }
-
-            return Column(
-              children: actions.map((act) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _quickActionCard(act),
-                );
-              }).toList(),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _quickActionCard(({
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    Color bgColor,
-    VoidCallback onTap,
-  }) act) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: act.onTap,
-        borderRadius: BorderRadius.circular(16),
-        hoverColor: lightGreen.withValues(alpha: 0.5),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: softBorder),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x06000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: act.bgColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(act.icon, color: act.color, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      act.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: darkGreen,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      act.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF64816D),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 13,
-                color: Color(0xFF9EBAA5),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -5911,9 +5642,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   _welcomeHero(),
                   const SizedBox(height: 18),
                   publishedQuizSection(mobile: mobile),
-                  const SizedBox(height: 24),
-                  _buildDashboardQuickActions(mobile: mobile),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 25),
                   const Center(
                     child: Text(
                       'TechNoWiz • Contestant Dashboard',
