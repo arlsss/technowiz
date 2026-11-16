@@ -91,7 +91,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   bool get _hasQuizStarted {
     if (_quizData?['startedAt'] != null) return true;
     if (_currentQuestion > 0) return true;
-    final s = _status.toLowerCase().trim().replaceAll('-', '_').replaceAll(' ', '_');
+    final s = _status
+        .toLowerCase()
+        .trim()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
     if (s.isEmpty) return false;
     return s != 'waiting';
   }
@@ -588,9 +592,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       final requests = await quizDoc.reference
           .collection('join_requests')
           .get();
-      final scores = await quizDoc.reference
-          .collection('scores')
-          .get();
+      final scores = await quizDoc.reference.collection('scores').get();
       final eliminatedScoreIds = <String>{
         for (final s in scores.docs)
           if (s.data()['eliminated'] == true ||
@@ -602,7 +604,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       final activeRequests = requests.docs.where((doc) {
         final data = doc.data();
         final status = (data['status'] ?? '').toString().trim().toLowerCase();
-        if (status != 'approved' && status != 'proceeding' && status.isNotEmpty) {
+        if (status != 'approved' &&
+            status != 'proceeding' &&
+            status.isNotEmpty) {
           return false;
         }
         return !_isDocEliminated(doc, eliminatedScoreIds);
@@ -721,12 +725,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       setState(() => _readyCheckSecondsLeft = 0);
 
       try {
-        final requests = await quizRef
-            .collection('join_requests')
-            .get();
-        final scores = await quizRef
-            .collection('scores')
-            .get();
+        final requests = await quizRef.collection('join_requests').get();
+        final scores = await quizRef.collection('scores').get();
         final eliminatedScoreIds = <String>{
           for (final s in scores.docs)
             if (s.data()['eliminated'] == true ||
@@ -738,7 +738,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         final activeRequests = requests.docs.where((doc) {
           final data = doc.data();
           final status = (data['status'] ?? '').toString().trim().toLowerCase();
-          if (status != 'approved' && status != 'proceeding' && status.isNotEmpty) {
+          if (status != 'approved' &&
+              status != 'proceeding' &&
+              status.isNotEmpty) {
             return false;
           }
           return !_isDocEliminated(doc, eliminatedScoreIds);
@@ -781,12 +783,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     if (quizDoc == null) return false;
 
-    final requests = await quizDoc.reference
-        .collection('join_requests')
-        .get();
-    final scores = await quizDoc.reference
-        .collection('scores')
-        .get();
+    final requests = await quizDoc.reference.collection('join_requests').get();
+    final scores = await quizDoc.reference.collection('scores').get();
     final eliminatedScoreIds = <String>{
       for (final s in scores.docs)
         if (s.data()['eliminated'] == true ||
@@ -1025,8 +1023,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         );
         if (parsed != null) savedLevel = parsed;
       }
-      final int nextLevel =
-          savedLevel > _currentLevel ? savedLevel : _currentLevel + 1;
+      final int nextLevel = savedLevel > _currentLevel
+          ? savedLevel
+          : _currentLevel + 1;
 
       // Refresh the session questions so any newly configured level is included.
       final freshQuestionsSnap = await quizDoc.reference
@@ -1495,7 +1494,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             });
 
             final pending = docs.where((doc) {
-              return doc.data()['status']?.toString().toLowerCase() == 'pending';
+              return doc.data()['status']?.toString().toLowerCase() ==
+                  'pending';
             }).length;
 
             return Container(
@@ -1556,39 +1556,66 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   else
                     ...docs.map((doc) {
                       final data = doc.data();
-                      final uid = (data['contestantUid'] ?? doc.id.split('_').first).toString();
+                      final uid =
+                          (data['contestantUid'] ?? doc.id.split('_').first)
+                              .toString();
                       final jData = joinByUid[uid];
 
-                      final rawTeam = (data['teamName'] ?? jData?['teamName'] ?? '').toString().trim();
-                      final contestantType = (data['contestantType'] ?? jData?['contestantType'] ?? '').toString().trim().toLowerCase();
-                      final bool isTeam = data['isTeam'] == true ||
+                      final rawTeam =
+                          (data['teamName'] ?? jData?['teamName'] ?? '')
+                              .toString()
+                              .trim();
+                      final contestantType =
+                          (data['contestantType'] ??
+                                  jData?['contestantType'] ??
+                                  '')
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+                      final bool isTeam =
+                          data['isTeam'] == true ||
                           contestantType == 'team' ||
                           jData?['isTeam'] == true ||
                           rawTeam.isNotEmpty;
 
-                      final personalName = (jData?['realName'] ??
-                              jData?['fullName'] ??
-                              jData?['displayName'] ??
-                              jData?['name'] ??
-                              data['realName'] ??
-                              data['contestantName'] ??
-                              data['displayName'] ??
-                              data['name'] ??
-                              data['email'] ??
-                              uid)
-                          .toString().trim();
+                      final personalName =
+                          (jData?['realName'] ??
+                                  jData?['fullName'] ??
+                                  jData?['displayName'] ??
+                                  jData?['name'] ??
+                                  data['realName'] ??
+                                  data['contestantName'] ??
+                                  data['displayName'] ??
+                                  data['name'] ??
+                                  data['email'] ??
+                                  uid)
+                              .toString()
+                              .trim();
 
-                      final teamName = rawTeam.isNotEmpty ? rawTeam : (isTeam ? personalName : '');
+                      final teamName = rawTeam.isNotEmpty
+                          ? rawTeam
+                          : (isTeam ? personalName : '');
                       final displayName = isTeam
                           ? (teamName.isNotEmpty ? teamName : personalName)
-                          : (personalName.isNotEmpty ? personalName : 'Contestant');
+                          : (personalName.isNotEmpty
+                                ? personalName
+                                : 'Contestant');
 
-                      final rawMembers = data['teamMembers'] ?? data['members'] ?? jData?['teamMembers'] ?? jData?['members'];
+                      final rawMembers =
+                          data['teamMembers'] ??
+                          data['members'] ??
+                          jData?['teamMembers'] ??
+                          jData?['members'];
                       final List<String> teamMembers = [];
                       if (rawMembers is List) {
                         for (final m in rawMembers) {
-                          final s = m is Map ? (m['name'] ?? m['displayName'] ?? '').toString().trim() : m.toString().trim();
-                          if (s.isNotEmpty && !teamMembers.contains(s)) teamMembers.add(s);
+                          final s = m is Map
+                              ? (m['name'] ?? m['displayName'] ?? '')
+                                    .toString()
+                                    .trim()
+                              : m.toString().trim();
+                          if (s.isNotEmpty && !teamMembers.contains(s))
+                            teamMembers.add(s);
                         }
                       }
 
@@ -1624,14 +1651,17 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Icon(
-                                  isTeam ? Icons.groups_rounded : Icons.person_rounded,
+                                  isTeam
+                                      ? Icons.groups_rounded
+                                      : Icons.person_rounded,
                                   color: primaryBlue,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -1648,13 +1678,17 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                           if (isTeam) ...[
                                             const SizedBox(width: 6),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: primaryBlue.withValues(alpha: 0.10),
-                                                borderRadius: BorderRadius.circular(6),
+                                                color: primaryBlue.withValues(
+                                                  alpha: 0.10,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
                                               child: const Text(
                                                 'TEAM',
@@ -1671,7 +1705,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                       ),
                                       if (isTeam && teamMembers.isNotEmpty)
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 3),
+                                          padding: const EdgeInsets.only(
+                                            top: 3,
+                                          ),
                                           child: Text(
                                             'Members: ${teamMembers.join(', ')}',
                                             style: TextStyle(
@@ -1764,7 +1800,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                               explanation.isEmpty
                                   ? 'No explanation provided.'
                                   : explanation,
-                              style: const TextStyle(color: darkBlue, height: 1.35),
+                              style: const TextStyle(
+                                color: darkBlue,
+                                height: 1.35,
+                              ),
                             ),
                             if (isPending) ...[
                               const SizedBox(height: 13),
@@ -1782,7 +1821,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                       label: const Text('REJECT'),
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: Colors.red,
-                                        side: const BorderSide(color: Colors.red),
+                                        side: const BorderSide(
+                                          color: Colors.red,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 11,
                                         ),
@@ -2089,11 +2130,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         final List<Map<String, dynamic>> participantScores = [];
         for (final doc in scoresSnap.docs) {
           final sData = doc.data();
-          final int score =
-              int.tryParse(sData['score']?.toString() ?? '') ?? 0;
+          final int score = int.tryParse(sData['score']?.toString() ?? '') ?? 0;
           final rawUpdated = sData['updatedAt'];
-          final int timeMs =
-              rawUpdated is Timestamp ? rawUpdated.millisecondsSinceEpoch : 0;
+          final int timeMs = rawUpdated is Timestamp
+              ? rawUpdated.millisecondsSinceEpoch
+              : 0;
           participantScores.add({
             'uid': doc.id,
             'score': score,
@@ -2119,8 +2160,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
         // Sort: highest score first, earlier time on tie, then name
         participantScores.sort((a, b) {
-          final int scoreCompare =
-              (b['score'] as int).compareTo(a['score'] as int);
+          final int scoreCompare = (b['score'] as int).compareTo(
+            a['score'] as int,
+          );
           if (scoreCompare != 0) return scoreCompare;
           final int timeA = a['timeMs'] as int;
           final int timeB = b['timeMs'] as int;
@@ -2146,7 +2188,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           for (final req in requestsSnap.docs) {
             final int assignedRank =
                 ranksByUid[req.id] ?? (ranksByUid.length + 1);
-            final int score = scoresByUid[req.id] ??
+            final int score =
+                scoresByUid[req.id] ??
                 (int.tryParse(req.data()['score']?.toString() ?? '') ?? 0);
             batch.set(req.reference, {
               'quizFinished': true,
@@ -2163,7 +2206,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           for (final doc in scoresSnap.docs) {
             final int assignedRank =
                 ranksByUid[doc.id] ?? (ranksByUid.length + 1);
-            final int score = scoresByUid[doc.id] ??
+            final int score =
+                scoresByUid[doc.id] ??
                 (int.tryParse(doc.data()['score']?.toString() ?? '') ?? 0);
             batch.set(doc.reference, {
               'finalRank': assignedRank,
@@ -2848,14 +2892,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               for (final s in scoreDocs)
                 if (s.data()['eliminated'] == true ||
                     s.data()['isEliminated'] == true ||
-                    s.data()['status']?.toString().toLowerCase() == 'eliminated')
+                    s.data()['status']?.toString().toLowerCase() ==
+                        'eliminated')
                   s.id,
             };
 
             final docs = rawRequests.where((doc) {
               final data = doc.data();
-              final status = (data['status'] ?? '').toString().trim().toLowerCase();
-              if (status != 'approved' && status != 'proceeding' && status.isNotEmpty) {
+              final status = (data['status'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+              if (status != 'approved' &&
+                  status != 'proceeding' &&
+                  status.isNotEmpty) {
                 return false;
               }
               return !_isDocEliminated(doc, eliminatedScoreIds);
@@ -2874,7 +2924,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: allReady ? Colors.green.shade200 : Colors.blue.shade100,
+                  color: allReady
+                      ? Colors.green.shade200
+                      : Colors.blue.shade100,
                 ),
               ),
               child: Column(
@@ -2930,7 +2982,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: allReady ? Colors.green.withValues(alpha: 0.08) : background,
+                      color: allReady
+                          ? Colors.green.withValues(alpha: 0.08)
+                          : background,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -2981,7 +3035,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             child: Text(
                               name,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           Text(
@@ -3079,7 +3135,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         color: Colors.grey.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.gavel_rounded, color: Colors.grey),
+                      child: const Icon(
+                        Icons.gavel_rounded,
+                        color: Colors.grey,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -3157,39 +3216,66 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   const SizedBox(height: 12),
                   ...docs.map((doc) {
                     final data = doc.data();
-                    final uid = (data['contestantUid'] ?? doc.id.split('_').first).toString();
+                    final uid =
+                        (data['contestantUid'] ?? doc.id.split('_').first)
+                            .toString();
                     final jData = joinByUid[uid];
 
-                    final rawTeam = (data['teamName'] ?? jData?['teamName'] ?? '').toString().trim();
-                    final contestantType = (data['contestantType'] ?? jData?['contestantType'] ?? '').toString().trim().toLowerCase();
-                    final bool isTeam = data['isTeam'] == true ||
+                    final rawTeam =
+                        (data['teamName'] ?? jData?['teamName'] ?? '')
+                            .toString()
+                            .trim();
+                    final contestantType =
+                        (data['contestantType'] ??
+                                jData?['contestantType'] ??
+                                '')
+                            .toString()
+                            .trim()
+                            .toLowerCase();
+                    final bool isTeam =
+                        data['isTeam'] == true ||
                         contestantType == 'team' ||
                         jData?['isTeam'] == true ||
                         rawTeam.isNotEmpty;
 
-                    final personalName = (jData?['realName'] ??
-                            jData?['fullName'] ??
-                            jData?['displayName'] ??
-                            jData?['name'] ??
-                            data['realName'] ??
-                            data['contestantName'] ??
-                            data['displayName'] ??
-                            data['name'] ??
-                            data['email'] ??
-                            uid)
-                        .toString().trim();
+                    final personalName =
+                        (jData?['realName'] ??
+                                jData?['fullName'] ??
+                                jData?['displayName'] ??
+                                jData?['name'] ??
+                                data['realName'] ??
+                                data['contestantName'] ??
+                                data['displayName'] ??
+                                data['name'] ??
+                                data['email'] ??
+                                uid)
+                            .toString()
+                            .trim();
 
-                    final teamName = rawTeam.isNotEmpty ? rawTeam : (isTeam ? personalName : '');
+                    final teamName = rawTeam.isNotEmpty
+                        ? rawTeam
+                        : (isTeam ? personalName : '');
                     final displayName = isTeam
                         ? (teamName.isNotEmpty ? teamName : personalName)
-                        : (personalName.isNotEmpty ? personalName : 'Contestant');
+                        : (personalName.isNotEmpty
+                              ? personalName
+                              : 'Contestant');
 
-                    final rawMembers = data['teamMembers'] ?? data['members'] ?? jData?['teamMembers'] ?? jData?['members'];
+                    final rawMembers =
+                        data['teamMembers'] ??
+                        data['members'] ??
+                        jData?['teamMembers'] ??
+                        jData?['members'];
                     final List<String> teamMembers = [];
                     if (rawMembers is List) {
                       for (final m in rawMembers) {
-                        final s = m is Map ? (m['name'] ?? m['displayName'] ?? '').toString().trim() : m.toString().trim();
-                        if (s.isNotEmpty && !teamMembers.contains(s)) teamMembers.add(s);
+                        final s = m is Map
+                            ? (m['name'] ?? m['displayName'] ?? '')
+                                  .toString()
+                                  .trim()
+                            : m.toString().trim();
+                        if (s.isNotEmpty && !teamMembers.contains(s))
+                          teamMembers.add(s);
                       }
                     }
 
@@ -3216,7 +3302,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Icon(
-                                isTeam ? Icons.groups_rounded : Icons.person_rounded,
+                                isTeam
+                                    ? Icons.groups_rounded
+                                    : Icons.person_rounded,
                                 color: primaryBlue,
                                 size: 20,
                               ),
@@ -3245,8 +3333,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: primaryBlue.withValues(alpha: 0.10),
-                                              borderRadius: BorderRadius.circular(6),
+                                              color: primaryBlue.withValues(
+                                                alpha: 0.10,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
                                             child: const Text(
                                               'TEAM',
@@ -3325,7 +3416,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             explanation.isEmpty
                                 ? 'No explanation provided.'
                                 : explanation,
-                            style: const TextStyle(color: darkBlue, height: 1.35),
+                            style: const TextStyle(
+                              color: darkBlue,
+                              height: 1.35,
+                            ),
                           ),
                           const SizedBox(height: 13),
                           Row(
@@ -3414,8 +3508,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     if (eliminatedScoreIds.contains(doc.id)) return true;
     final data = doc.data() ?? {};
     final status = (data['status'] ?? '').toString().trim().toLowerCase();
-    final decision =
-        (data['contestantDecision'] ?? '').toString().trim().toLowerCase();
+    final decision = (data['contestantDecision'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
     return data['eliminated'] == true ||
         data['isEliminated'] == true ||
         status == 'eliminated' ||
@@ -3452,20 +3548,28 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               for (final s in scoreDocs)
                 if (s.data()['eliminated'] == true ||
                     s.data()['isEliminated'] == true ||
-                    s.data()['status']?.toString().toLowerCase() == 'eliminated')
+                    s.data()['status']?.toString().toLowerCase() ==
+                        'eliminated')
                   s.id,
             };
 
             final docs = rawRequests.where((doc) {
               final data = doc.data();
-              final status = (data['status'] ?? '').toString().trim().toLowerCase();
-              if (status != 'approved' && status != 'proceeding' && status.isNotEmpty) {
+              final status = (data['status'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+              if (status != 'approved' &&
+                  status != 'proceeding' &&
+                  status.isNotEmpty) {
                 return false;
               }
               return !_isDocEliminated(doc, eliminatedScoreIds);
             }).toList();
 
-            final confirmed = docs.where((doc) => _isConfirmed(doc.data())).length;
+            final confirmed = docs
+                .where((doc) => _isConfirmed(doc.data()))
+                .length;
             final allConfirmed = docs.isNotEmpty && confirmed == docs.length;
 
             return Container(
@@ -3584,7 +3688,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             child: Text(
                               name,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           Text(
@@ -3627,9 +3733,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       final requests = await quizDoc.reference
           .collection('join_requests')
           .get();
-      final scores = await quizDoc.reference
-          .collection('scores')
-          .get();
+      final scores = await quizDoc.reference.collection('scores').get();
 
       if (!mounted) return;
 
@@ -3644,7 +3748,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       final activeDocs = requests.docs.where((doc) {
         final data = doc.data();
         final status = (data['status'] ?? '').toString().trim().toLowerCase();
-        if (status != 'approved' && status != 'proceeding' && status.isNotEmpty) {
+        if (status != 'approved' &&
+            status != 'proceeding' &&
+            status.isNotEmpty) {
           return false;
         }
         return !_isDocEliminated(doc, eliminatedScoreIds);
@@ -4308,594 +4414,597 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           child: SafeArea(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(isWideLayout ? 20 : 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ==================================================
-                      // MANUAL PAUSE MESSAGE
-                      // ==================================================
-                      if (isPaused && !_isFinished)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.pause_circle_filled,
-                                color: Colors.orange.shade700,
-                                size: 38,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'QUIZ PAUSED\n'
-                                  'Press RESUME QUIZ to continue from '
-                                  '${_formatTimer(_secondsLeft)}.',
-                                  style: TextStyle(
-                                    color: Colors.orange.shade900,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      if (isPaused && !_isFinished) const SizedBox(height: 20),
-
-                      // ==================================================
-                      // LEVEL PAUSE MESSAGE
-                      // ==================================================
-                      if (isLevelPause)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.pause_circle_filled,
-                                color: Colors.orange.shade700,
-                                size: 38,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'LEVEL $_currentLevel FINISHED\n'
-                                  'Waiting for the next level to start.',
-                                  style: TextStyle(
-                                    color: Colors.orange.shade900,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      if (isLevelPause) const SizedBox(height: 20),
-
-                      // ==================================================
-                      // LEVEL INFO  (blue icon square removed)
-                      // ==================================================
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.blue.shade100),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              'LEVEL $_currentLevel',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: darkBlue,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Question $_currentLevelQuestionCount of $_currentLevelQuestionCount',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.black54,
-                                fontSize: 10,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Type: $_questionType',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.black54,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Admin-configured timer for the currently selected level.
-                      // Displayed as a circle between the level summary and question.
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12, bottom: 12),
-                        child: Center(
-                          child: Container(
-                            width: 116,
-                            height: 116,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(isWideLayout ? 20 : 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ==================================================
+                        // MANUAL PAUSE MESSAGE
+                        // ==================================================
+                        if (isPaused && !_isFinished)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
                               color: Colors.orange.shade50,
-                              border: Border.all(
-                                color: Colors.orange.shade300,
-                                width: 1.8,
-                              ),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.orange.shade200),
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
+                            child: Row(
                               children: [
                                 Icon(
-                                  isCountdown
-                                      ? Icons.hourglass_top_rounded
-                                      : Icons.timer_outlined,
-                                  color: isCountdown
-                                      ? primaryBlue
-                                      : Colors.orange.shade800,
-                                  size: 25,
+                                  Icons.pause_circle_filled,
+                                  color: Colors.orange.shade700,
+                                  size: 38,
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  isCountdown
-                                      ? (_countdown > 0 ? '$_countdown' : 'GO!')
-                                      : (_isRunning || isPaused)
-                                      ? _formatTimer(_secondsLeft)
-                                      : _quizData == null
-                                      ? '...'
-                                      : '$_configuredTimerSeconds',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: isCountdown
-                                        ? primaryBlue
-                                        : Colors.orange.shade900,
-                                    fontSize: isCountdown ? 24 : 19,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1,
-                                  ),
-                                ),
-                                Text(
-                                  isCountdown
-                                      ? 'GET READY'
-                                      : (_isRunning || isPaused)
-                                      ? 'remaining'
-                                      : 'sec',
-                                  style: TextStyle(
-                                    color: isCountdown
-                                        ? primaryBlue
-                                        : Colors.orange.shade800,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'QUIZ PAUSED\n'
+                                    'Press RESUME QUIZ to continue from '
+                                    '${_formatTimer(_secondsLeft)}.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ),
 
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.blue.shade100),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'QUESTION ${_getQuestionNumberWithinLevel(_currentQuestion)}',
-                              style: const TextStyle(
-                                color: primaryBlue,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
+                        if (isPaused && !_isFinished)
+                          const SizedBox(height: 20),
+
+                        // ==================================================
+                        // LEVEL PAUSE MESSAGE
+                        // ==================================================
+                        if (isLevelPause)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.orange.shade200),
                             ),
-                            const SizedBox(height: 15),
-                            Text(
-                              _questionText,
-                              style: const TextStyle(
-                                color: darkBlue,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                                height: 1.4,
-                              ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.pause_circle_filled,
+                                  color: Colors.orange.shade700,
+                                  size: 38,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'LEVEL $_currentLevel FINISHED\n'
+                                    'Waiting for the next level to start.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _questionType,
+                          ),
+
+                        if (isLevelPause) const SizedBox(height: 20),
+
+                        // ==================================================
+                        // LEVEL INFO  (blue icon square removed)
+                        // ==================================================
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.blue.shade100),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'LEVEL $_currentLevel',
+                                textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  color: primaryBlue,
-                                  fontSize: 11,
+                                  color: darkBlue,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'CORRECT ANSWER',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.green.shade200,
+                              const SizedBox(height: 3),
+                              Text(
+                                'Question $_currentLevelQuestionCount of $_currentLevelQuestionCount',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 10,
                                 ),
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(height: 2),
+                              Text(
+                                'Type: $_questionType',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Admin-configured timer for the currently selected level.
+                        // Displayed as a circle between the level summary and question.
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 12),
+                          child: Center(
+                            child: Container(
+                              width: 116,
+                              height: 116,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.orange.shade50,
+                                border: Border.all(
+                                  color: Colors.orange.shade300,
+                                  width: 1.8,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Colors.green,
-                                    size: 20,
+                                  Icon(
+                                    isCountdown
+                                        ? Icons.hourglass_top_rounded
+                                        : Icons.timer_outlined,
+                                    color: isCountdown
+                                        ? primaryBlue
+                                        : Colors.orange.shade800,
+                                    size: 25,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _correctAnswerText,
-                                      style: const TextStyle(
-                                        color: Colors.green,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    isCountdown
+                                        ? (_countdown > 0
+                                              ? '$_countdown'
+                                              : 'GO!')
+                                        : (_isRunning || isPaused)
+                                        ? _formatTimer(_secondsLeft)
+                                        : _quizData == null
+                                        ? '...'
+                                        : '$_configuredTimerSeconds',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: isCountdown
+                                          ? primaryBlue
+                                          : Colors.orange.shade900,
+                                      fontSize: isCountdown ? 24 : 19,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1,
+                                    ),
+                                  ),
+                                  Text(
+                                    isCountdown
+                                        ? 'GET READY'
+                                        : (_isRunning || isPaused)
+                                        ? 'remaining'
+                                        : 'sec',
+                                    style: TextStyle(
+                                      color: isCountdown
+                                          ? primaryBlue
+                                          : Colors.orange.shade800,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
 
-                      const SizedBox(height: 20),
-
-                      // ==================================================
-                      // QUIZ CONTROLS
-                      // ==================================================
-                      const Text(
-                        'Quiz Controls',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: darkBlue,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // --------------------------------------------------
-                      // COMPACT RESPONSIVE QUIZ CONTROLS
-                      // --------------------------------------------------
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final compact = constraints.maxWidth < 560;
-                          final columns = compact ? 2 : 4;
-                          const gap = 8.0;
-                          final buttonWidth =
-                              (constraints.maxWidth - gap * (columns - 1)) /
-                              columns;
-                          final currentLevel = _getLevel(_currentQuestion);
-                          final lastQuestionOfCurrentLevel =
-                              _getLastQuestionIndexForLevel(currentLevel) ==
-                              _currentQuestion;
-                          final hasNextLevelAfterCurrent = _hasLevel(
-                            currentLevel + 1,
-                          );
-                          final shouldShowNextLevel =
-                              lastQuestionOfCurrentLevel &&
-                              hasNextLevelAfterCurrent;
-
-                          return Wrap(
-                            spacing: gap,
-                            runSpacing: gap,
-                            children: [
-                              SizedBox(
-                                width: buttonWidth,
-                                child: _compactControlButton(
-                                  icon:
-                                      (_currentQuestion == 0 &&
-                                          isWaiting &&
-                                          _quizData?['startedAt'] == null)
-                                      ? Icons.play_arrow_rounded
-                                      : shouldShowNextLevel
-                                      ? Icons.play_circle_fill_rounded
-                                      : Icons.skip_next_rounded,
-                                  label: _levelPreparedForStart
-                                      ? 'START LEVEL $_currentLevel'
-                                      : (_currentQuestion == 0 &&
-                                            isWaiting &&
-                                            _quizData?['startedAt'] == null)
-                                      ? 'START'
-                                      : shouldShowNextLevel
-                                      ? 'END LEVEL'
-                                      : 'NEXT QUESTION',
-                                  color:
-                                      _levelPreparedForStart ||
-                                          (_currentQuestion == 0 &&
-                                              isWaiting &&
-                                              _quizData?['startedAt'] ==
-                                                  null) ||
-                                          shouldShowNextLevel
-                                      ? Colors.green
-                                      : ((_totalQuestions > 0 &&
-                                                _currentQuestion >=
-                                                    _totalQuestions - 1)
-                                            ? Colors.grey
-                                            : primaryBlue),
-                                  enabled:
-                                      !_isFinished &&
-                                      !_isAdvancingQuestion &&
-                                      !_startingFromMainButton &&
-                                      (_levelPreparedForStart ||
-                                          ((_currentQuestion == 0 &&
-                                                  isWaiting &&
-                                                  _quizData?['startedAt'] ==
-                                                      null)
-                                              ? isWaiting
-                                              : shouldShowNextLevel
-                                              ? true
-                                              : !isWaiting &&
-                                                    !isCountdown &&
-                                                    !_contestReviewActive &&
-                                                    !_isManuallyPaused &&
-                                                    _totalQuestions > 0 &&
-                                                    _currentQuestion <
-                                                        _totalQuestions - 1)),
-                                  // One primary control starts the next question or level.
-                                  onTap: _levelPreparedForStart
-                                      ? () async {
-                                          final targetQuestion =
-                                              _pendingQuestionIndex ??
-                                              _currentQuestion;
-                                          final targetLevel =
-                                              _pendingLevel ?? _currentLevel;
-                                          setState(
-                                            () =>
-                                                _levelPreparedForStart = false,
-                                          );
-                                          await _startQuestionCountdown(
-                                            questionIndex: targetQuestion,
-                                            level: targetLevel,
-                                          );
-                                        }
-                                      : (_currentQuestion == 0 &&
-                                            isWaiting &&
-                                            _quizData?['startedAt'] == null)
-                                      ? _startInitialCountdownFromButton
-                                      : shouldShowNextLevel
-                                      ? _endLevelAndOpenElimination
-                                      : _confirmNextQuestion,
-                                ),
-                              ),
-                              SizedBox(
-                                width: buttonWidth,
-                                child: _compactControlButton(
-                                  icon: Icons.pause_rounded,
-                                  label: 'PAUSE',
-                                  color: Colors.orange,
-                                  // Restore clickability after browser refresh:
-                                  // the Firestore status/remaining time can be active
-                                  // even if the local periodic timer flag has not
-                                  // resumed yet. Do not enable PAUSE in waiting,
-                                  // countdown, paused, level-finished, or review states.
-                                  enabled:
-                                      !_isFinished &&
-                                      !isPaused &&
-                                      !isWaiting &&
-                                      !isCountdown &&
-                                      !isLevelPause &&
-                                      !_contestReviewActive &&
-                                      (_isRunning ||
-                                          _status == 'active' ||
-                                          _secondsLeft > 0),
-                                  onTap: _pauseQuiz,
-                                ),
-                              ),
-                              SizedBox(
-                                width: buttonWidth,
-                                child: _compactControlButton(
-                                  icon: Icons.play_circle_outline_rounded,
-                                  label: 'RESUME',
-                                  color: Colors.teal,
-                                  enabled: isPaused && !_isFinished,
-                                  onTap: _resumeQuiz,
-                                ),
-                              ),
-                              SizedBox(
-                                width: buttonWidth,
-                                child: _compactControlButton(
-                                  icon: Icons.flag_rounded,
-                                  label: 'FINISH',
-                                  color: Colors.red,
-                                  enabled: !_isFinished && !_isFinishingQuiz,
-                                  onTap: _confirmFinishQuiz,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      // --------------------------------------------------
-                      // PAUSE / RESUME  +  FINISH
-                      //
-                      // FIX: the first button toggles between PAUSE QUIZ
-                      // (while running) and RESUME QUIZ (while paused).
-                      // --------------------------------------------------
-                      const SizedBox(height: 14),
-
-                      // --------------------------------------------------
-                      // LIVE CONTEST REQUESTS (REJECT / APPROVE)
-                      // --------------------------------------------------
-                      _liveContestRequestsCard(),
-
-                      // --------------------------------------------------
-                      // CONTEST REVIEW (before moving to next question)
-                      // --------------------------------------------------
-                      _contestReviewCard(),
-
-                      // --------------------------------------------------
-                      // NEXT QUESTION
-                      // --------------------------------------------------
-                      if (!_isFinished &&
-                          !isWaiting &&
-                          !isCountdown &&
-                          !_contestReviewActive &&
-                          _questions.isNotEmpty) ...[
-                        _nextQuestionButton(),
-                        const SizedBox(height: 14),
-                      ],
-
-                      // --------------------------------------------------
-                      // FINISHED
-                      // --------------------------------------------------
-                      if (_isFinished)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: Colors.blue.shade100),
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 30,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'This quiz has already finished.',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: darkBlue,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                'QUESTION ${_getQuestionNumberWithinLevel(_currentQuestion)}',
+                                style: const TextStyle(
+                                  color: primaryBlue,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 15),
+                              Text(
+                                _questionText,
+                                style: const TextStyle(
+                                  color: darkBlue,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                ),
                               ),
                               const SizedBox(height: 12),
-                              SizedBox(
-                                height: 48,
-                                child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    await prefs.setString(
-                                      _quizMasterLastPageKey,
-                                      'dashboard',
-                                    );
-                                    await prefs.remove(
-                                      _quizMasterCurrentQuizCodeKey,
-                                    );
-                                    if (!context.mounted) return;
-                                    Navigator.of(context).pushAndRemoveUntil(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const QuizMasterDashboard(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  _questionType,
+                                  style: const TextStyle(
+                                    color: primaryBlue,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                'CORRECT ANSWER',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.green.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.green,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _correctAnswerText,
+                                        style: const TextStyle(
+                                          color: Colors.green,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      (route) => false,
-                                    );
-                                  },
-                                  icon: const Icon(Icons.dashboard_rounded),
-                                  label: const Text(
-                                    'BACK TO DASHBOARD',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryBlue,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
 
-                      // FINAL RANKING + ELIMINATION
-                      _finalRankingCard(),
+                        const SizedBox(height: 20),
 
-                      const SizedBox(height: 10),
+                        // ==================================================
+                        // QUIZ CONTROLS
+                        // ==================================================
+                        const Text(
+                          'Quiz Controls',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: darkBlue,
+                          ),
+                        ),
 
-                      if (isWaiting) ...[
-                        _contestantReadinessCard(),
-                        const SizedBox(height: 25),
+                        const SizedBox(height: 12),
+
+                        // --------------------------------------------------
+                        // COMPACT RESPONSIVE QUIZ CONTROLS
+                        // --------------------------------------------------
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth < 560;
+                            final columns = compact ? 2 : 4;
+                            const gap = 8.0;
+                            final buttonWidth =
+                                (constraints.maxWidth - gap * (columns - 1)) /
+                                columns;
+                            final currentLevel = _getLevel(_currentQuestion);
+                            final lastQuestionOfCurrentLevel =
+                                _getLastQuestionIndexForLevel(currentLevel) ==
+                                _currentQuestion;
+                            final hasNextLevelAfterCurrent = _hasLevel(
+                              currentLevel + 1,
+                            );
+                            final shouldShowNextLevel =
+                                lastQuestionOfCurrentLevel &&
+                                hasNextLevelAfterCurrent;
+
+                            return Wrap(
+                              spacing: gap,
+                              runSpacing: gap,
+                              children: [
+                                SizedBox(
+                                  width: buttonWidth,
+                                  child: _compactControlButton(
+                                    icon:
+                                        (_currentQuestion == 0 &&
+                                            isWaiting &&
+                                            _quizData?['startedAt'] == null)
+                                        ? Icons.play_arrow_rounded
+                                        : shouldShowNextLevel
+                                        ? Icons.play_circle_fill_rounded
+                                        : Icons.skip_next_rounded,
+                                    label: _levelPreparedForStart
+                                        ? 'START LEVEL $_currentLevel'
+                                        : (_currentQuestion == 0 &&
+                                              isWaiting &&
+                                              _quizData?['startedAt'] == null)
+                                        ? 'START'
+                                        : shouldShowNextLevel
+                                        ? 'END LEVEL'
+                                        : 'NEXT QUESTION',
+                                    color:
+                                        _levelPreparedForStart ||
+                                            (_currentQuestion == 0 &&
+                                                isWaiting &&
+                                                _quizData?['startedAt'] ==
+                                                    null) ||
+                                            shouldShowNextLevel
+                                        ? Colors.green
+                                        : ((_totalQuestions > 0 &&
+                                                  _currentQuestion >=
+                                                      _totalQuestions - 1)
+                                              ? Colors.grey
+                                              : primaryBlue),
+                                    enabled:
+                                        !_isFinished &&
+                                        !_isAdvancingQuestion &&
+                                        !_startingFromMainButton &&
+                                        (_levelPreparedForStart ||
+                                            ((_currentQuestion == 0 &&
+                                                    isWaiting &&
+                                                    _quizData?['startedAt'] ==
+                                                        null)
+                                                ? isWaiting
+                                                : shouldShowNextLevel
+                                                ? true
+                                                : !isWaiting &&
+                                                      !isCountdown &&
+                                                      !_contestReviewActive &&
+                                                      !_isManuallyPaused &&
+                                                      _totalQuestions > 0 &&
+                                                      _currentQuestion <
+                                                          _totalQuestions - 1)),
+                                    // One primary control starts the next question or level.
+                                    onTap: _levelPreparedForStart
+                                        ? () async {
+                                            final targetQuestion =
+                                                _pendingQuestionIndex ??
+                                                _currentQuestion;
+                                            final targetLevel =
+                                                _pendingLevel ?? _currentLevel;
+                                            setState(
+                                              () => _levelPreparedForStart =
+                                                  false,
+                                            );
+                                            await _startQuestionCountdown(
+                                              questionIndex: targetQuestion,
+                                              level: targetLevel,
+                                            );
+                                          }
+                                        : (_currentQuestion == 0 &&
+                                              isWaiting &&
+                                              _quizData?['startedAt'] == null)
+                                        ? _startInitialCountdownFromButton
+                                        : shouldShowNextLevel
+                                        ? _endLevelAndOpenElimination
+                                        : _confirmNextQuestion,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: buttonWidth,
+                                  child: _compactControlButton(
+                                    icon: Icons.pause_rounded,
+                                    label: 'PAUSE',
+                                    color: Colors.orange,
+                                    // Restore clickability after browser refresh:
+                                    // the Firestore status/remaining time can be active
+                                    // even if the local periodic timer flag has not
+                                    // resumed yet. Do not enable PAUSE in waiting,
+                                    // countdown, paused, level-finished, or review states.
+                                    enabled:
+                                        !_isFinished &&
+                                        !isPaused &&
+                                        !isWaiting &&
+                                        !isCountdown &&
+                                        !isLevelPause &&
+                                        !_contestReviewActive &&
+                                        (_isRunning ||
+                                            _status == 'active' ||
+                                            _secondsLeft > 0),
+                                    onTap: _pauseQuiz,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: buttonWidth,
+                                  child: _compactControlButton(
+                                    icon: Icons.play_circle_outline_rounded,
+                                    label: 'RESUME',
+                                    color: Colors.teal,
+                                    enabled: isPaused && !_isFinished,
+                                    onTap: _resumeQuiz,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: buttonWidth,
+                                  child: _compactControlButton(
+                                    icon: Icons.flag_rounded,
+                                    label: 'FINISH',
+                                    color: Colors.red,
+                                    enabled: !_isFinished && !_isFinishingQuiz,
+                                    onTap: _confirmFinishQuiz,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+
+                        // --------------------------------------------------
+                        // PAUSE / RESUME  +  FINISH
+                        //
+                        // FIX: the first button toggles between PAUSE QUIZ
+                        // (while running) and RESUME QUIZ (while paused).
+                        // --------------------------------------------------
+                        const SizedBox(height: 14),
+
+                        // --------------------------------------------------
+                        // LIVE CONTEST REQUESTS (REJECT / APPROVE)
+                        // --------------------------------------------------
+                        _liveContestRequestsCard(),
+
+                        // --------------------------------------------------
+                        // CONTEST REVIEW (before moving to next question)
+                        // --------------------------------------------------
+                        _contestReviewCard(),
+
+                        // --------------------------------------------------
+                        // NEXT QUESTION
+                        // --------------------------------------------------
+                        if (!_isFinished &&
+                            !isWaiting &&
+                            !isCountdown &&
+                            !_contestReviewActive &&
+                            _questions.isNotEmpty) ...[
+                          _nextQuestionButton(),
+                          const SizedBox(height: 14),
+                        ],
+
+                        // --------------------------------------------------
+                        // FINISHED
+                        // --------------------------------------------------
+                        if (_isFinished)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                      size: 30,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'This quiz has already finished.',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: darkBlue,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final prefs =
+                                          await SharedPreferences.getInstance();
+                                      await prefs.setString(
+                                        _quizMasterLastPageKey,
+                                        'dashboard',
+                                      );
+                                      await prefs.remove(
+                                        _quizMasterCurrentQuizCodeKey,
+                                      );
+                                      if (!context.mounted) return;
+                                      Navigator.of(context).pushAndRemoveUntil(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const QuizMasterDashboard(),
+                                        ),
+                                        (route) => false,
+                                      );
+                                    },
+                                    icon: const Icon(Icons.dashboard_rounded),
+                                    label: const Text(
+                                      'BACK TO DASHBOARD',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryBlue,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // FINAL RANKING + ELIMINATION
+                        _finalRankingCard(),
+
+                        const SizedBox(height: 10),
+
+                        if (isWaiting) ...[
+                          _contestantReadinessCard(),
+                          const SizedBox(height: 25),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ), // SafeArea
-      ), // QuizMasterCircuitBackground
-    ), // Scaffold
-  ); // PopScope
-}
+              ],
+            ),
+          ), // SafeArea
+        ), // QuizMasterCircuitBackground
+      ), // Scaffold
+    ); // PopScope
+  }
 
   // ============================================================
   // SUBMITTED ANSWERS POPUP (live Firestore updates)
@@ -4942,26 +5051,43 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             for (final c in contestants) {
               final data = c.data();
               final sc = scoreById[c.id];
-              final rawTeam = (data['teamName'] ?? sc?['teamName'] ?? '').toString().trim();
-              final contestantType = (data['contestantType'] ?? '').toString().trim().toLowerCase();
+              final rawTeam = (data['teamName'] ?? sc?['teamName'] ?? '')
+                  .toString()
+                  .trim();
+              final contestantType = (data['contestantType'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
               final isTeam = contestantType == 'team' || rawTeam.isNotEmpty;
 
-              final personalName = (data['displayName'] ??
-                      data['name'] ??
-                      sc?['name'] ??
-                      data['email'] ??
-                      c.id)
-                  .toString();
+              final personalName =
+                  (data['displayName'] ??
+                          data['name'] ??
+                          sc?['name'] ??
+                          data['email'] ??
+                          c.id)
+                      .toString();
 
-              final teamName = rawTeam.isNotEmpty ? rawTeam : (isTeam ? personalName : '');
-              final displayName = isTeam ? (teamName.isNotEmpty ? teamName : personalName) : personalName;
+              final teamName = rawTeam.isNotEmpty
+                  ? rawTeam
+                  : (isTeam ? personalName : '');
+              final displayName = isTeam
+                  ? (teamName.isNotEmpty ? teamName : personalName)
+                  : personalName;
 
-              final rawMembers = data['teamMembers'] ?? data['members'] ?? sc?['teamMembers'] ?? sc?['members'];
+              final rawMembers =
+                  data['teamMembers'] ??
+                  data['members'] ??
+                  sc?['teamMembers'] ??
+                  sc?['members'];
               final List<String> teamMembers = [];
               if (rawMembers is List) {
                 for (final m in rawMembers) {
-                  final s = m is Map ? (m['name'] ?? '').toString().trim() : m.toString().trim();
-                  if (s.isNotEmpty && !teamMembers.contains(s)) teamMembers.add(s);
+                  final s = m is Map
+                      ? (m['name'] ?? '').toString().trim()
+                      : m.toString().trim();
+                  if (s.isNotEmpty && !teamMembers.contains(s))
+                    teamMembers.add(s);
                 }
               }
 
@@ -5170,7 +5296,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                         fontSize: 10.5,
                                       ),
                                     )
-                                  else if (team.isNotEmpty && team != row['name'])
+                                  else if (team.isNotEmpty &&
+                                      team != row['name'])
                                     Text(
                                       team,
                                       overflow: TextOverflow.ellipsis,
