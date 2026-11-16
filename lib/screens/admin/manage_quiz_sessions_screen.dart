@@ -3397,7 +3397,6 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 'Multiple Choice',
                                 'Identification',
                                 'True/False',
-                                'Enumeration',
                                 'Fill in the Blank',
                                 'Mixed',
                               ].contains(levelQuestionType)
@@ -3426,10 +3425,6 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 DropdownMenuItem(
                                   value: 'True/False',
                                   child: Text('True / False'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Enumeration',
-                                  child: Text('Enumeration'),
                                 ),
                                 DropdownMenuItem(
                                   value: 'Fill in the Blank',
