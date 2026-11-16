@@ -19,7 +19,7 @@ class LeaderboardScreen extends StatefulWidget {
     super.key,
     required this.quizCode,
     this.initialShowHistory = false,
-    this.initialLevel = 'Level 1',
+    this.initialLevel = 'Overall',
   });
 
   @override
@@ -62,6 +62,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   bool _isViewingFromHistory = false;
   final Set<int> _hoveredMenuItems = <int>{};
   static const int _selectedNavigationIndex = 2;
+
+  final Map<String, Map<int, int>> _levelScoresCache = {};
+  final Set<String> _syncingUids = {};
+  final Set<String> _checkedUids = {};
+  String? _lastSyncedQuizCode;
 
   static const String _lastPageKey = 'technowiz_quizmaster_last_page';
   static const String _quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
@@ -231,7 +236,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 setState(() {
                   _selectedQuizCode = quizCode;
                   _isViewingFromHistory = true;
-                  selectedLevel = 'Level 1';
+                  selectedLevel = 'Overall';
                   showHistory = false;
                 });
               },
@@ -445,10 +450,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
                           final requests = requestSnap.data?.docs ?? [];
                           final scores = scoreSnap.data?.docs ?? [];
+                          _syncOrFetchLevelScores(effectiveCode, scores);
+                          final configuredLevels =
+                              _extractConfiguredLevels(quizData);
                           final entries = _buildLeaderboard(
                             requests: requests,
                             scores: scores,
                             selectedLevel: selectedLevel,
+                            configuredLevels: configuredLevels,
                           );
 
                           return SingleChildScrollView(
@@ -1212,7 +1221,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     );
   }
 
-  Widget _buildLevelSelectorTabs(Map<String, dynamic>? data) {
+  List<String> _extractConfiguredLevels(Map<String, dynamic>? data) {
     final int currentLevel = _toInt(data?['currentLevel'] ?? 1);
     final String status = data?['status']?.toString().toLowerCase() ?? '';
     final int completedLevel = (status == 'level_pause' || status == 'finished')
@@ -1228,7 +1237,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         final numericLevel = int.tryParse(
           rawLabel.replaceFirst(RegExp(r'^level\s*', caseSensitive: false), ''),
         );
-        final normalizedLabel = numericLevel != null ? 'Level $numericLevel' : rawLabel;
+        final normalizedLabel =
+            numericLevel != null ? 'Level $numericLevel' : rawLabel;
         if (!configuredLevels.contains(normalizedLabel)) {
           configuredLevels.add(normalizedLabel);
         }
@@ -1238,18 +1248,32 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     if (configuredLevels.isEmpty) {
       final int highestAvailableLevel =
           completedLevel > currentLevel ? completedLevel : currentLevel;
-      final int levelCount = highestAvailableLevel > 1 ? highestAvailableLevel : 1;
+      final int levelCount =
+          highestAvailableLevel > 1 ? highestAvailableLevel : 1;
       for (var number = 1; number <= levelCount; number++) {
         configuredLevels.add('Level $number');
       }
     }
 
-    if (!configuredLevels.contains('Level 1')) {
-      configuredLevels.insert(0, 'Level 1');
+    return configuredLevels;
+  }
+
+  Widget _buildLevelSelectorTabs(Map<String, dynamic>? data) {
+    final configuredLevels = _extractConfiguredLevels(data);
+    return _levelTabs(configuredLevels);
+  }
+
+  Widget _levelTabs(List<String> configuredLevels) {
+    final cleanLevels = configuredLevels
+        .where((l) => l.trim().toLowerCase() != 'overall')
+        .toList();
+
+    if (!cleanLevels.contains('Level 1')) {
+      cleanLevels.insert(0, 'Level 1');
     }
 
     // Siguradoha nga numerically ascending ang levels: Level 1, Level 2, Level 3...
-    configuredLevels.sort((a, b) {
+    cleanLevels.sort((a, b) {
       final matchA = RegExp(r'\d+').firstMatch(a);
       final matchB = RegExp(r'\d+').firstMatch(b);
       final numA = matchA != null ? int.tryParse(matchA.group(0)!) ?? 0 : 0;
@@ -1258,14 +1282,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       return a.compareTo(b);
     });
 
-    final levels = <String>[...configuredLevels, 'Overall'];
+    final levels = <String>['Overall', ...cleanLevels];
     if (!levels.contains(selectedLevel)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !levels.contains(selectedLevel)) {
           setState(() {
-            selectedLevel = configuredLevels.contains('Level 1')
-                ? 'Level 1'
-                : configuredLevels.first;
+            selectedLevel = 'Overall';
           });
         }
       });
@@ -1273,6 +1295,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final bool shouldScroll =
+            levels.length > 4 && constraints.maxWidth < (levels.length * 75);
+        final buttons = [
+          for (final level in levels)
+            shouldScroll
+                ? SizedBox(
+                    width: 78,
+                    child: _levelButton(level),
+                  )
+                : Flexible(fit: FlexFit.tight, child: _levelButton(level)),
+        ];
+
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(5),
@@ -1288,13 +1322,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ),
             ],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              for (final level in levels)
-                Flexible(fit: FlexFit.tight, child: _levelButton(level)),
-            ],
-          ),
+          child: shouldScroll
+              ? SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: buttons,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.max,
+                  children: buttons,
+                ),
         );
       },
     );
@@ -2200,6 +2240,85 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   // ================================================================
+  // LEVEL SCORES SYNC & ENGINE
+  // ================================================================
+
+  void _syncOrFetchLevelScores(
+    String quizCode,
+    List<QueryDocumentSnapshot> scoreDocs,
+  ) {
+    if (quizCode.isEmpty) return;
+
+    if (_lastSyncedQuizCode != quizCode) {
+      _lastSyncedQuizCode = quizCode;
+      _levelScoresCache.clear();
+      _syncingUids.clear();
+      _checkedUids.clear();
+    }
+
+    for (final doc in scoreDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final uid = (data['uid'] ?? doc.id).toString();
+
+      // Check if doc already has explicit level breakdown
+      final hasLevel1 = data.containsKey('level1Score') ||
+          (data['levelScores'] is Map &&
+              data['levelScores']['Level 1'] != null);
+      final hasLevel2 = data.containsKey('level2Score') ||
+          (data['levelScores'] is Map &&
+              data['levelScores']['Level 2'] != null);
+
+      if (hasLevel1 && hasLevel2) {
+        continue;
+      }
+
+      if (_checkedUids.contains(uid) || _syncingUids.contains(uid)) continue;
+      _syncingUids.add(uid);
+      _checkedUids.add(uid);
+
+      FirebaseFirestore.instance
+          .collection('quiz_sessions')
+          .doc(quizCode)
+          .collection('answers')
+          .doc(uid)
+          .collection('responses')
+          .get()
+          .then((responsesSnap) {
+        if (!mounted) return;
+        final Map<int, int> userLevelScores = {};
+        for (final r in responsesSnap.docs) {
+          final rData = r.data();
+          final lvl = (rData['level'] as num?)?.toInt() ?? 1;
+          final pts = (rData['points'] as num?)?.toInt() ?? 0;
+          final isCorrect = rData['isCorrect'] == true ||
+              (rData['answerStatus'] ?? '').toString().toLowerCase() ==
+                  'correct';
+          if (pts > 0 && isCorrect) {
+            userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
+          }
+        }
+
+        if (userLevelScores.isNotEmpty) {
+          setState(() {
+            _levelScoresCache[uid] = userLevelScores;
+          });
+
+          final updateData = <String, dynamic>{};
+          for (final entry in userLevelScores.entries) {
+            updateData['level${entry.key}Score'] = entry.value;
+            updateData['levelScores.Level ${entry.key}'] = entry.value;
+          }
+          doc.reference
+              .set(updateData, SetOptions(merge: true))
+              .catchError((_) {});
+        }
+      }).catchError((_) {}).whenComplete(() {
+        _syncingUids.remove(uid);
+      });
+    }
+  }
+
+  // ================================================================
   // BUILD LEADERBOARD DATA
   // ================================================================
 
@@ -2207,6 +2326,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     required List<QueryDocumentSnapshot> requests,
     required List<QueryDocumentSnapshot> scores,
     required String selectedLevel,
+    List<String> configuredLevels = const [],
   }) {
     final Map<String, _LeaderboardEntry> grouped = {};
 
@@ -2280,23 +2400,52 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
       // Score based on selected level
       int contestantScore = 0;
+      final cached = _levelScoresCache[uid];
+
       if (selectedLevel == 'Overall') {
-        contestantScore = _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
+        int total = _toInt(
+          data['score'] ?? data['totalScore'] ?? data['points'] ?? 0,
+        );
+        if (total == 0 && cached != null && cached.isNotEmpty) {
+          total = cached.values.fold<int>(0, (acc, val) => acc + val);
+        } else if (total == 0 && data['levelScores'] is Map) {
+          int mapSum = 0;
+          for (final val in (data['levelScores'] as Map).values) {
+            mapSum += _toInt(val);
+          }
+          if (mapSum > 0) total = mapSum;
+        }
+        contestantScore = total;
       } else {
         final levelMatch = RegExp(r'\d+').firstMatch(selectedLevel);
-        final levelNum = levelMatch != null ? int.tryParse(levelMatch.group(0)!) ?? 1 : 1;
+        final levelNum = levelMatch != null
+            ? int.tryParse(levelMatch.group(0)!) ?? 1
+            : 1;
         final levelKey = 'level${levelNum}Score';
         final altKey = 'level_$levelNum';
         if (data.containsKey(levelKey)) {
           contestantScore = _toInt(data[levelKey]);
         } else if (data.containsKey(altKey)) {
           contestantScore = _toInt(data[altKey]);
+        } else if (data['levelScores'] is Map &&
+            (data['levelScores'] as Map).containsKey('Level $levelNum')) {
+          contestantScore =
+              _toInt((data['levelScores'] as Map)['Level $levelNum']);
+        } else if (data['levelScores'] is Map &&
+            (data['levelScores'] as Map).containsKey(levelNum.toString())) {
+          contestantScore =
+              _toInt((data['levelScores'] as Map)[levelNum.toString()]);
+        } else if (cached != null && cached.containsKey(levelNum)) {
+          contestantScore = cached[levelNum]!;
         } else {
-          final currentLevel = _toInt(data['currentLevel'] ?? data['level'] ?? 1);
-          if (currentLevel == levelNum) {
+          final currentLevel = _toInt(
+            data['currentLevel'] ?? data['level'] ?? 1,
+          );
+          if (configuredLevels.length <= 1 &&
+              (currentLevel == levelNum || levelNum == 1)) {
             contestantScore = _toInt(data['score'] ?? data['points'] ?? 0);
-          } else if (levelNum == 1) {
-            contestantScore = _toInt(data['score'] ?? 0);
+          } else {
+            contestantScore = 0;
           }
         }
       }

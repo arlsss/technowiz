@@ -2301,6 +2301,11 @@ class _QuizScreenState extends State<QuizScreen> {
         final bool shouldBeCorrect =
             isAnswerCorrect(questionForEval, savedAnswer);
 
+        final sessionLevel = getLevelFromSessionQuestion(
+          questionForEval,
+          fallbackQuestionNumber: questionIndex + 1,
+        );
+
         if (isCurrentlyCorrect &&
             !shouldBeCorrect &&
             savedContestStatus != "approved") {
@@ -2319,7 +2324,7 @@ class _QuizScreenState extends State<QuizScreen> {
               debugPrint("CORRECT TO WRONG RESPONSE ERROR: $e");
             });
             if (existingPoints > 0) {
-              updateScore(currentUser.uid, -existingPoints, questionIndex + 1)
+              updateScore(currentUser.uid, -existingPoints, questionIndex + 1, level: sessionLevel)
                   .catchError((e) {
                 debugPrint("DEDUCT INCOMPLETE SCORE ERROR: $e");
               });
@@ -2332,10 +2337,6 @@ class _QuizScreenState extends State<QuizScreen> {
           // self-heal and award points.
           isCurrentlyCorrect = true;
           try {
-            final sessionLevel = getLevelFromSessionQuestion(
-              questionForEval,
-              fallbackQuestionNumber: questionIndex + 1,
-            );
             final earnedPoints =
                 getPointsForLevel(sessionLevel, question: questionForEval);
             responseRef.update({
@@ -2347,7 +2348,7 @@ class _QuizScreenState extends State<QuizScreen> {
             }).catchError((e) {
               debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
             });
-            updateScore(currentUser.uid, earnedPoints, questionIndex + 1)
+            updateScore(currentUser.uid, earnedPoints, questionIndex + 1, level: sessionLevel)
                 .catchError((e) {
               debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
             });
@@ -2468,6 +2469,10 @@ class _QuizScreenState extends State<QuizScreen> {
               if (questionForEval != null && savedAnswer.trim().isNotEmpty) {
                 final bool shouldBeCorrect =
                     isAnswerCorrect(questionForEval, savedAnswer);
+                final sessionLevel = getLevelFromSessionQuestion(
+                  questionForEval,
+                  fallbackQuestionNumber: questionNumber,
+                );
 
                 if (isCurrentlyCorrect &&
                     !shouldBeCorrect &&
@@ -2486,7 +2491,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     debugPrint("CORRECT TO WRONG RESPONSE ERROR: $e");
                   });
                   if (existingPoints > 0) {
-                    updateScore(uid, -existingPoints, questionNumber)
+                    updateScore(uid, -existingPoints, questionNumber, level: sessionLevel)
                         .catchError((e) {
                       debugPrint("DEDUCT INCOMPLETE SCORE ERROR: $e");
                     });
@@ -2494,10 +2499,6 @@ class _QuizScreenState extends State<QuizScreen> {
                 } else if (!isCurrentlyCorrect && shouldBeCorrect) {
                   // Complete answer (e.g. "DNS(Domain Name System)"): Mark CORRECT
                   isCurrentlyCorrect = true;
-                  final sessionLevel = getLevelFromSessionQuestion(
-                    questionForEval,
-                    fallbackQuestionNumber: questionNumber,
-                  );
                   final earnedPoints =
                       getPointsForLevel(sessionLevel, question: questionForEval);
                   responseRef.update({
@@ -2509,7 +2510,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   }).catchError((e) {
                     debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
                   });
-                  updateScore(uid, earnedPoints, questionNumber)
+                  updateScore(uid, earnedPoints, questionNumber, level: sessionLevel)
                       .catchError((e) {
                     debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
                   });
@@ -2598,7 +2599,7 @@ class _QuizScreenState extends State<QuizScreen> {
       });
 
       if (correct) {
-        await updateScore(uid, earnedPoints, questionNumber);
+        await updateScore(uid, earnedPoints, questionNumber, level: sessionLevel);
       }
 
       if (!mounted) return;
@@ -3725,7 +3726,7 @@ class _QuizScreenState extends State<QuizScreen> {
       });
 
       if (shouldAwardPoints) {
-        await updateScore(uid, points, questionNumber);
+        await updateScore(uid, points, questionNumber, level: contestLevel);
       }
 
       if (mounted) {
@@ -3957,7 +3958,12 @@ class _QuizScreenState extends State<QuizScreen> {
   // UPDATE SCORE
   // ==========================================================
 
-  Future<void> updateScore(String uid, int points, int questionNumber) async {
+  Future<void> updateScore(
+    String uid,
+    int points,
+    int questionNumber, {
+    int? level,
+  }) async {
     final name = await getUserName(uid);
 
     // Get the contestant's team name and members from the users collection.
@@ -3991,20 +3997,35 @@ class _QuizScreenState extends State<QuizScreen> {
         .collection('scores')
         .doc(uid);
 
+    final int targetLevel = level ?? getLevelFromQuestionNumber(questionNumber);
+    final String levelKey = 'level${targetLevel}Score';
+
     await FirebaseFirestore.instance.runTransaction((transaction) async {
       final scoreDoc = await transaction.get(scoreRef);
 
       int oldScore = 0;
+      int oldLevelScore = 0;
 
       if (scoreDoc.exists) {
         final data = scoreDoc.data();
 
-        if (data != null && data['score'] != null) {
-          oldScore = int.tryParse(data['score'].toString()) ?? 0;
+        if (data != null) {
+          if (data['score'] != null) {
+            oldScore = int.tryParse(data['score'].toString()) ?? 0;
+          }
+          final dynamic rawLvl = data[levelKey] ??
+              (data['levelScores'] is Map
+                  ? data['levelScores']['Level $targetLevel']
+                  : null);
+          if (rawLvl != null) {
+            oldLevelScore = int.tryParse(rawLvl.toString()) ?? 0;
+          }
         }
       }
 
       final newScore = (oldScore + points) < 0 ? 0 : (oldScore + points);
+      final newLevelScore =
+          (oldLevelScore + points) < 0 ? 0 : (oldLevelScore + points);
 
       transaction.set(scoreRef, {
         'uid': uid,
@@ -4013,6 +4034,10 @@ class _QuizScreenState extends State<QuizScreen> {
         'teamMembers': teamMembers,
         'members': teamMembers,
         'score': newScore,
+        'totalScore': newScore,
+        levelKey: newLevelScore,
+        'levelScores.Level $targetLevel': newLevelScore,
+        'currentLevel': targetLevel,
         'lastQuestion': questionNumber,
         'lastPoints': points,
         'updatedAt': FieldValue.serverTimestamp(),
