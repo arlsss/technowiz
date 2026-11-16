@@ -7474,7 +7474,6 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: session
                       .collection('join_requests')
-                      .where('status', isEqualTo: 'approved')
                       .snapshots(),
                   builder: (context, contestantSnap) {
                     final scoreDocs = scoreSnap.data?.docs ?? [];
@@ -7572,9 +7571,11 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                           : personalName;
 
                       final isElim = sData['eliminated'] == true ||
+                          sData['isEliminated'] == true ||
                           sData['status']?.toString().toLowerCase() == 'eliminated' ||
                           cData['eliminated'] == true ||
                           cData['isEliminated'] == true ||
+                          cData['contestantDecision']?.toString().toLowerCase() == 'eliminated' ||
                           cData['status']?.toString().toLowerCase() == 'eliminated';
 
                       rows.add({
@@ -7592,11 +7593,9 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                     }
 
               rows.sort((a, b) {
-                if (isActuallyFinal) {
-                  final aElim = a['eliminated'] == true;
-                  final bElim = b['eliminated'] == true;
-                  if (aElim != bElim) return aElim ? 1 : -1;
-                }
+                final aElim = a['eliminated'] == true;
+                final bElim = b['eliminated'] == true;
+                if (aElim != bElim) return aElim ? 1 : -1;
                 final byScore = (b['score'] as int).compareTo(
                   a['score'] as int,
                 );
@@ -7627,7 +7626,9 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
 
               // Competition ranking: equal scores share the same rank
               final ranks = <int>[];
+              int activeRankCounter = 0;
               for (int i = 0; i < rows.length; i++) {
+                final bool isElim = rows[i]['eliminated'] == true;
                 if (officialRanks is Map && officialRanks.containsKey(rows[i]['uid'])) {
                   final offR = officialRanks[rows[i]['uid']];
                   final parsed = offR is num ? offR.toInt() : int.tryParse(offR?.toString() ?? '');
@@ -7636,10 +7637,15 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                     continue;
                   }
                 }
-                if (i > 0 && rows[i]['score'] == rows[i - 1]['score']) {
-                  ranks.add(ranks[i - 1]);
-                } else {
+                if (isElim) {
                   ranks.add(i + 1);
+                } else {
+                  activeRankCounter++;
+                  if (i > 0 && rows[i]['score'] == rows[i - 1]['score'] && rows[i - 1]['eliminated'] != true) {
+                    ranks.add(ranks[i - 1]);
+                  } else {
+                    ranks.add(activeRankCounter);
+                  }
                 }
               }
 
@@ -8151,12 +8157,17 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                 final row = rows[i];
                                 final rank = ranks[i];
                                 final isMe = row['uid'] == myUid;
+                                final eliminated = row['eliminated'] == true;
 
                                 Color rankBadgeColor;
                                 Color rankBorderColor;
                                 Color rankTextColor;
 
-                                if (rank == 1) {
+                                if (eliminated) {
+                                  rankBadgeColor = const Color(0xFFFEE2E2);
+                                  rankBorderColor = const Color(0xFFEF4444);
+                                  rankTextColor = const Color(0xFFB91C1C);
+                                } else if (rank == 1) {
                                   rankBadgeColor = const Color(0xFFFEF3C7);
                                   rankBorderColor = const Color(0xFFF59E0B);
                                   rankTextColor = const Color(0xFFB45309);
@@ -8181,16 +8192,40 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                     vertical: 12,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isMe ? softGreen : Colors.white,
+                                    color: eliminated
+                                        ? const Color(0xFFFDF2F2)
+                                        : (isMe ? softGreen : Colors.white),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: isMe ? primaryGreen : borderGreen,
+                                      color: eliminated
+                                          ? Colors.red.shade300
+                                          : (isMe ? primaryGreen : borderGreen),
                                       width: isMe ? 1.8 : 1.2,
                                     ),
                                   ),
                                   child: Row(
                                     children: [
-                                      if (rank <= 10)
+                                      if (eliminated)
+                                        Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.red.shade300,
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              color: Colors.red.shade700,
+                                              size: 19,
+                                            ),
+                                          ),
+                                        )
+                                      else if (rank <= 10)
                                         TechRankLeaderboardIcon(
                                           rank: rank,
                                           size: 32,
@@ -8239,20 +8274,35 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                       width: 0.8,
                                                     ),
                                                   ),
-                                                  child: Text(
-                                                    rank == 1
-                                                        ? '🏆 RANK 1 • 1ST'
-                                                        : (rank == 2
-                                                            ? '🥈 RANK 2 • 2ND'
-                                                            : (rank == 3
-                                                                ? '🥉 RANK 3 • 3RD'
-                                                                : 'RANK $rank')),
-                                                    style: TextStyle(
-                                                      color: rankTextColor,
-                                                      fontSize: 9.5,
-                                                      fontWeight: FontWeight.w800,
-                                                      letterSpacing: 0.3,
-                                                    ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      if (eliminated) ...[
+                                                        Icon(
+                                                          Icons.cancel_rounded,
+                                                          size: 11,
+                                                          color: rankTextColor,
+                                                        ),
+                                                        const SizedBox(width: 3),
+                                                      ],
+                                                      Text(
+                                                        eliminated
+                                                            ? 'ELIMINATED'
+                                                            : (rank == 1
+                                                                ? '🏆 RANK 1 • 1ST'
+                                                                : (rank == 2
+                                                                    ? '🥈 RANK 2 • 2ND'
+                                                                    : (rank == 3
+                                                                        ? '🥉 RANK 3 • 3RD'
+                                                                        : 'RANK $rank'))),
+                                                        style: TextStyle(
+                                                          color: rankTextColor,
+                                                          fontSize: 9.5,
+                                                          fontWeight: FontWeight.w800,
+                                                          letterSpacing: 0.3,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
                                               ],
@@ -8262,8 +8312,10 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                   ? '${row['name']} (You)'
                                                   : row['name'] as String,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: textDark,
+                                              style: TextStyle(
+                                                color: eliminated
+                                                    ? Colors.red.shade900
+                                                    : textDark,
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 15,
                                               ),
@@ -8276,8 +8328,10 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                   'Members: ${(row['members'] as List<String>).join(', ')}',
                                                   maxLines: 2,
                                                   overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF5B7A9C),
+                                                  style: TextStyle(
+                                                    color: eliminated
+                                                        ? Colors.grey.shade600
+                                                        : const Color(0xFF5B7A9C),
                                                     fontSize: 11,
                                                   ),
                                                 ),
@@ -8286,13 +8340,46 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                           ],
                                         ),
                                       ),
-                                      Text(
-                                        '${row['score']} pts',
-                                        style: const TextStyle(
-                                          color: darkGreen,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${row['score']} pts',
+                                            style: TextStyle(
+                                              color: eliminated
+                                                  ? Colors.red.shade700
+                                                  : darkGreen,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          if (eliminated) ...[
+                                            const SizedBox(height: 2),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 5,
+                                                vertical: 1.5,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red.shade100,
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: Colors.red.shade200,
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'Eliminated',
+                                                style: TextStyle(
+                                                  color: Colors.red.shade800,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                     ],
                                   ),
