@@ -1206,35 +1206,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     required List<_RankingEntry> rankings,
     required List<int> ranks,
   }) {
-    final topEntries = <({int rank, String name, String team, int score})>[];
-    for (int i = 0; i < rankings.length; i++) {
-      final data = rankings[i].data();
-      if (_isEliminated(data)) continue;
-      if (ranks[i] <= 3) {
-        topEntries.add((
-          rank: ranks[i],
-          name: data['name']?.toString() ?? rankings[i].id,
-          team: data['teamName']?.toString().trim() ?? '',
-          score: _scoreOf(data),
-        ));
-      }
-    }
-
-    if (topEntries.isEmpty) {
-      for (int i = 0; i < rankings.length; i++) {
-        final data = rankings[i].data();
-        if (ranks[i] <= 3) {
-          topEntries.add((
-            rank: ranks[i],
-            name: data['name']?.toString() ?? rankings[i].id,
-            team: data['teamName']?.toString().trim() ?? '',
-            score: _scoreOf(data),
-          ));
-        }
-      }
-    }
-
-    if (topEntries.isEmpty) {
+    if (rankings.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -1259,71 +1231,130 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 26),
-              SizedBox(width: 8),
-              Expanded(
+              const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 26),
+              const SizedBox(width: 8),
+              const Expanded(
                 child: Text(
-                  'OFFICIAL WINNERS PODIUM',
+                  'TOTAL RANKINGS',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.6,
                   ),
                 ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white30),
+                ),
+                child: Text(
+                  '${rankings.length} Contestants',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          ...topEntries.map((winner) {
-            final String titleLabel = winner.rank == 1
-                ? 'CHAMPION • RANK 1'
-                : winner.rank == 2
-                ? '1ST RUNNER-UP • RANK 2'
-                : '2ND RUNNER-UP • RANK 3';
-            final Color badgeColor = winner.rank == 1
-                ? Colors.amber.shade600
-                : winner.rank == 2
-                ? Colors.blueGrey.shade300
-                : Colors.orange.shade400;
+          const SizedBox(height: 14),
+          ...List.generate(rankings.length, (i) {
+            final player = rankings[i];
+            final data = player.data();
+            final rank = ranks[i];
+            final bool isEliminated = _isEliminated(data);
+            final int score = _scoreOf(data);
+            final String name = (data['displayName'] ??
+                    data['name'] ??
+                    player.id)
+                .toString()
+                .trim();
+            final String team = data['teamName']?.toString().trim() ?? '';
+            final rawMembers = data['teamMembers'] ?? data['members'];
+            final List<String> members = [];
+            if (rawMembers is List) {
+              for (final m in rawMembers) {
+                final s = m is Map
+                    ? (m['name'] ?? '').toString().trim()
+                    : m.toString().trim();
+                if (s.isNotEmpty && !members.contains(s)) {
+                  members.add(s);
+                }
+              }
+            }
+
+            // Subtitle label and accent colors based on rank & elimination
+            String titleLabel;
+            Color accentColor;
+            if (isEliminated) {
+              titleLabel = 'ELIMINATED • RANK #$rank';
+              accentColor = const Color(0xFFFF8A80);
+            } else if (rank == 1) {
+              titleLabel = 'CHAMPION • RANK 1';
+              accentColor = Colors.amber.shade300;
+            } else if (rank == 2) {
+              titleLabel = '1ST RUNNER-UP • RANK 2';
+              accentColor = Colors.blueGrey.shade200;
+            } else if (rank == 3) {
+              titleLabel = '2ND RUNNER-UP • RANK 3';
+              accentColor = Colors.orange.shade300;
+            } else if (rank <= 10) {
+              titleLabel = 'TOP 10 • RANK #$rank';
+              accentColor = const Color(0xFF86EFAC);
+            } else {
+              titleLabel = 'RANK #$rank';
+              accentColor = Colors.white70;
+            }
+
+            final cardBg = isEliminated
+                ? Colors.red.withValues(alpha: 0.14)
+                : Colors.white.withValues(
+                    alpha: rank == 1
+                        ? 0.20
+                        : rank == 2
+                        ? 0.15
+                        : rank == 3
+                        ? 0.13
+                        : rank <= 10
+                        ? 0.10
+                        : 0.08,
+                  );
+
+            final cardBorder = isEliminated
+                ? Colors.redAccent.withValues(alpha: 0.45)
+                : rank == 1
+                ? Colors.amber.shade300
+                : rank == 2
+                ? Colors.blueGrey.shade200
+                : rank == 3
+                ? Colors.orange.shade300
+                : rank <= 10
+                ? const Color(0xFF86EFAC).withValues(alpha: 0.60)
+                : Colors.white24;
 
             return Container(
               width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(bottom: 9),
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: winner.rank == 1 ? 0.18 : 0.11),
-                borderRadius: BorderRadius.circular(14),
+                color: cardBg,
+                borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: winner.rank == 1
-                      ? Colors.amber.shade300
-                      : Colors.white24,
-                  width: winner.rank == 1 ? 1.4 : 1.0,
+                  color: cardBorder,
+                  width: (!isEliminated && rank <= 2) ? 1.5 : 1.0,
                 ),
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '#${winner.rank}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 11),
+                  _buildRankLeadingWidget(rank, isEliminated),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1331,9 +1362,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                         Text(
                           titleLabel,
                           style: TextStyle(
-                            color: winner.rank == 1
-                                ? Colors.amber.shade300
-                                : Colors.white70,
+                            color: accentColor,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
@@ -1341,7 +1370,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          winner.name,
+                          name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1350,9 +1379,9 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (winner.team.isNotEmpty)
+                        if (team.isNotEmpty && team != name)
                           Text(
-                            winner.team,
+                            team,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1360,22 +1389,221 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                               fontSize: 11,
                             ),
                           ),
+                        if (members.isNotEmpty)
+                          Text(
+                            'Members: ${members.join(', ')}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 10,
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  Text(
-                    '${winner.score} pts',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$score pts',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (isEliminated) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.28),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFFFF8A80),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Text(
+                            'ELIMINATED',
+                            style: TextStyle(
+                              color: Color(0xFFFF8A80),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             );
           }),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRankLeadingWidget(int rank, bool isEliminated) {
+    if (rank <= 3) {
+      final trophyAsset = rank == 1
+          ? 'assets/trophies/gold_trophy_3d.jpg'
+          : (rank == 2
+              ? 'assets/trophies/silver_trophy_3d.jpg'
+              : 'assets/trophies/bronze_trophy_3d.jpg');
+
+      final rankColor = rank == 1
+          ? const Color(0xFFF59E0B)
+          : (rank == 2 ? const Color(0xFFCBD5E1) : const Color(0xFFD97706));
+
+      return Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                trophyAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.emoji_events_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              width: 15,
+              height: 15,
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (rank >= 4 && rank <= 10) {
+      const badgeAsset = 'assets/trophies/top10_badge_3d.jpg';
+      const rankColor = Color(0xFF22C55E);
+
+      return Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                badgeAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              width: 15,
+              height: 15,
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Rank 11+ : Numbers only
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.16),
+        border: Border.all(
+          color: isEliminated
+              ? Colors.redAccent.withValues(alpha: 0.5)
+              : Colors.white38,
+          width: 1.3,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '#$rank',
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w900,
+          color: isEliminated ? const Color(0xFFFF8A80) : Colors.white,
+        ),
       ),
     );
   }
