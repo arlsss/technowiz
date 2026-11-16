@@ -1198,22 +1198,9 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
 
                     return Column(
                       children: [
-                        // Hero Card with Quiz Details & Stats
-                        _buildHeroCard(
-                          context: context,
-                          quizTitle: quizTitle,
-                          quizCode: effectiveCode,
-                          status: rawStatus,
-                          totalParticipants: participantsList.length,
-                          readyCount: readyCount,
-                          allSessions: isViewingHistoryQuiz
-                              ? [chosenDoc!]
-                              : activeSessions,
-                        ),
-
                         if (isViewingHistoryQuiz) ...[
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -1271,6 +1258,19 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                             ),
                           ),
                         ],
+
+                        // Hero Card with Quiz Details & Stats
+                        _buildHeroCard(
+                          context: context,
+                          quizTitle: quizTitle,
+                          quizCode: effectiveCode,
+                          status: rawStatus,
+                          totalParticipants: participantsList.length,
+                          readyCount: readyCount,
+                          allSessions: isViewingHistoryQuiz
+                              ? [chosenDoc!]
+                              : activeSessions,
+                        ),
 
                         // Participants list
                         Expanded(
