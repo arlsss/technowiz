@@ -1015,60 +1015,43 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                   ),
                                 ),
                               ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(dialogCtx),
-                                    child: const Text(
-                                      "Close",
-                                      style: TextStyle(
-                                        color: textGrey,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  await confirmToggleBlock(
+                                    context,
+                                    uid,
+                                    name,
+                                    isBlocked,
+                                    roleLabel: roleLabel,
+                                  );
+                                },
+                                icon: Icon(
+                                  isBlocked
+                                      ? Icons.lock_open_rounded
+                                      : Icons.block_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  isBlocked
+                                      ? "Unblock $roleLabel"
+                                      : "Block $roleLabel",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
                                   ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () async {
-                                      await confirmToggleBlock(
-                                        context,
-                                        uid,
-                                        name,
-                                        isBlocked,
-                                        roleLabel: roleLabel,
-                                      );
-                                    },
-                                    icon: Icon(
-                                      isBlocked
-                                          ? Icons.lock_open_rounded
-                                          : Icons.block_rounded,
-                                      size: 16,
-                                    ),
-                                    label: Text(
-                                      isBlocked
-                                          ? "Unblock $roleLabel"
-                                          : "Block $roleLabel",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isBlocked ? green : red,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 11,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isBlocked ? green : red,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 11,
                                   ),
-                                ],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
