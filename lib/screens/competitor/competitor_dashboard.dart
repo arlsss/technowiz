@@ -272,6 +272,25 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       final snapshot = await ref.get();
       final data = snapshot.data() ?? {};
 
+      final bool isBlocked = data['isBlocked'] == true ||
+          (data['status']?.toString().trim().toLowerCase() == 'blocked');
+      if (isBlocked) {
+        if (mounted) {
+          await logout(context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  "This account has been blocked by the Administrator.",
+                ),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() {
           profileData = data;

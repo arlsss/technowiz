@@ -217,6 +217,815 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   // =========================================================
 
+  // USER BLOCKING & PROFILE HELPERS
+
+  // =========================================================
+
+  bool isUserBlocked(Map<String, dynamic> data) {
+    if (data['isBlocked'] == true) return true;
+    final status = (data['status'] ?? '').toString().trim().toLowerCase();
+    return status == 'blocked';
+  }
+
+  String _formatDate(dynamic raw) {
+    if (raw == null) return "Unknown";
+    DateTime? dt;
+    if (raw is Timestamp) {
+      dt = raw.toDate();
+    } else if (raw is DateTime) {
+      dt = raw;
+    } else if (raw is String) {
+      dt = DateTime.tryParse(raw);
+    }
+    if (dt == null) return "Unknown";
+
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final month = months[dt.month - 1];
+    final day = dt.day;
+    final year = dt.year;
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return "$month $day, $year • $hour:$minute $ampm";
+  }
+
+  Future<void> confirmToggleBlock(
+    BuildContext context,
+    String uid,
+    String name,
+    bool isCurrentlyBlocked,
+  ) async {
+    final bool willBlock = !isCurrentlyBlocked;
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          elevation: 10,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                willBlock ? Icons.block_rounded : Icons.lock_open_rounded,
+                color: willBlock ? red : green,
+                size: 24,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                willBlock ? "Block Contestant" : "Unblock Contestant",
+                style: const TextStyle(
+                  color: textDark,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            willBlock
+                ? "Are you sure you want to block $name? This contestant will be logged out and cannot participate in quizzes until unblocked."
+                : "Are you sure you want to unblock $name? This contestant will be permitted to log in and join quizzes again.",
+            style: const TextStyle(
+              color: textGrey,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: textGrey, fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: willBlock ? red : green,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 11,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9),
+                ),
+              ),
+              child: Text(
+                willBlock ? "Block User" : "Unblock User",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'isBlocked': willBlock,
+        'status': willBlock ? 'blocked' : 'Offline',
+        'blockedAt': willBlock ? FieldValue.serverTimestamp() : null,
+      });
+
+      if (!context.mounted) return;
+      AdminNotification.success(
+        context,
+        willBlock
+            ? "$name has been blocked."
+            : "$name has been unblocked successfully.",
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      AdminNotification.error(
+        context,
+        "Failed to update user block status: $e",
+      );
+    }
+  }
+
+  Widget blockedBadge({bool compact = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 9,
+        vertical: compact ? 3 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFFCA5A5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.block_rounded,
+            color: const Color(0xFFDC2626),
+            size: compact ? 10 : 12,
+          ),
+          SizedBox(width: compact ? 3 : 5),
+          Text(
+            "Blocked",
+            style: TextStyle(
+              color: const Color(0xFFDC2626),
+              fontSize: compact ? 9.5 : 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileInfoTile({
+    required IconData icon,
+    required String title,
+    required String value,
+    Color? iconColor,
+  }) {
+    final effectiveColor = iconColor ?? primaryPurple;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: effectiveColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: effectiveColor.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Icon(icon, color: effectiveColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: textDark,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _teamMembersCard(List<String> members) {
+    if (members.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8F0),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF2D7B7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.groups_outlined,
+                color: Color(0xFFE67E22),
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                "Team Members",
+                style: TextStyle(
+                  color: Color(0xFF9A5515),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE67E22).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "${members.length} members",
+                  style: const TextStyle(
+                    color: Color(0xFF9A5515),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...members.map(
+            (m) => Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Row(
+                children: [
+                  const Text(
+                    "• ",
+                    style: TextStyle(
+                      color: Color(0xFFE67E22),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      m,
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUserDetailsDialog(
+    BuildContext context,
+    String uid,
+    Map<String, dynamic> initialData,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (dialogCtx) {
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final data = snapshot.hasData && snapshot.data!.exists
+                ? (snapshot.data!.data() ?? initialData)
+                : initialData;
+
+            final String name = (data['name'] ?? 'Contestant').toString().trim();
+            final String email = (data['email'] ?? 'No email').toString().trim();
+            final String role = (data['role'] ?? 'Contestant').toString().trim();
+            final String accountType = getAccountType(data);
+            final bool isTeam = accountType == 'TEAM';
+            final String teamName = (data['teamName'] ?? '').toString().trim();
+            final List<String> teamMembers = getTeamMembers(data);
+            final bool isBlocked = isUserBlocked(data);
+            final bool isOnline = UserPresenceService.isUserActive(
+              data,
+              docUid: uid,
+            );
+
+            final String schoolName = (data['schoolName'] ??
+                    data['address'] ??
+                    data['school'] ??
+                    '')
+                .toString()
+                .trim();
+            final String educationLevel =
+                (data['educationLevel'] ?? '').toString().trim();
+            final String gradeLevel =
+                (data['gradeLevel'] ?? '').toString().trim();
+            final String contactNumber = (data['contactNumber'] ??
+                    data['phone'] ??
+                    data['contact'] ??
+                    '')
+                .toString()
+                .trim();
+            final int score =
+                int.tryParse(data['score']?.toString() ?? '0') ?? 0;
+            final String createdAtStr = _formatDate(data['createdAt']);
+            final String lastLoginStr =
+                _formatDate(data['lastLogin'] ?? data['lastSeen']);
+
+            final Color roleColor = getRoleColor(role);
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 560,
+                  maxHeight: 760,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 28,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // HEADER WITH GRADIENT
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(20, 18, 16, 20),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isBlocked
+                                  ? const [
+                                      Color(0xFF7F1D1D),
+                                      Color(0xFF991B1B),
+                                      Color(0xFFDC2626),
+                                    ]
+                                  : [
+                                      const Color(0xFF4C1D95),
+                                      const Color(0xFF6D28D9),
+                                      primaryPurple,
+                                    ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.badge_outlined,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        "USER PROFILE DETAILS",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  IconButton(
+                                    tooltip: "Close",
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    icon: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    onPressed: () => Navigator.pop(dialogCtx),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  userAvatar(
+                                    name: (isTeam && teamName.isNotEmpty)
+                                        ? teamName
+                                        : name,
+                                    role: role,
+                                    size: 64,
+                                    photoUrl: data['photoUrl']?.toString(),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          (isTeam && teamName.isNotEmpty)
+                                              ? teamName
+                                              : name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          email,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFFE9D5FF),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            accountTypeBadge(accountType),
+                                            statusBadge(isOnline),
+                                            if (isBlocked) blockedBadge(),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // BODY CONTENT (SCROLLABLE)
+                        Flexible(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // BLOCKED WARNING BANNER
+                                if (isBlocked) ...[
+                                  Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFFFCA5A5),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(
+                                          Icons.block_rounded,
+                                          color: Color(0xFFDC2626),
+                                          size: 20,
+                                        ),
+                                        SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            "This contestant is BLOCKED. They cannot log in or participate in any quiz sessions.",
+                                            style: TextStyle(
+                                              color: Color(0xFF991B1B),
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                // PROFILE INFORMATION CARDS
+                                const Text(
+                                  "Contestant Information",
+                                  style: TextStyle(
+                                    color: textDark,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                _profileInfoTile(
+                                  icon: Icons.person_outline_rounded,
+                                  title: isTeam ? "Team Leader" : "Full Name",
+                                  value: name.isNotEmpty ? name : "Not set",
+                                  iconColor: roleColor,
+                                ),
+
+                                _profileInfoTile(
+                                  icon: Icons.school_outlined,
+                                  title: "School / Institution",
+                                  value: schoolName.isNotEmpty
+                                      ? schoolName
+                                      : "Not yet set",
+                                  iconColor: primaryPurple,
+                                ),
+
+                                _profileInfoTile(
+                                  icon: Icons.groups_outlined,
+                                  title: "Participation Type",
+                                  value: accountType,
+                                  iconColor: const Color(0xFFE67E22),
+                                ),
+
+                                if (isTeam) ...[
+                                  _profileInfoTile(
+                                    icon: Icons.badge_outlined,
+                                    title: "Team Name",
+                                    value: teamName.isNotEmpty
+                                        ? teamName
+                                        : "Not yet set",
+                                    iconColor: const Color(0xFFE67E22),
+                                  ),
+                                  _teamMembersCard(teamMembers),
+                                ],
+
+                                _profileInfoTile(
+                                  icon: Icons.menu_book_outlined,
+                                  title: "Education Level",
+                                  value: educationLevel.isNotEmpty
+                                      ? educationLevel
+                                      : "Not yet set",
+                                  iconColor: blue,
+                                ),
+
+                                _profileInfoTile(
+                                  icon: Icons.grade_outlined,
+                                  title: "Grade / Year Level",
+                                  value: gradeLevel.isNotEmpty
+                                      ? gradeLevel
+                                      : "Not yet set",
+                                  iconColor: primaryPurple,
+                                ),
+
+                                if (contactNumber.isNotEmpty)
+                                  _profileInfoTile(
+                                    icon: Icons.phone_outlined,
+                                    title: "Contact Number",
+                                    value: contactNumber,
+                                    iconColor: green,
+                                  ),
+
+                                _profileInfoTile(
+                                  icon: Icons.emoji_events_outlined,
+                                  title: "Total Points / Score",
+                                  value: "$score pts",
+                                  iconColor: const Color(0xFFF59E0B),
+                                ),
+
+                                _profileInfoTile(
+                                  icon: Icons.calendar_today_outlined,
+                                  title: "Date Registered",
+                                  value: createdAtStr,
+                                  iconColor: textGrey,
+                                ),
+
+                                if (lastLoginStr != "Unknown")
+                                  _profileInfoTile(
+                                    icon: Icons.access_time_rounded,
+                                    title: "Last Seen",
+                                    value: lastLoginStr,
+                                    iconColor: textGrey,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // ACTIONS FOOTER
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF8FAFC),
+                            border: Border(
+                              top: BorderSide(color: border, width: 1),
+                            ),
+                          ),
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.pop(dialogCtx);
+                                  confirmDelete(context, uid, name);
+                                },
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 16,
+                                  color: red,
+                                ),
+                                label: const Text(
+                                  "Delete User",
+                                  style: TextStyle(
+                                    color: red,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                    color: Color(0xFFFCA5A5),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dialogCtx),
+                                    child: const Text(
+                                      "Close",
+                                      style: TextStyle(
+                                        color: textGrey,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      await confirmToggleBlock(
+                                        context,
+                                        uid,
+                                        name,
+                                        isBlocked,
+                                      );
+                                    },
+                                    icon: Icon(
+                                      isBlocked
+                                          ? Icons.lock_open_rounded
+                                          : Icons.block_rounded,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      isBlocked
+                                          ? "Unblock Contestant"
+                                          : "Block Contestant",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isBlocked ? green : red,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 11,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // =========================================================
+
   // ACCOUNT TYPE
 
   // =========================================================
@@ -340,10 +1149,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Widget userAvatar({
     required String name,
-
     required String role,
-
     double size = 40,
+    String? photoUrl,
   }) {
     final Color roleColor = getRoleColor(role);
 
@@ -353,11 +1161,13 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       initial = name.trim()[0].toUpperCase();
     }
 
+    final bool hasValidPhoto = photoUrl != null &&
+        photoUrl.trim().isNotEmpty &&
+        (photoUrl.startsWith('http://') || photoUrl.startsWith('https://'));
+
     return Container(
       width: size,
-
       height: size,
-
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -367,14 +1177,11 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-
         shape: BoxShape.circle,
-
         border: Border.all(
           color: roleColor.withValues(alpha: 0.35),
           width: 1.5,
         ),
-
         boxShadow: [
           BoxShadow(
             color: roleColor.withValues(alpha: 0.12),
@@ -382,21 +1189,25 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             offset: const Offset(0, 2),
           ),
         ],
+        image: hasValidPhoto
+            ? DecorationImage(
+                image: NetworkImage(photoUrl.trim()),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
-
-      child: Center(
-        child: Text(
-          initial,
-
-          style: TextStyle(
-            color: roleColor,
-
-            fontSize: size * .38,
-
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
+      child: hasValidPhoto
+          ? null
+          : Center(
+              child: Text(
+                initial,
+                style: TextStyle(
+                  color: roleColor,
+                  fontSize: size * .38,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
     );
   }
 
@@ -528,40 +1339,31 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Widget actionButton({
     required IconData icon,
-
     required Color color,
-
     required VoidCallback onPressed,
-
     String? tooltip,
+    Color? bgColor,
+    Color? borderColor,
   }) {
     return Tooltip(
       message: tooltip ?? "",
-
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-
         onTap: onPressed,
-
         child: Container(
           width: 36,
-
           height: 36,
-
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
-
+            color: bgColor ?? color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
-
             border: Border.all(
-              color: const Color(0xFFFCA5A5).withValues(alpha: 0.5),
+              color: borderColor ?? color.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
-
-          child: const Icon(
-            Icons.delete_outline_rounded,
-            color: Color(0xFFEF4444),
+          child: Icon(
+            icon,
+            color: color,
             size: 18,
           ),
         ),
@@ -844,182 +1646,203 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Widget desktopUserRow({
     required BuildContext context,
-
     required String uid,
-
     required String name,
-
     required String email,
-
     required String role,
-
     required String accountType,
-
     required bool isOnline,
-
     required String teamName,
-
     required List<String> teamMembers,
+    required bool isBlocked,
+    required Map<String, dynamic> rawData,
   }) {
     final bool isTeam = accountType == "TEAM";
     final bool hasTeamName = isTeam && teamName.trim().isNotEmpty;
     final String displayName = hasTeamName ? teamName.trim() : name;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+    return Material(
+      color: isBlocked ? const Color(0xFFFFF8F8) : Colors.white,
+      child: InkWell(
+        onTap: () {
+          _showUserDetailsDialog(context, uid, rawData);
+        },
+        hoverColor: primaryPurple.withValues(alpha: 0.04),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: const BorderSide(color: border, width: 1),
+              left: isBlocked
+                  ? const BorderSide(color: Color(0xFFEF4444), width: 3.5)
+                  : BorderSide.none,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // USER
+              Expanded(
+                flex: 4,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    userAvatar(
+                      name: displayName,
+                      role: role,
+                      size: 40,
+                      photoUrl: rawData['photoUrl']?.toString(),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: textDark,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (isBlocked) ...[
+                                const SizedBox(width: 6),
+                                blockedBadge(compact: true),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: textGrey,
+                              fontSize: 10,
+                            ),
+                          ),
+                          if (isTeam)
+                            teamInfo(
+                              teamName: teamName,
+                              teamMembers: teamMembers,
+                              compact: true,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-      decoration: const BoxDecoration(
-        color: Colors.white,
+              // ACCOUNT TYPE
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: accountTypeBadge(accountType),
+                  ),
+                ),
+              ),
 
-        border: Border(bottom: BorderSide(color: border, width: 1)),
-      ),
+              // STATUS
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        statusBadge(isOnline),
+                        if (isBlocked) blockedBadge(compact: true),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-
-        children: [
-          // USER
-          Expanded(
-            flex: 4,
-
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              children: [
-                userAvatar(name: displayName, role: role, size: 40),
-
-                const SizedBox(width: 11),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-
+              // JOINED
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 7),
+                  child: Row(
                     children: [
-                      Text(
-                        displayName,
-
-                        maxLines: 1,
-
-                        overflow: TextOverflow.ellipsis,
-
-                        style: const TextStyle(
-                          color: textDark,
-
-                          fontSize: 12,
-
-                          fontWeight: FontWeight.w700,
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        color: textGrey,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          _formatDate(rawData['createdAt']),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: textGrey, fontSize: 10),
                         ),
                       ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        email,
-
-                        maxLines: 1,
-
-                        overflow: TextOverflow.ellipsis,
-
-                        style: const TextStyle(color: textGrey, fontSize: 10),
-                      ),
-
-                      if (isTeam)
-                        teamInfo(
-                          teamName: teamName,
-
-                          teamMembers: teamMembers,
-
-                          compact: true,
-                        ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          // ACCOUNT TYPE
-          Expanded(
-            flex: 2,
-
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-
-              child: Align(
-                alignment: Alignment.topLeft,
-
-                child: accountTypeBadge(accountType),
               ),
-            ),
-          ),
 
-          // STATUS
-          Expanded(
-            flex: 2,
-
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-
-              child: Align(
-                alignment: Alignment.topLeft,
-
-                child: statusBadge(isOnline),
-              ),
-            ),
-          ),
-
-          // JOINED
-          const Expanded(
-            flex: 2,
-
-            child: Padding(
-              padding: EdgeInsets.only(top: 7),
-
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_outlined,
-
-                    color: textGrey,
-
-                    size: 14,
-                  ),
-
-                  SizedBox(width: 7),
-
-                  Text(
-                    "Registered",
-
-                    style: TextStyle(color: textGrey, fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // ACTIONS
-          SizedBox(
-            width: 82,
-
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-
-              children: [
-                actionButton(
-                  icon: Icons.delete_outline_rounded,
-
-                  color: red,
-
-                  tooltip: "Delete User",
-
-                  onPressed: () {
-                    confirmDelete(context, uid, displayName);
-                  },
+              // ACTIONS
+              SizedBox(
+                width: 100,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    actionButton(
+                      icon: isBlocked
+                          ? Icons.lock_open_rounded
+                          : Icons.block_rounded,
+                      color: isBlocked ? green : const Color(0xFFEA580C),
+                      tooltip: isBlocked ? "Unblock User" : "Block User",
+                      bgColor: isBlocked
+                          ? const Color(0xFFDCFCE7)
+                          : const Color(0xFFFFF7ED),
+                      borderColor: isBlocked
+                          ? const Color(0xFF86EFAC)
+                          : const Color(0xFFFED7AA),
+                      onPressed: () {
+                        confirmToggleBlock(
+                          context,
+                          uid,
+                          displayName,
+                          isBlocked,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    actionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: red,
+                      tooltip: "Delete User",
+                      bgColor: const Color(0xFFFEF2F2),
+                      borderColor:
+                          const Color(0xFFFCA5A5).withValues(alpha: 0.5),
+                      onPressed: () {
+                        confirmDelete(context, uid, displayName);
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1032,145 +1855,183 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Widget mobileUserCard({
     required BuildContext context,
-
     required String uid,
-
     required String name,
-
     required String email,
-
     required String role,
-
     required String accountType,
-
     required bool isOnline,
-
     required String teamName,
-
     required List<String> teamMembers,
+    required bool isBlocked,
+    required Map<String, dynamic> rawData,
   }) {
     final bool isTeam = accountType == "TEAM";
     final bool hasTeamName = isTeam && teamName.trim().isNotEmpty;
     final String displayName = hasTeamName ? teamName.trim() : name;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-
-      padding: const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          _showUserDetailsDialog(context, uid, rawData);
+        },
         borderRadius: BorderRadius.circular(16),
-
-        border: Border.all(
-          color: AdminThemeColors.primary.withValues(alpha: 0.12),
-          width: 1,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isBlocked ? const Color(0xFFFFF8F8) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isBlocked
+                  ? const Color(0xFFFCA5A5)
+                  : AdminThemeColors.primary.withValues(alpha: 0.12),
+              width: isBlocked ? 1.5 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isBlocked
+                    ? const Color(0xFFEF4444).withValues(alpha: 0.08)
+                    : AdminThemeColors.primary.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  userAvatar(
+                    name: displayName,
+                    role: role,
+                    size: 46,
+                    photoUrl: rawData['photoUrl']?.toString(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: textDark,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                            if (isBlocked) ...[
+                              const SizedBox(width: 6),
+                              blockedBadge(compact: true),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      actionButton(
+                        icon: isBlocked
+                            ? Icons.lock_open_rounded
+                            : Icons.block_rounded,
+                        color: isBlocked ? green : const Color(0xFFEA580C),
+                        tooltip: isBlocked ? "Unblock User" : "Block User",
+                        bgColor: isBlocked
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFFFF7ED),
+                        borderColor: isBlocked
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFFFED7AA),
+                        onPressed: () {
+                          confirmToggleBlock(
+                            context,
+                            uid,
+                            displayName,
+                            isBlocked,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      actionButton(
+                        icon: Icons.delete_outline_rounded,
+                        color: red,
+                        tooltip: "Delete User",
+                        bgColor: const Color(0xFFFEF2F2),
+                        borderColor:
+                            const Color(0xFFFCA5A5).withValues(alpha: 0.5),
+                        onPressed: () {
+                          confirmDelete(context, uid, displayName);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (isTeam) teamInfo(teamName: teamName, teamMembers: teamMembers),
+              const SizedBox(height: 12),
+              Container(
+                height: 1,
+                color: AdminThemeColors.primary.withValues(alpha: 0.08),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: accountTypeBadge(accountType)),
+                  const SizedBox(width: 8),
+                  statusBadge(isOnline),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    "Click to view profile",
+                    style: TextStyle(
+                      color: primaryPurple.withValues(alpha: 0.75),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: primaryPurple.withValues(alpha: 0.75),
+                    size: 10,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-
-        boxShadow: [
-          BoxShadow(
-            color: AdminThemeColors.primary.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-
-            children: [
-              userAvatar(name: displayName, role: role, size: 46),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-
-                  children: [
-                    Text(
-                      displayName,
-
-                      maxLines: 1,
-
-                      overflow: TextOverflow.ellipsis,
-
-                      style: const TextStyle(
-                        color: textDark,
-
-                        fontSize: 14,
-
-                        fontWeight: FontWeight.w800,
-
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-
-                    const SizedBox(height: 3),
-
-                    Text(
-                      email,
-
-                      maxLines: 1,
-
-                      overflow: TextOverflow.ellipsis,
-
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-
-                        fontSize: 11,
-
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              actionButton(
-                icon: Icons.delete_outline_rounded,
-
-                color: red,
-
-                tooltip: "Delete User",
-
-                onPressed: () {
-                  confirmDelete(context, uid, displayName);
-                },
-              ),
-            ],
-          ),
-
-          if (isTeam) teamInfo(teamName: teamName, teamMembers: teamMembers),
-
-          const SizedBox(height: 12),
-
-          Container(
-            height: 1,
-            color: AdminThemeColors.primary.withValues(alpha: 0.08),
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              Expanded(child: accountTypeBadge(accountType)),
-
-              const SizedBox(width: 8),
-
-              statusBadge(isOnline),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -1890,7 +2751,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           ),
 
                                           SizedBox(
-                                            width: 82,
+                                            width: 100,
 
                                             child: Text(
                                               "ACTION",
@@ -2001,6 +2862,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                             data,
                                           );
 
+                                          final isBlocked = isUserBlocked(data);
+
                                           return mobileUserCard(
                                             context: context,
 
@@ -2019,6 +2882,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                             teamName: teamName,
 
                                             teamMembers: teamMembers,
+
+                                            isBlocked: isBlocked,
+
+                                            rawData: data,
                                           );
                                         }).toList(),
                                       ),
@@ -2058,6 +2925,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           data,
                                         );
 
+                                        final isBlocked = isUserBlocked(data);
+
                                         return desktopUserRow(
                                           context: context,
 
@@ -2076,6 +2945,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           teamName: teamName,
 
                                           teamMembers: teamMembers,
+
+                                          isBlocked: isBlocked,
+
+                                          rawData: data,
                                         );
                                       }).toList(),
                                     ),

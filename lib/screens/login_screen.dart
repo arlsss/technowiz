@@ -283,6 +283,14 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final Map<String, dynamic> userData = userDoc.data() ?? {};
+      final bool isBlocked = userData["isBlocked"] == true ||
+          (userData["status"]?.toString().trim().toLowerCase() == "blocked");
+      if (isBlocked) {
+        await FirebaseAuth.instance.signOut();
+        throw Exception(
+          "This account has been blocked by the Administrator. Please contact support.",
+        );
+      }
       final String role = userData["role"]?.toString() ?? "";
       final String normalizedRole =
           role.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
@@ -549,6 +557,14 @@ class _LoginScreenState extends State<LoginScreen> {
         role = chosenRole;
       } else {
         final Map<String, dynamic> userData = userDoc.data() ?? {};
+        final bool isBlocked = userData["isBlocked"] == true ||
+            (userData["status"]?.toString().trim().toLowerCase() == "blocked");
+        if (isBlocked) {
+          await FirebaseAuth.instance.signOut();
+          throw Exception(
+            "This account has been blocked by the Administrator. Please contact support.",
+          );
+        }
         role = userData["role"]?.toString() ?? "Contestant";
 
         // Update online status and photo if available
