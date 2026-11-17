@@ -831,6 +831,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     required List<String> teamMembers,
   }) {
     final bool isTeam = accountType == "TEAM";
+    final bool hasTeamName = isTeam && teamName.trim().isNotEmpty;
+    final String displayName = hasTeamName ? teamName.trim() : name;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -853,7 +855,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
-                userAvatar(name: name, role: role, size: 40),
+                userAvatar(name: displayName, role: role, size: 40),
 
                 const SizedBox(width: 11),
 
@@ -863,7 +865,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
                     children: [
                       Text(
-                        name,
+                        displayName,
 
                         maxLines: 1,
 
@@ -980,7 +982,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   tooltip: "Delete User",
 
                   onPressed: () {
-                    confirmDelete(context, uid, name);
+                    confirmDelete(context, uid, displayName);
                   },
                 ),
               ],
@@ -1017,6 +1019,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     required List<String> teamMembers,
   }) {
     final bool isTeam = accountType == "TEAM";
+    final bool hasTeamName = isTeam && teamName.trim().isNotEmpty;
+    final String displayName = hasTeamName ? teamName.trim() : name;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1053,7 +1057,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
 
             children: [
-              userAvatar(name: name, role: role, size: 46),
+              userAvatar(name: displayName, role: role, size: 46),
 
               const SizedBox(width: 12),
 
@@ -1063,7 +1067,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
                   children: [
                     Text(
-                      name,
+                      displayName,
 
                       maxLines: 1,
 
@@ -1109,7 +1113,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                 tooltip: "Delete User",
 
                 onPressed: () {
-                  confirmDelete(context, uid, name);
+                  confirmDelete(context, uid, displayName);
                 },
               ),
             ],
