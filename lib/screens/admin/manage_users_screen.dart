@@ -266,8 +266,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     BuildContext context,
     String uid,
     String name,
-    bool isCurrentlyBlocked,
-  ) async {
+    bool isCurrentlyBlocked, {
+    String roleLabel = "User",
+  }) async {
     final bool willBlock = !isCurrentlyBlocked;
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -287,7 +288,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                willBlock ? "Block Contestant" : "Unblock Contestant",
+                willBlock ? "Block $roleLabel" : "Unblock $roleLabel",
                 style: const TextStyle(
                   color: textDark,
                   fontSize: 18,
@@ -298,8 +299,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           ),
           content: Text(
             willBlock
-                ? "Are you sure you want to block $name? This contestant will be logged out and cannot participate in quizzes until unblocked."
-                : "Are you sure you want to unblock $name? This contestant will be permitted to log in and join quizzes again.",
+                ? "Are you sure you want to block $name? This $roleLabel will be logged out and cannot access TechNoWiz until unblocked."
+                : "Are you sure you want to unblock $name? This $roleLabel will be permitted to log in and use TechNoWiz again.",
             style: const TextStyle(
               color: textGrey,
               fontSize: 13,
@@ -561,11 +562,35 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                 ? (snapshot.data!.data() ?? initialData)
                 : initialData;
 
-            final String name = (data['name'] ?? 'Contestant').toString().trim();
+            final String name = (data['name'] ?? 'User').toString().trim();
             final String email = (data['email'] ?? 'No email').toString().trim();
-            final String role = (data['role'] ?? 'Contestant').toString().trim();
+            final String role = (data['role'] ?? 'User').toString().trim();
+            final String rawRole = role.toLowerCase();
             final String accountType = getAccountType(data);
-            final bool isTeam = accountType == 'TEAM';
+            final bool isQuizMaster = accountType == 'QUIZ MASTER' ||
+                rawRole == 'quizmaster' ||
+                rawRole.contains('quiz');
+            final bool isAdmin =
+                accountType == 'ADMIN' || rawRole == 'admin';
+            final bool isContestant = !isQuizMaster && !isAdmin;
+
+            final String roleLabel = isQuizMaster
+                ? "Quiz Master"
+                : (isAdmin ? "Admin" : "Contestant");
+
+            final String headerBadgeTitle = isQuizMaster
+                ? "QUIZ MASTER PROFILE DETAILS"
+                : (isAdmin
+                    ? "ADMIN PROFILE DETAILS"
+                    : "CONTESTANT PROFILE DETAILS");
+
+            final String sectionTitle = isQuizMaster
+                ? "Quiz Master Information"
+                : (isAdmin
+                    ? "Administrator Information"
+                    : "Contestant Information");
+
+            final bool isTeam = isContestant && accountType == 'TEAM';
             final String teamName = (data['teamName'] ?? '').toString().trim();
             final List<String> teamMembers = getTeamMembers(data);
             final bool isBlocked = isUserBlocked(data);
@@ -669,9 +694,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      const Text(
-                                        "USER PROFILE DETAILS",
-                                        style: TextStyle(
+                                      Text(
+                                        headerBadgeTitle,
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 12,
                                           fontWeight: FontWeight.w900,
@@ -781,18 +806,18 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                         color: const Color(0xFFFCA5A5),
                                       ),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       children: [
-                                        Icon(
+                                        const Icon(
                                           Icons.block_rounded,
                                           color: Color(0xFFDC2626),
                                           size: 20,
                                         ),
-                                        SizedBox(width: 10),
+                                        const SizedBox(width: 10),
                                         Expanded(
                                           child: Text(
-                                            "This contestant is BLOCKED. They cannot log in or participate in any quiz sessions.",
-                                            style: TextStyle(
+                                            "This $roleLabel is BLOCKED. They cannot log in or access TechNoWiz until unblocked.",
+                                            style: const TextStyle(
                                               color: Color(0xFF991B1B),
                                               fontSize: 11.5,
                                               fontWeight: FontWeight.w700,
@@ -805,9 +830,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                 ],
 
                                 // PROFILE INFORMATION CARDS
-                                const Text(
-                                  "Contestant Information",
-                                  style: TextStyle(
+                                Text(
+                                  sectionTitle,
+                                  style: const TextStyle(
                                     color: textDark,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
@@ -816,7 +841,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                 ),
                                 const SizedBox(height: 10),
 
-                                if (!isTeam)
+                                if (isQuizMaster || isAdmin) ...[
                                   _profileInfoTile(
                                     icon: Icons.person_outline_rounded,
                                     title: "Full Name",
@@ -824,74 +849,135 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     iconColor: roleColor,
                                   ),
 
-                                _profileInfoTile(
-                                  icon: Icons.school_outlined,
-                                  title: "School / Institution",
-                                  value: schoolName.isNotEmpty
-                                      ? schoolName
-                                      : "Not yet set",
-                                  iconColor: primaryPurple,
-                                ),
-
-                                _profileInfoTile(
-                                  icon: Icons.groups_outlined,
-                                  title: "Participation Type",
-                                  value: accountType,
-                                  iconColor: const Color(0xFFE67E22),
-                                ),
-
-                                if (isTeam) ...[
                                   _profileInfoTile(
-                                    icon: Icons.badge_outlined,
-                                    title: "Team Name",
-                                    value: teamName.isNotEmpty
-                                        ? teamName
-                                        : "Not yet set",
-                                    iconColor: const Color(0xFFE67E22),
-                                  ),
-                                  _teamMembersCard(teamMembers),
-                                ],
-
-                                _profileInfoTile(
-                                  icon: Icons.menu_book_outlined,
-                                  title: "Education Level",
-                                  value: educationLevel.isNotEmpty
-                                      ? educationLevel
-                                      : "Not yet set",
-                                  iconColor: blue,
-                                ),
-
-                                _profileInfoTile(
-                                  icon: Icons.grade_outlined,
-                                  title: "Grade / Year Level",
-                                  value: gradeLevel.isNotEmpty
-                                      ? gradeLevel
-                                      : "Not yet set",
-                                  iconColor: primaryPurple,
-                                ),
-
-                                if (contactNumber.isNotEmpty)
-                                  _profileInfoTile(
-                                    icon: Icons.phone_outlined,
-                                    title: "Contact Number",
-                                    value: contactNumber,
-                                    iconColor: green,
+                                    icon: Icons.mail_outline_rounded,
+                                    title: "Email Address",
+                                    value: email.isNotEmpty ? email : "No email",
+                                    iconColor: blue,
                                   ),
 
-                                _profileInfoTile(
-                                  icon: Icons.calendar_today_outlined,
-                                  title: "Date Registered",
-                                  value: createdAtStr,
-                                  iconColor: textGrey,
-                                ),
-
-                                if (lastLoginStr != "Unknown")
                                   _profileInfoTile(
-                                    icon: Icons.access_time_rounded,
-                                    title: "Last Seen",
-                                    value: lastLoginStr,
+                                    icon: isQuizMaster
+                                        ? Icons.school_outlined
+                                        : Icons.admin_panel_settings_outlined,
+                                    title: "Assigned Role",
+                                    value: isQuizMaster
+                                        ? "Official Quiz Master Host"
+                                        : "System Administrator",
+                                    iconColor: roleColor,
+                                  ),
+
+                                  if (schoolName.isNotEmpty &&
+                                      schoolName != "Not yet set")
+                                    _profileInfoTile(
+                                      icon: Icons.business_outlined,
+                                      title: "School / Institution",
+                                      value: schoolName,
+                                      iconColor: primaryPurple,
+                                    ),
+
+                                  if (contactNumber.isNotEmpty &&
+                                      contactNumber != "Not yet set")
+                                    _profileInfoTile(
+                                      icon: Icons.phone_outlined,
+                                      title: "Contact Number",
+                                      value: contactNumber,
+                                      iconColor: green,
+                                    ),
+
+                                  _profileInfoTile(
+                                    icon: Icons.calendar_today_outlined,
+                                    title: "Date Registered",
+                                    value: createdAtStr,
                                     iconColor: textGrey,
                                   ),
+
+                                  if (lastLoginStr != "Unknown")
+                                    _profileInfoTile(
+                                      icon: Icons.access_time_rounded,
+                                      title: "Last Seen",
+                                      value: lastLoginStr,
+                                      iconColor: textGrey,
+                                    ),
+                                ] else ...[
+                                  if (!isTeam)
+                                    _profileInfoTile(
+                                      icon: Icons.person_outline_rounded,
+                                      title: "Full Name",
+                                      value: name.isNotEmpty ? name : "Not set",
+                                      iconColor: roleColor,
+                                    ),
+
+                                  _profileInfoTile(
+                                    icon: Icons.school_outlined,
+                                    title: "School / Institution",
+                                    value: schoolName.isNotEmpty
+                                        ? schoolName
+                                        : "Not yet set",
+                                    iconColor: primaryPurple,
+                                  ),
+
+                                  _profileInfoTile(
+                                    icon: Icons.groups_outlined,
+                                    title: "Participation Type",
+                                    value: accountType,
+                                    iconColor: const Color(0xFFE67E22),
+                                  ),
+
+                                  if (isTeam) ...[
+                                    _profileInfoTile(
+                                      icon: Icons.badge_outlined,
+                                      title: "Team Name",
+                                      value: teamName.isNotEmpty
+                                          ? teamName
+                                          : "Not yet set",
+                                      iconColor: const Color(0xFFE67E22),
+                                    ),
+                                    _teamMembersCard(teamMembers),
+                                  ],
+
+                                  _profileInfoTile(
+                                    icon: Icons.menu_book_outlined,
+                                    title: "Education Level",
+                                    value: educationLevel.isNotEmpty
+                                        ? educationLevel
+                                        : "Not yet set",
+                                    iconColor: blue,
+                                  ),
+
+                                  _profileInfoTile(
+                                    icon: Icons.grade_outlined,
+                                    title: "Grade / Year Level",
+                                    value: gradeLevel.isNotEmpty
+                                        ? gradeLevel
+                                        : "Not yet set",
+                                    iconColor: primaryPurple,
+                                  ),
+
+                                  if (contactNumber.isNotEmpty &&
+                                      contactNumber != "Not yet set")
+                                    _profileInfoTile(
+                                      icon: Icons.phone_outlined,
+                                      title: "Contact Number",
+                                      value: contactNumber,
+                                      iconColor: green,
+                                    ),
+
+                                  _profileInfoTile(
+                                    icon: Icons.calendar_today_outlined,
+                                    title: "Date Registered",
+                                    value: createdAtStr,
+                                    iconColor: textGrey,
+                                  ),
+
+                                  if (lastLoginStr != "Unknown")
+                                    _profileInfoTile(
+                                      icon: Icons.access_time_rounded,
+                                      title: "Last Seen",
+                                      value: lastLoginStr,
+                                      iconColor: textGrey,
+                                    ),
+                                ],
                               ],
                             ),
                           ),
@@ -969,6 +1055,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                         uid,
                                         name,
                                         isBlocked,
+                                        roleLabel: roleLabel,
                                       );
                                     },
                                     icon: Icon(
@@ -979,8 +1066,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     ),
                                     label: Text(
                                       isBlocked
-                                          ? "Unblock Contestant"
-                                          : "Block Contestant",
+                                          ? "Unblock $roleLabel"
+                                          : "Block $roleLabel",
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12.5,
