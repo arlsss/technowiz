@@ -3274,6 +3274,61 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   }
 
   // =========================================================
+  // MODERN CONTESTANT DASHBOARD UI
+  // =========================================================
+
+  Widget _sidebarItem({
+    required IconData icon,
+    required String title,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Material(
+        color: active ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: active ? primaryGreen : Color(0xC714532D),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: active ? primaryGreen : Color(0xC714532D),
+                      fontSize: 13,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (active)
+                  Container(
+                    width: 5,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: primaryGreen,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================
   // LEADERBOARD DATA
   // =========================================================
 
@@ -4086,7 +4141,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   Widget _badgesContent({required bool mobile}) {
     return ContestantBadgesView(
       mobile: mobile,
-      mobileHeader: _mobileHeader(),
+      mobileHeader: mobile ? _mobileHeader() : null,
     );
   }
 
@@ -4975,8 +5030,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _mobileHeader(),
-              const SizedBox(height: 20),
+              if (mobile) ...[_mobileHeader(), const SizedBox(height: 20)],
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('quiz_sessions')
@@ -5421,6 +5475,183 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     );
   }
 
+  Widget _desktopSidebar([BuildContext? sidebarContext]) {
+    final actionContext = sidebarContext ?? context;
+    final user = FirebaseAuth.instance.currentUser;
+    final name = profileData['name']?.toString().trim().isNotEmpty == true
+        ? profileData['name'].toString()
+        : user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!
+        : 'Contestant';
+
+    final role = getParticipationType();
+
+    return Container(
+      width: 238,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF0FFF4), Color(0xFFE5F9EB), Color(0xFFD8F5E1)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 18, 24),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [primaryGreen, darkGreen],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(
+                      Icons.school_rounded,
+                      color: Colors.white,
+                      size: 23,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  const Text(
+                    'TechNoWiz',
+                    style: TextStyle(
+                      color: darkGreen,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'CONTESTANT',
+                  style: TextStyle(
+                    color: Color(0x8C14532D),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            _sidebarItem(
+              icon: Icons.dashboard_rounded,
+              title: 'Dashboard',
+              active: !_showLeaderboard && !_showBadges && !_showHistory,
+              onTap: () => _openDashboard(actionContext),
+            ),
+            _sidebarItem(
+              icon: Icons.leaderboard_rounded,
+              title: 'Leaderboard',
+              active: _showLeaderboard,
+              onTap: () => _openLeaderboard(actionContext),
+            ),
+            _sidebarItem(
+              icon: Icons.workspace_premium_rounded,
+              title: 'Badges',
+              active: _showBadges,
+              onTap: () => _openBadges(actionContext),
+            ),
+            _sidebarItem(
+              icon: Icons.history_rounded,
+              title: 'History',
+              active: _showHistory,
+              onTap: () => _openHistory(actionContext),
+            ),
+            const Spacer(),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
+              child: Material(
+                color: Colors.white.withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => showProfileDrawer(actionContext),
+                  child: Padding(
+                    padding: const EdgeInsets.all(11),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFD0F4DA),
+                            image: profileImageProvider == null
+                                ? null
+                                : DecorationImage(
+                                    image: profileImageProvider!,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                          child: profileImageProvider == null
+                              ? const Icon(
+                                  Icons.person_rounded,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: darkGreen,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                role,
+                                style: const TextStyle(
+                                  color: Color(0xA614532D),
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0x8C14532D),
+                          size: 19,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _mobileHeader() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -5674,8 +5905,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _mobileHeader(),
-                  const SizedBox(height: 20),
+                  if (mobile) ...[_mobileHeader(), const SizedBox(height: 20)],
                   _welcomeHero(),
                   const SizedBox(height: 18),
                   publishedQuizSection(mobile: mobile),
@@ -5715,27 +5945,23 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       (icon: Icons.person_rounded, label: 'Profile', index: 4),
     ];
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: softBorder)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x10000000),
-            blurRadius: 10,
-            offset: Offset(0, -3),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 700),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(5, 7, 5, 4),
-              child: Row(
-                children: items.map((item) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: softBorder)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x10000000),
+              blurRadius: 10,
+              offset: Offset(0, -3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(5, 7, 5, 4),
+        child: Row(
+          children: items.map((item) {
             final selected = item.index == _selectedBottomNavigationIndex;
             return Expanded(
               child: InkWell(
@@ -5809,9 +6035,6 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           }).toList(),
         ),
       ),
-    ),
-    ),
-    ),
     );
   }
 
@@ -5819,51 +6042,51 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
-      // No drawer: completely prevents sidebar navigation from opening on CP / mobile
-      bottomNavigationBar: _buildContestantBottomNavigation(),
+      bottomNavigationBar: MediaQuery.of(context).size.width < 900
+          ? _buildContestantBottomNavigation()
+          : null,
       body: TechCircuitBackground(
         child: SafeArea(
           bottom: false,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final desktop = constraints.maxWidth >= 900;
+          final desktop = constraints.maxWidth >= 900;
 
-              if (desktop) {
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: IndexedStack(
-                      index: _selectedBottomNavigationIndex,
-                      children: [
-                        _dashboardContent(mobile: false),
-                        _leaderboardContent(mobile: false),
-                        _badgesContent(mobile: false),
-                        ContestantHistoryScreen(
-                          mobile: false,
-                          mobileHeader: _mobileHeader(),
-                        ),
-                      ],
-                    ),
+          if (desktop) {
+            return Row(
+              children: [
+                _desktopSidebar(),
+                Expanded(
+                  child: IndexedStack(
+                    index: _selectedBottomNavigationIndex,
+                    children: [
+                      _dashboardContent(mobile: false),
+                      _leaderboardContent(mobile: false),
+                      _badgesContent(mobile: false),
+                      const ContestantHistoryScreen(mobile: false),
+                    ],
                   ),
-                );
-              }
+                ),
+              ],
+            );
+          }
 
-              return IndexedStack(
-                index: _selectedBottomNavigationIndex,
-                children: [
-                  _dashboardContent(mobile: true),
-                  _leaderboardContent(mobile: true),
-                  _badgesContent(mobile: true),
-                  ContestantHistoryScreen(
-                    mobile: true,
-                    mobileHeader: _mobileHeader(),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
+          return IndexedStack(
+            index: _selectedBottomNavigationIndex,
+            children: [
+              _dashboardContent(mobile: true),
+              _leaderboardContent(mobile: true),
+              _badgesContent(mobile: true),
+              ContestantHistoryScreen(
+                mobile: true,
+                mobileHeader: _mobileHeader(),
+              ),
+            ],
+          );
+        },
       ),
+    ),
+  ),
     );
   }
 
