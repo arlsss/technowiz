@@ -344,35 +344,15 @@ class _AdminMenuItem {
   final IconData icon;
 }
 
-/// Displays the Admin profile popup on the side (docked above the profile card in the sidebar/drawer).
+/// Displays the Admin profile popup on the right side (docked above the profile card in the sidebar/drawer).
 void showAdminProfileSidePopup(BuildContext context) {
   final user = FirebaseAuth.instance.currentUser;
   final mediaQuery = MediaQuery.of(context);
   final screenWidth = mediaQuery.size.width;
   final screenHeight = mediaQuery.size.height;
 
-  final scaffold = Scaffold.maybeOf(context);
-  final renderBox = context.findRenderObject() as RenderBox?;
-  Offset? offset;
-  if (renderBox != null && renderBox.hasSize) {
-    try {
-      offset = renderBox.localToGlobal(Offset.zero);
-    } catch (_) {}
-  }
-
-  final bool isRightSide;
-  if (offset != null) {
-    isRightSide = offset.dx > (screenWidth / 2);
-  } else if (scaffold != null && scaffold.isEndDrawerOpen) {
-    isRightSide = true;
-  } else if (scaffold != null && scaffold.isDrawerOpen) {
-    isRightSide = false;
-  } else {
-    isRightSide = (screenWidth < 960);
-  }
-
   final double bottomPos = screenHeight < 550 ? 12.0 : 84.0;
-  final double popupWidth = (screenWidth * 0.85).clamp(240.0, 275.0);
+  final double popupWidth = (screenWidth * 0.85).clamp(240.0, 260.0);
 
   showDialog<void>(
     context: context,
@@ -384,8 +364,7 @@ void showAdminProfileSidePopup(BuildContext context) {
         children: [
           Positioned(
             bottom: bottomPos,
-            right: isRightSide ? 14.0 : null,
-            left: isRightSide ? null : 14.0,
+            right: 14.0,
             child: Material(
               color: Colors.transparent,
               child: Container(
