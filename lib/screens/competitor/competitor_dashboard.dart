@@ -1951,7 +1951,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: const Text(
-              'Please standby! When the Quiz Master or Admin publishes a new quiz session, it will automatically appear here.',
+              'Please standby! When the Admin publishes a new quiz session, it will automatically appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF4B6354),
