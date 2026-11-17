@@ -68,7 +68,7 @@ class AdminSidebar extends StatelessWidget {
           children: [
             // Header: TechNoWiz Admin Brand
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -115,29 +115,79 @@ class AdminSidebar extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _selectedBackground,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _selectedBorder, width: 1),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.shield_rounded, size: 11, color: _purple),
-                        SizedBox(width: 4),
-                        Text(
-                          'ADMIN COMMAND CENTER',
-                          style: TextStyle(
-                            color: _purpleDark,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
+                  // Admin Name & Admin Indicator Badge above Dashboard
+                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseAuth.instance.currentUser == null
+                        ? null
+                        : FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(FirebaseAuth.instance.currentUser!.uid)
+                            .snapshots(),
+                    builder: (context, snapshot) {
+                      final authUser = FirebaseAuth.instance.currentUser;
+                      final userData = snapshot.data?.data();
+                      final registeredName = (userData?['name'] ??
+                              userData?['fullName'] ??
+                              authUser?.displayName ??
+                              '')
+                          .toString()
+                          .trim();
+                      final displayName = registeredName.isNotEmpty
+                          ? registeredName
+                          : (authUser?.email?.split('@').first ?? 'Admin');
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _purpleDark,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _selectedBackground,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _selectedBorder,
+                                width: 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_rounded,
+                                  size: 11,
+                                  color: _purple,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'ADMIN COMMAND CENTER',
+                                  style: TextStyle(
+                                    color: _purpleDark,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -156,109 +206,127 @@ class AdminSidebar extends StatelessWidget {
 
             const Divider(color: Color(0xFFF3E8FF), height: 1),
 
-            // Footer Profile Card
+            // Footer Profile Card with Logout directly below the name
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-              child: Builder(
-                builder: (cardCtx) => InkWell(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _profileBackground,
                   borderRadius: BorderRadius.circular(14),
-                  onTap: () {
-                    if (onProfileTap != null) {
-                      onProfileTap!();
-                    } else {
-                      showAdminProfileSidePopup(cardCtx);
-                    }
-                  },
-                  child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _profileBackground,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _selectedBorder, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [_purple, _purpleDark],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                  border: Border.all(color: _selectedBorder, width: 1.2),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_purple, _purpleDark],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
                           ),
-                          shape: BoxShape.circle,
+                          child: const Icon(
+                            Icons.person_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseAuth.instance.currentUser == null
-                              ? null
-                              : FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(FirebaseAuth.instance.currentUser!.uid)
-                                  .snapshots(),
-                          builder: (context, snapshot) {
-                            final authUser = FirebaseAuth.instance.currentUser;
-                            final userData = snapshot.data?.data();
-                            final registeredName = (userData?['name'] ??
-                                    userData?['fullName'] ??
-                                    authUser?.displayName ??
-                                    '')
-                                .toString()
-                                .trim();
-                            final displayName = registeredName.isNotEmpty
-                                ? registeredName
-                                : (authUser?.email?.split('@').first ?? 'Admin');
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseAuth.instance.currentUser == null
+                                ? null
+                                : FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                                    .snapshots(),
+                            builder: (context, snapshot) {
+                              final authUser = FirebaseAuth.instance.currentUser;
+                              final userData = snapshot.data?.data();
+                              final registeredName = (userData?['name'] ??
+                                      userData?['fullName'] ??
+                                      authUser?.displayName ??
+                                      '')
+                                  .toString()
+                                  .trim();
+                              final displayName = registeredName.isNotEmpty
+                                  ? registeredName
+                                  : (authUser?.email?.split('@').first ?? 'Admin');
 
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  displayName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: _purpleDark,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _purpleDark,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  authUser?.email ?? 'admin@technowiz.com',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: _muted,
-                                    fontSize: 9.5,
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    authUser?.email ?? 'admin@technowiz.com',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _muted,
+                                      fontSize: 9.5,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            );
-                          },
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+                    const Divider(color: Color(0xFFDDD6FE), height: 1),
+                    const SizedBox(height: 10),
+
+                    // Logout Button placed directly below the name
+                    SizedBox(
+                      width: double.infinity,
+                      height: 36,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _performLogout(context),
+                        icon: const Icon(Icons.logout_rounded, size: 16),
+                        label: const Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF5F3FF),
+                          foregroundColor: _purple,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(
+                              color: Color(0xFFDDD6FE),
+                              width: 1.2,
+                            ),
+                          ),
                         ),
                       ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: _muted,
-                        size: 20,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
           ],
         ),
       ),
@@ -333,6 +401,31 @@ class AdminSidebar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static Future<void> _performLogout(BuildContext context) async {
+    final scaffold = Scaffold.maybeOf(context);
+    if (scaffold != null && (scaffold.isEndDrawerOpen || scaffold.isDrawerOpen)) {
+      Navigator.of(context).pop();
+    }
+    try {
+      await AdminNavPersistence.clear();
+      await LoginScreen.clearSavedCredentials();
+      await FirebaseAuth.instance.signOut();
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const LoginScreen(clearCredentials: true),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to log out: $e')),
+        );
+      }
+    }
   }
 }
 
