@@ -22,6 +22,7 @@ import '../../navigation_persistence.dart';
 
 import 'admin_sidebar.dart';
 import 'admin_theme.dart';
+import '../../services/user_presence_service.dart';
 
 import '../login_screen.dart';
 
@@ -310,6 +311,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> logout(BuildContext context) async {
+    await UserPresenceService.instance.setOffline();
     await AdminNavPersistence.clear();
     await _clearLastAdminPage();
     await LoginScreen.clearSavedCredentials();

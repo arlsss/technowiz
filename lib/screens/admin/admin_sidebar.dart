@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../login_screen.dart';
 import '../../navigation_persistence.dart';
+import '../../services/user_presence_service.dart';
 
 /// Shared Admin navigation drawer & desktop sidebar for TechNoWiz.
 /// Standardized with the cohesive Light Purple theme.
@@ -370,6 +371,7 @@ class AdminSidebar extends StatelessWidget {
       Navigator.of(context).pop();
     }
     try {
+      await UserPresenceService.instance.setOffline();
       await AdminNavPersistence.clear();
       await LoginScreen.clearSavedCredentials();
       await FirebaseAuth.instance.signOut();
@@ -572,6 +574,7 @@ void showAdminProfileSidePopup(BuildContext context) {
                             }
                           }
                           try {
+                            await UserPresenceService.instance.setOffline();
                             await AdminNavPersistence.clear();
                             await LoginScreen.clearSavedCredentials();
                             await FirebaseAuth.instance.signOut();

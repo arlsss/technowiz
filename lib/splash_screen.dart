@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'services/user_presence_service.dart';
+
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 
@@ -154,12 +156,15 @@ class _SplashScreenState extends State<SplashScreen> {
         await FirebaseAuth.instance.signOut();
         navigateAction = _goToLogin;
       } else if (role == 'admin') {
+        UserPresenceService.instance.setOnline(user.uid);
         await AuthNavPersistence.saveSession(uid: user.uid, role: 'admin');
         navigateAction = _restoreAdminPage;
       } else if (role == 'quizmaster') {
+        UserPresenceService.instance.setOnline(user.uid);
         await AuthNavPersistence.saveSession(uid: user.uid, role: 'quizmaster');
         navigateAction = _restoreQuizMasterPage;
       } else if (role == 'contestant' || role == 'competitor') {
+        UserPresenceService.instance.setOnline(user.uid);
         await AuthNavPersistence.saveSession(uid: user.uid, role: 'contestant');
         navigateAction = _restoreContestantPage;
       } else if (role.isNotEmpty) {

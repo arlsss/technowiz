@@ -14,6 +14,7 @@ import 'manage_participants_screen.dart';
 
 import '../login_screen.dart';
 import '../../navigation_persistence.dart';
+import '../../services/user_presence_service.dart';
 
 class QuizMasterDashboard extends StatefulWidget {
   const QuizMasterDashboard({super.key});
@@ -46,6 +47,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   @override
   void initState() {
     super.initState();
+    UserPresenceService.instance.setOnline();
     _saveLastPage('dashboard');
   }
 
@@ -99,6 +101,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   }
 
   Future<void> logout(BuildContext context) async {
+    await UserPresenceService.instance.setOffline();
     await _clearLastPage();
     await LoginScreen.clearSavedCredentials();
     await FirebaseAuth.instance.signOut();

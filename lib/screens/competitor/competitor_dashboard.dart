@@ -16,6 +16,7 @@ import 'contestant_history_screen.dart';
 import 'waiting_room_screen.dart';
 import '../login_screen.dart';
 import '../../navigation_persistence.dart';
+import '../../services/user_presence_service.dart';
 
 class CompetitorDashboard extends StatefulWidget {
   final String? initialPage;
@@ -291,6 +292,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   // =========================================================
 
   Future<void> logout(BuildContext context) async {
+    await UserPresenceService.instance.setOffline();
     await CompetitorNavPersistence.clearAll();
 
     await LoginScreen.clearSavedCredentials();
@@ -6200,6 +6202,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   @override
   void initState() {
     super.initState();
+    UserPresenceService.instance.setOnline();
     if (widget.initialPage != null) {
       _applyTabSelection(widget.initialPage!);
     }

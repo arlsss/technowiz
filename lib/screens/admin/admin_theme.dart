@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'admin_sidebar.dart';
 import '../login_screen.dart';
 import '../../navigation_persistence.dart';
+import '../../services/user_presence_service.dart';
 
 /// ============================================================================
 /// TECHNOWIZ ADMIN COMMAND CENTER - LIGHT PURPLE THEME & REUSABLE DESIGN SYSTEM
@@ -447,6 +448,7 @@ class AdminTopBar extends StatelessWidget {
       ],
       onSelected: (value) async {
         if (value == 'logout') {
+          await UserPresenceService.instance.setOffline();
           await AdminNavPersistence.clear();
           await LoginScreen.clearSavedCredentials();
           await FirebaseAuth.instance.signOut();

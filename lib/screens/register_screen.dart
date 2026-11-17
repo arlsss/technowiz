@@ -210,6 +210,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "displayName": name,
         "email": email,
         "role": role,
+        "isOnline": true,
+        "status": "Online",
+        "lastSeen": FieldValue.serverTimestamp(),
         "createdAt": FieldValue.serverTimestamp(),
       };
 
@@ -423,7 +426,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role = userData["role"]?.toString() ?? selectedRole;
 
         final Map<String, dynamic> updateData = {
+          "isOnline": true,
           "status": "Online",
+          "lastSeen": FieldValue.serverTimestamp(),
           "lastLogin": FieldValue.serverTimestamp(),
         };
         if (googleUser.photoURL != null &&
@@ -446,7 +451,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "role": selectedRole,
           "photoUrl": googleUser.photoURL ?? "",
           "score": 0,
+          "isOnline": true,
           "status": "Online",
+          "lastSeen": FieldValue.serverTimestamp(),
           "createdAt": FieldValue.serverTimestamp(),
           "lastLogin": FieldValue.serverTimestamp(),
         };

@@ -20,6 +20,7 @@ import 'admin_sidebar.dart';
 import 'admin_theme.dart';
 
 import '../../navigation_persistence.dart';
+import '../../services/user_presence_service.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
@@ -504,7 +505,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           const SizedBox(width: 6),
 
           Text(
-            isOnline ? "Active" : "Inactive",
+            isOnline ? "Active" : "Offline",
 
             style: TextStyle(
               color: color,
@@ -1987,7 +1988,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           );
 
                                           final isOnline =
-                                              data['isOnline'] == true;
+                                              UserPresenceService.isUserActive(
+                                            data,
+                                            docUid: user.id,
+                                          );
 
                                           final teamName =
                                               (data['teamName'] ?? '')
@@ -2042,7 +2046,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                         );
 
                                         final isOnline =
-                                            data['isOnline'] == true;
+                                            UserPresenceService.isUserActive(
+                                          data,
+                                          docUid: user.id,
+                                        );
 
                                         final teamName =
                                             (data['teamName'] ?? '').toString();

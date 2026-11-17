@@ -6,6 +6,7 @@ import '../login_screen.dart';
 import 'quizmaster_dashboard.dart';
 import 'quizmaster_theme.dart';
 import '../../navigation_persistence.dart';
+import '../../services/user_presence_service.dart';
 
 /// Shows the Quiz Master profile as a smooth slide-out side panel from the right
 void showQuizMasterProfileSideSheet(BuildContext context) {
@@ -112,6 +113,7 @@ class _QuizMasterProfilePanelState extends State<QuizMasterProfilePanel> {
   User? get _user => FirebaseAuth.instance.currentUser;
 
   Future<void> _logout() async {
+    await UserPresenceService.instance.setOffline();
     await QuizMasterNavPersistence.clearAll();
     await LoginScreen.clearSavedCredentials();
     await FirebaseAuth.instance.signOut();

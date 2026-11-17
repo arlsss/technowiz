@@ -11,6 +11,7 @@ import 'admin/admin_dashboard.dart';
 import 'quizmaster/quizmaster_dashboard.dart';
 import 'competitor/competitor_dashboard.dart';
 import '../navigation_persistence.dart';
+import '../services/user_presence_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool clearCredentials;
@@ -179,10 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // =========================================================
   Future<void> setUserOnline(String uid) async {
     try {
-      await FirebaseFirestore.instance.collection("users").doc(uid).update({
-        "isOnline": true,
-        "lastLogin": FieldValue.serverTimestamp(),
-      });
+      await UserPresenceService.instance.setOnline(uid);
     } catch (e) {
       debugPrint("Error setting user online: $e");
     }

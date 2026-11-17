@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'splash_screen.dart';
+import 'services/user_presence_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,9 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   debugPrint('FIREBASE INITIALIZED');
+
+  // Initialize presence tracking for online/offline status
+  UserPresenceService.instance.init();
 
   // Configure web persistence before creating the app's auth listener.
   if (kIsWeb) {
