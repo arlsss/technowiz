@@ -616,8 +616,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                 .toString()
                 .trim();
             final String createdAtStr = _formatDate(data['createdAt']);
-            final String lastLoginStr =
-                _formatDate(data['lastLogin'] ?? data['lastSeen']);
 
             final Color roleColor = getRoleColor(role);
 
@@ -891,14 +889,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     value: createdAtStr,
                                     iconColor: textGrey,
                                   ),
-
-                                  if (lastLoginStr != "Unknown")
-                                    _profileInfoTile(
-                                      icon: Icons.access_time_rounded,
-                                      title: "Last Seen",
-                                      value: lastLoginStr,
-                                      iconColor: textGrey,
-                                    ),
                                 ] else ...[
                                   if (!isTeam)
                                     _profileInfoTile(
@@ -969,14 +959,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     value: createdAtStr,
                                     iconColor: textGrey,
                                   ),
-
-                                  if (lastLoginStr != "Unknown")
-                                    _profileInfoTile(
-                                      icon: Icons.access_time_rounded,
-                                      title: "Last Seen",
-                                      value: lastLoginStr,
-                                      iconColor: textGrey,
-                                    ),
                                 ],
                               ],
                             ),
