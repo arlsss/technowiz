@@ -590,8 +590,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                     '')
                 .toString()
                 .trim();
-            final int score =
-                int.tryParse(data['score']?.toString() ?? '0') ?? 0;
             final String createdAtStr = _formatDate(data['createdAt']);
             final String lastLoginStr =
                 _formatDate(data['lastLogin'] ?? data['lastSeen']);
@@ -818,12 +816,13 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                 ),
                                 const SizedBox(height: 10),
 
-                                _profileInfoTile(
-                                  icon: Icons.person_outline_rounded,
-                                  title: isTeam ? "Team Leader" : "Full Name",
-                                  value: name.isNotEmpty ? name : "Not set",
-                                  iconColor: roleColor,
-                                ),
+                                if (!isTeam)
+                                  _profileInfoTile(
+                                    icon: Icons.person_outline_rounded,
+                                    title: "Full Name",
+                                    value: name.isNotEmpty ? name : "Not set",
+                                    iconColor: roleColor,
+                                  ),
 
                                 _profileInfoTile(
                                   icon: Icons.school_outlined,
@@ -878,13 +877,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     value: contactNumber,
                                     iconColor: green,
                                   ),
-
-                                _profileInfoTile(
-                                  icon: Icons.emoji_events_outlined,
-                                  title: "Total Points / Score",
-                                  value: "$score pts",
-                                  iconColor: const Color(0xFFF59E0B),
-                                ),
 
                                 _profileInfoTile(
                                   icon: Icons.calendar_today_outlined,
