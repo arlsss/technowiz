@@ -1858,27 +1858,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   ),
                 ),
               ),
-
-              // ACTIONS
-              SizedBox(
-                width: 82,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    actionButton(
-                      icon: Icons.delete_outline_rounded,
-                      color: red,
-                      tooltip: "Delete User",
-                      bgColor: const Color(0xFFFEF2F2),
-                      borderColor:
-                          const Color(0xFFFCA5A5).withValues(alpha: 0.5),
-                      onPressed: () {
-                        confirmDelete(context, uid, displayName);
-                      },
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -1993,17 +1972,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                         ),
                       ],
                     ),
-                  ),
-                  actionButton(
-                    icon: Icons.delete_outline_rounded,
-                    color: red,
-                    tooltip: "Delete User",
-                    bgColor: const Color(0xFFFEF2F2),
-                    borderColor:
-                        const Color(0xFFFCA5A5).withValues(alpha: 0.5),
-                    onPressed: () {
-                      confirmDelete(context, uid, displayName);
-                    },
                   ),
                 ],
               ),
@@ -2749,26 +2717,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
                                             child: Text(
                                               "JOINED",
-
-                                              style: TextStyle(
-                                                color: textGrey,
-
-                                                fontSize: 9,
-
-                                                fontWeight: FontWeight.bold,
-
-                                                letterSpacing: .7,
-                                              ),
-                                            ),
-                                          ),
-
-                                          SizedBox(
-                                            width: 82,
-
-                                            child: Text(
-                                              "ACTION",
-
-                                              textAlign: TextAlign.end,
 
                                               style: TextStyle(
                                                 color: textGrey,
