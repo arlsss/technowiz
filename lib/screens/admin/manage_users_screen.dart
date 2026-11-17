@@ -1792,32 +1792,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
               // ACTIONS
               SizedBox(
-                width: 100,
+                width: 82,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    actionButton(
-                      icon: isBlocked
-                          ? Icons.lock_open_rounded
-                          : Icons.block_rounded,
-                      color: isBlocked ? green : const Color(0xFFEA580C),
-                      tooltip: isBlocked ? "Unblock User" : "Block User",
-                      bgColor: isBlocked
-                          ? const Color(0xFFDCFCE7)
-                          : const Color(0xFFFFF7ED),
-                      borderColor: isBlocked
-                          ? const Color(0xFF86EFAC)
-                          : const Color(0xFFFED7AA),
-                      onPressed: () {
-                        confirmToggleBlock(
-                          context,
-                          uid,
-                          displayName,
-                          isBlocked,
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 6),
                     actionButton(
                       icon: Icons.delete_outline_rounded,
                       color: red,
@@ -1947,43 +1925,16 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                       ],
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      actionButton(
-                        icon: isBlocked
-                            ? Icons.lock_open_rounded
-                            : Icons.block_rounded,
-                        color: isBlocked ? green : const Color(0xFFEA580C),
-                        tooltip: isBlocked ? "Unblock User" : "Block User",
-                        bgColor: isBlocked
-                            ? const Color(0xFFDCFCE7)
-                            : const Color(0xFFFFF7ED),
-                        borderColor: isBlocked
-                            ? const Color(0xFF86EFAC)
-                            : const Color(0xFFFED7AA),
-                        onPressed: () {
-                          confirmToggleBlock(
-                            context,
-                            uid,
-                            displayName,
-                            isBlocked,
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      actionButton(
-                        icon: Icons.delete_outline_rounded,
-                        color: red,
-                        tooltip: "Delete User",
-                        bgColor: const Color(0xFFFEF2F2),
-                        borderColor:
-                            const Color(0xFFFCA5A5).withValues(alpha: 0.5),
-                        onPressed: () {
-                          confirmDelete(context, uid, displayName);
-                        },
-                      ),
-                    ],
+                  actionButton(
+                    icon: Icons.delete_outline_rounded,
+                    color: red,
+                    tooltip: "Delete User",
+                    bgColor: const Color(0xFFFEF2F2),
+                    borderColor:
+                        const Color(0xFFFCA5A5).withValues(alpha: 0.5),
+                    onPressed: () {
+                      confirmDelete(context, uid, displayName);
+                    },
                   ),
                 ],
               ),
@@ -2743,7 +2694,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           ),
 
                                           SizedBox(
-                                            width: 100,
+                                            width: 82,
 
                                             child: Text(
                                               "ACTION",
