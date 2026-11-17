@@ -115,79 +115,40 @@ class AdminSidebar extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Admin Name & Admin Indicator Badge above Dashboard
-                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseAuth.instance.currentUser == null
-                        ? null
-                        : FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(FirebaseAuth.instance.currentUser!.uid)
-                            .snapshots(),
-                    builder: (context, snapshot) {
-                      final authUser = FirebaseAuth.instance.currentUser;
-                      final userData = snapshot.data?.data();
-                      final registeredName = (userData?['name'] ??
-                              userData?['fullName'] ??
-                              authUser?.displayName ??
-                              '')
-                          .toString()
-                          .trim();
-                      final displayName = registeredName.isNotEmpty
-                          ? registeredName
-                          : (authUser?.email?.split('@').first ?? 'Admin');
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: _purpleDark,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            ),
+                  // Admin Indicator Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _selectedBackground,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _selectedBorder,
+                        width: 1,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.shield_rounded,
+                          size: 11,
+                          color: _purple,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'ADMIN COMMAND CENTER',
+                          style: TextStyle(
+                            color: _purpleDark,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _selectedBackground,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: _selectedBorder,
-                                width: 1,
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.shield_rounded,
-                                  size: 11,
-                                  color: _purple,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'ADMIN COMMAND CENTER',
-                                  style: TextStyle(
-                                    color: _purpleDark,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
