@@ -37,6 +37,19 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  /// Filter active on the user list: 'ALL', 'SOLO', 'TEAM', 'QUIZ MASTER', 'ADMIN'.
+  String _selectedFilter = 'ALL';
+
+  void _toggleFilter(String filterKey) {
+    setState(() {
+      if (_selectedFilter == filterKey) {
+        _selectedFilter = 'ALL';
+      } else {
+        _selectedFilter = filterKey;
+      }
+    });
+  }
+
   // =========================================================
 
   // COLORS
@@ -208,30 +221,48 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   // =========================================================
 
   String getAccountType(Map<String, dynamic> data) {
-    final role = (data['role'] ?? '').toString().trim().toLowerCase();
+    final rawRole = (data['role'] ?? '').toString().trim().toLowerCase();
+    final cleanRole = rawRole.replaceAll(RegExp(r'[\s_-]+'), '');
 
     final contestantType = (data['contestantType'] ?? '')
         .toString()
         .trim()
         .toLowerCase();
 
-    if (role == 'admin') {
+    final isTeam = data['isTeam'] == true ||
+        contestantType == 'team' ||
+        (data['teamName'] != null &&
+            data['teamName'].toString().trim().isNotEmpty);
+
+    if (cleanRole == 'admin') {
       return "ADMIN";
     }
 
-    if (role == 'quiz master') {
+    if (cleanRole == 'quizmaster' ||
+        cleanRole.contains('quizmaster') ||
+        rawRole.contains('quiz')) {
       return "QUIZ MASTER";
     }
 
-    if (role == 'contestant' || role == 'competitor') {
-      if (contestantType == 'team') {
+    if (cleanRole == 'contestant' ||
+        cleanRole == 'competitor' ||
+        cleanRole.isEmpty) {
+      if (isTeam) {
         return "TEAM";
       }
 
       return "SOLO";
     }
 
-    return role.isEmpty ? "UNKNOWN" : role.toUpperCase();
+    if (cleanRole == 'team' || isTeam) {
+      return "TEAM";
+    }
+
+    if (cleanRole == 'solo') {
+      return "SOLO";
+    }
+
+    return rawRole.isEmpty ? "UNKNOWN" : rawRole.toUpperCase();
   }
 
   // =========================================================
@@ -241,20 +272,17 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   // =========================================================
 
   Color getRoleColor(String role) {
-    switch (role.toLowerCase()) {
-      case "admin":
-        return blue;
-
-      case "quiz master":
-        return primaryPurple;
-
-      case "competitor":
-      case "contestant":
-        return green;
-
-      default:
-        return textGrey;
+    final cleanRole = role.toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    if (cleanRole == 'admin') {
+      return blue;
     }
+    if (cleanRole == 'quizmaster' || cleanRole.contains('quiz')) {
+      return primaryPurple;
+    }
+    if (cleanRole == 'competitor' || cleanRole == 'contestant') {
+      return green;
+    }
+    return textGrey;
   }
 
   // =========================================================
@@ -264,22 +292,20 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   // =========================================================
 
   Color getAccountTypeColor(String accountType) {
-    switch (accountType.toUpperCase()) {
-      case "ADMIN":
-        return blue;
-
-      case "QUIZ MASTER":
-        return primaryPurple;
-
-      case "TEAM":
-        return const Color(0xFFE67E22);
-
-      case "SOLO":
-        return green;
-
-      default:
-        return textGrey;
+    final cleanType = accountType.toUpperCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    if (cleanType == 'ADMIN') {
+      return blue;
     }
+    if (cleanType == 'QUIZMASTER' || cleanType.contains('QUIZ')) {
+      return primaryPurple;
+    }
+    if (cleanType == 'TEAM') {
+      return const Color(0xFFE67E22);
+    }
+    if (cleanType == 'SOLO') {
+      return green;
+    }
+    return textGrey;
   }
 
   // =========================================================
@@ -289,22 +315,20 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   // =========================================================
 
   IconData getAccountTypeIcon(String accountType) {
-    switch (accountType.toUpperCase()) {
-      case "ADMIN":
-        return Icons.admin_panel_settings_outlined;
-
-      case "QUIZ MASTER":
-        return Icons.school_outlined;
-
-      case "TEAM":
-        return Icons.groups_outlined;
-
-      case "SOLO":
-        return Icons.person_outline_rounded;
-
-      default:
-        return Icons.person_outline_rounded;
+    final cleanType = accountType.toUpperCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    if (cleanType == 'ADMIN') {
+      return Icons.admin_panel_settings_outlined;
     }
+    if (cleanType == 'QUIZMASTER' || cleanType.contains('QUIZ')) {
+      return Icons.school_outlined;
+    }
+    if (cleanType == 'TEAM') {
+      return Icons.groups_outlined;
+    }
+    if (cleanType == 'SOLO') {
+      return Icons.person_outline_rounded;
+    }
+    return Icons.person_outline_rounded;
   }
 
   // =========================================================
@@ -552,112 +576,118 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Widget statCard({
     required IconData icon,
-
     required int value,
-
     required String label,
-
     required Color color,
+    String? filterKey,
+    VoidCallback? onTap,
+    bool isSelected = false,
   }) {
     return Expanded(
-      child: Container(
-        height: 86,
-
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-        decoration: BoxDecoration(
-          color: Colors.white,
-
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
-
-          border: Border.all(color: color.withValues(alpha: 0.22), width: 1.2),
-
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-
-              height: 44,
-
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color, color.withValues(alpha: 0.82)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: 86,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withValues(alpha: 0.08) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected ? color : color.withValues(alpha: 0.22),
+                width: isSelected ? 2.0 : 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isSelected
+                      ? color.withValues(alpha: 0.24)
+                      : color.withValues(alpha: 0.08),
+                  blurRadius: isSelected ? 12 : 10,
+                  offset: const Offset(0, 3),
                 ),
-
-                borderRadius: BorderRadius.circular(12),
-
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.32),
-                    blurRadius: 7,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-
-              child: Icon(icon, color: Colors.white, size: 21),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  Text(
-                    "$value",
-
-                    style: const TextStyle(
-                      color: textDark,
-
-                      fontSize: 22,
-
-                      fontWeight: FontWeight.w900,
-
-                      letterSpacing: -0.5,
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color, color.withValues(alpha: 0.82)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.32),
+                        blurRadius: 7,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(height: 2),
-
-                  Text(
-                    label,
-
-                    overflow: TextOverflow.ellipsis,
-
-                    style: const TextStyle(
-                      color: Color(0xFF64748B),
-
-                      fontSize: 11,
-
-                      fontWeight: FontWeight.w600,
-
-                      letterSpacing: 0.1,
-                    ),
+                  child: Icon(icon, color: Colors.white, size: 21),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "$value",
+                            style: const TextStyle(
+                              color: textDark,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          if (isSelected)
+                            Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 11,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isSelected ? color : const Color(0xFF64748B),
+                          fontSize: 11,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1434,6 +1464,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                     }
                   }
 
+                  final filteredUsers = users.where((user) {
+                    if (_selectedFilter == 'ALL') return true;
+                    final accType = getAccountType(user.data());
+                    return accType == _selectedFilter;
+                  }).toList();
+
                   // =================================================
 
                   // MAIN
@@ -1471,24 +1507,24 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     children: [
                                       statCard(
                                         icon: Icons.person_outline,
-
                                         value: soloUsers,
-
                                         label: "Solo",
-
                                         color: green,
+                                        filterKey: "SOLO",
+                                        isSelected: _selectedFilter == "SOLO",
+                                        onTap: () => _toggleFilter("SOLO"),
                                       ),
 
                                       const SizedBox(width: 9),
 
                                       statCard(
                                         icon: Icons.groups_outlined,
-
                                         value: teamUsers,
-
                                         label: "Teams",
-
                                         color: const Color(0xFFE67E22),
+                                        filterKey: "TEAM",
+                                        isSelected: _selectedFilter == "TEAM",
+                                        onTap: () => _toggleFilter("TEAM"),
                                       ),
                                     ],
                                   ),
@@ -1499,12 +1535,14 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     children: [
                                       statCard(
                                         icon: Icons.school_outlined,
-
                                         value: quizMasters,
-
                                         label: "Quiz Masters",
-
                                         color: primaryPurple,
+                                        filterKey: "QUIZ MASTER",
+                                        isSelected:
+                                            _selectedFilter == "QUIZ MASTER",
+                                        onTap: () =>
+                                            _toggleFilter("QUIZ MASTER"),
                                       ),
 
                                       const SizedBox(width: 9),
@@ -1512,12 +1550,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                       statCard(
                                         icon:
                                             Icons.admin_panel_settings_outlined,
-
                                         value: admins,
-
                                         label: "Admins",
-
                                         color: blue,
+                                        filterKey: "ADMIN",
+                                        isSelected: _selectedFilter == "ADMIN",
+                                        onTap: () => _toggleFilter("ADMIN"),
                                       ),
                                     ],
                                   ),
@@ -1528,48 +1566,50 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                 children: [
                                   statCard(
                                     icon: Icons.person_outline,
-
                                     value: soloUsers,
-
                                     label: "Solo",
-
                                     color: green,
+                                    filterKey: "SOLO",
+                                    isSelected: _selectedFilter == "SOLO",
+                                    onTap: () => _toggleFilter("SOLO"),
                                   ),
 
                                   const SizedBox(width: 12),
 
                                   statCard(
                                     icon: Icons.groups_outlined,
-
                                     value: teamUsers,
-
                                     label: "Teams",
-
                                     color: const Color(0xFFE67E22),
+                                    filterKey: "TEAM",
+                                    isSelected: _selectedFilter == "TEAM",
+                                    onTap: () => _toggleFilter("TEAM"),
                                   ),
 
                                   const SizedBox(width: 12),
 
                                   statCard(
                                     icon: Icons.school_outlined,
-
                                     value: quizMasters,
-
                                     label: "Quiz Masters",
-
                                     color: primaryPurple,
+                                    filterKey: "QUIZ MASTER",
+                                    isSelected:
+                                        _selectedFilter == "QUIZ MASTER",
+                                    onTap: () =>
+                                        _toggleFilter("QUIZ MASTER"),
                                   ),
 
                                   const SizedBox(width: 12),
 
                                   statCard(
                                     icon: Icons.admin_panel_settings_outlined,
-
                                     value: admins,
-
                                     label: "Admins",
-
                                     color: blue,
+                                    filterKey: "ADMIN",
+                                    isSelected: _selectedFilter == "ADMIN",
+                                    onTap: () => _toggleFilter("ADMIN"),
                                   ),
                                 ],
                               ),
@@ -1672,6 +1712,53 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           ),
                                         ),
 
+                                        if (_selectedFilter != 'ALL') ...[
+                                          InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            onTap: () => setState(
+                                                () => _selectedFilter = 'ALL'),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 9,
+                                                vertical: 5,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: primaryPurple.withValues(
+                                                    alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: primaryPurple
+                                                      .withValues(alpha: 0.4),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    "Filter: $_selectedFilter",
+                                                    style: const TextStyle(
+                                                      color: primaryPurple,
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  const Icon(
+                                                    Icons.close_rounded,
+                                                    size: 13,
+                                                    color: primaryPurple,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 10,
@@ -1695,7 +1782,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                           ),
 
                                           child: Text(
-                                            "${users.length} Users",
+                                            _selectedFilter == 'ALL'
+                                                ? "${users.length} Users"
+                                                : "${filteredUsers.length} of ${users.length} Users",
 
                                             style: const TextStyle(
                                               color: primaryPurple,
@@ -1823,16 +1912,62 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                     ),
 
                                   // =================================================
-
-                                  // MOBILE USERS
-
+                                  // FILTERED EMPTY STATE
                                   // =================================================
-                                  if (isMobile)
+                                  if (filteredUsers.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 36,
+                                        horizontal: 20,
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          children: [
+                                            Icon(
+                                              Icons.filter_list_off_rounded,
+                                              size: 42,
+                                              color: textGrey.withValues(
+                                                alpha: 0.45,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Text(
+                                              "No $_selectedFilter users found",
+                                              style: const TextStyle(
+                                                color: textDark,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            TextButton.icon(
+                                              onPressed: () => setState(
+                                                () => _selectedFilter = 'ALL',
+                                              ),
+                                              icon: const Icon(
+                                                Icons.refresh_rounded,
+                                                size: 15,
+                                              ),
+                                              label: const Text(
+                                                "Show All Users",
+                                              ),
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: primaryPurple,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                  // =================================================
+                                  // MOBILE USERS
+                                  // =================================================
+                                  else if (isMobile)
                                     Padding(
                                       padding: const EdgeInsets.all(12),
 
                                       child: Column(
-                                        children: users.map((user) {
+                                        children: filteredUsers.map((user) {
                                           final data = user.data();
 
                                           final name =
@@ -1889,7 +2024,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                   // =================================================
                                   else
                                     Column(
-                                      children: users.map((user) {
+                                      children: filteredUsers.map((user) {
                                         final data = user.data();
 
                                         final name = (data['name'] ?? 'No Name')
@@ -1964,7 +2099,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            "Showing ${users.length} registered user${users.length == 1 ? '' : 's'}",
+                                            _selectedFilter == 'ALL'
+                                                ? "Showing ${users.length} registered user${users.length == 1 ? '' : 's'}"
+                                                : "Showing ${filteredUsers.length} of ${users.length} registered user${users.length == 1 ? '' : 's'} ($_selectedFilter)",
 
                                             style: const TextStyle(
                                               color: textGrey,
