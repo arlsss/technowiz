@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'admin_dashboard.dart';
 import 'manage_users_screen.dart';
@@ -10,7 +9,6 @@ import 'manage_quiz_sessions_screen.dart';
 import 'admin_report_screen.dart';
 import 'admin_sidebar.dart';
 import 'admin_theme.dart';
-import '../login_screen.dart';
 import '../../navigation_persistence.dart';
 
 // ============================================================================
@@ -102,110 +100,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   }
 
   void _showProfileMenu(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 25, 24, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0EBFF),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFFD8CCF7),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.admin_panel_settings_rounded,
-                    color: AdminThemeColors.primary,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Admin',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AdminThemeColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  user?.email ?? 'No email available',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AdminThemeColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Divider(color: AdminThemeColors.border),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(sheetContext);
-                      try {
-                        final prefs = await SharedPreferences.getInstance();
-                        await AdminNavPersistence.clear();
-                        await prefs.remove('technowiz_admin_last_page');
-                        await prefs.remove('technowiz_admin_detail_quiz_code');
-                        await LoginScreen.clearSavedCredentials();
-                        await FirebaseAuth.instance.signOut();
-
-                        if (!context.mounted) return;
-                        Navigator.of(
-                          context,
-                          rootNavigator: true,
-                        ).pushAndRemoveUntil<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                const LoginScreen(clearCredentials: true),
-                          ),
-                          (route) => false,
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        AdminNotification.error(context, 'Logout failed: $e');
-                      }
-                    },
-                    icon: const Icon(Icons.logout_rounded, size: 19),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF0EBFF),
-                      foregroundColor: AdminThemeColors.primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    showAdminProfileSidePopup(context);
   }
 
   Widget _adminNavigationDrawer(BuildContext context) {

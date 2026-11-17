@@ -3,8 +3,6 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'edit_question_screen.dart';
@@ -22,7 +20,6 @@ import 'admin_leaderboard_screen.dart';
 import 'admin_report_screen.dart';
 import 'admin_sidebar.dart';
 import 'admin_theme.dart';
-import '../login_screen.dart';
 import '../../navigation_persistence.dart';
 
 class QuestionListScreen extends StatefulWidget {
@@ -1409,98 +1406,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   // ============================================================
 
   Future<void> _showProfileMenu(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: lightPurple,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFD8CCF7), width: 2),
-                ),
-                child: const Icon(
-                  Icons.admin_panel_settings_rounded,
-                  color: primaryPurple,
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Admin',
-                style: TextStyle(
-                  color: textDark,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                user?.email ?? 'No email available',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: textGrey, fontSize: 12),
-              ),
-              const SizedBox(height: 20),
-              const Divider(color: borderColor),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    // Close the profile sheet, sign out, and clear protected pages.
-                    Navigator.pop(sheetContext);
-                    try {
-                      await AdminNavPersistence.clear();
-                      await LoginScreen.clearSavedCredentials();
-                      await FirebaseAuth.instance.signOut();
-                      if (!context.mounted) return;
-                      Navigator.of(
-                        context,
-                        rootNavigator: true,
-                      ).pushAndRemoveUntil<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const LoginScreen(clearCredentials: true),
-                        ),
-                        (route) => false,
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      AdminNotification.error(context, 'Logout failed: $e');
-                    }
-                  },
-                  icon: const Icon(Icons.logout_rounded, size: 19),
-                  label: const Text(
-                    'Logout',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: lightPurple,
-                    foregroundColor: primaryPurple,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    showAdminProfileSidePopup(context);
   }
 
   Future<void> _navigateFromAdminSidebar(

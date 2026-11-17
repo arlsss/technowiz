@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../login_screen.dart';
+import '../../navigation_persistence.dart';
+
 /// Shared Admin navigation drawer & desktop sidebar for TechNoWiz.
 /// Standardized with the cohesive Light Purple theme.
 class AdminSidebar extends StatelessWidget {
@@ -156,10 +159,17 @@ class AdminSidebar extends StatelessWidget {
             // Footer Profile Card
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: onProfileTap,
-                child: Container(
+              child: Builder(
+                builder: (cardCtx) => InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    if (onProfileTap != null) {
+                      onProfileTap!();
+                    } else {
+                      showAdminProfileSidePopup(cardCtx);
+                    }
+                  },
+                  child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 11,
@@ -248,6 +258,7 @@ class AdminSidebar extends StatelessWidget {
                 ),
               ),
             ),
+          ),
           ],
         ),
       ),
@@ -331,4 +342,252 @@ class _AdminMenuItem {
   final String keyName;
   final String title;
   final IconData icon;
+}
+
+/// Displays the Admin profile popup on the side (docked above the profile card in the sidebar/drawer).
+void showAdminProfileSidePopup(BuildContext context) {
+  final user = FirebaseAuth.instance.currentUser;
+  final mediaQuery = MediaQuery.of(context);
+  final screenWidth = mediaQuery.size.width;
+  final screenHeight = mediaQuery.size.height;
+
+  final scaffold = Scaffold.maybeOf(context);
+  final renderBox = context.findRenderObject() as RenderBox?;
+  Offset? offset;
+  if (renderBox != null && renderBox.hasSize) {
+    try {
+      offset = renderBox.localToGlobal(Offset.zero);
+    } catch (_) {}
+  }
+
+  final bool isRightSide;
+  if (offset != null) {
+    isRightSide = offset.dx > (screenWidth / 2);
+  } else if (scaffold != null && scaffold.isEndDrawerOpen) {
+    isRightSide = true;
+  } else if (scaffold != null && scaffold.isDrawerOpen) {
+    isRightSide = false;
+  } else {
+    isRightSide = (screenWidth < 960);
+  }
+
+  final double bottomPos = screenHeight < 550 ? 12.0 : 84.0;
+  final double popupWidth = (screenWidth * 0.85).clamp(240.0, 275.0);
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: const Color(0x1F000000),
+    useSafeArea: false,
+    builder: (dialogContext) {
+      return Stack(
+        children: [
+          Positioned(
+            bottom: bottomPos,
+            right: isRightSide ? 14.0 : null,
+            left: isRightSide ? null : 14.0,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: popupWidth,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: const Color(0xFFDDD6FE),
+                    width: 1.5,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x2E4C1D95),
+                      blurRadius: 26,
+                      spreadRadius: 2,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Top header with close button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3E8FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFDDD6FE), width: 1),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.shield_rounded, size: 11, color: Color(0xFF7C3AED)),
+                              SizedBox(width: 4),
+                              Text(
+                                'ADMIN',
+                                style: TextStyle(
+                                  color: Color(0xFF4C1D95),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.of(dialogContext).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Avatar
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0EBFF),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFD8CCF7), width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.admin_panel_settings_rounded,
+                        color: Color(0xFF7C3AED),
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Display Name
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: user == null
+                          ? null
+                          : FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        final userData = snapshot.data?.data();
+                        final registeredName = (userData?['name'] ??
+                                userData?['fullName'] ??
+                                user?.displayName ??
+                                '')
+                            .toString()
+                            .trim();
+                        final displayName = registeredName.isNotEmpty
+                            ? registeredName
+                            : (user?.email?.split('@').first ?? 'Admin');
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E1B4B),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              user?.email ?? 'admin@technowiz.com',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 14),
+                    const Divider(color: Color(0xFFF3E8FF), height: 1),
+                    const SizedBox(height: 12),
+
+                    // Logout Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(dialogContext).pop();
+                          final s = Scaffold.maybeOf(context);
+                          if (s != null) {
+                            if (s.isEndDrawerOpen || s.isDrawerOpen) {
+                              Navigator.of(context).pop();
+                            }
+                          }
+                          try {
+                            await AdminNavPersistence.clear();
+                            await LoginScreen.clearSavedCredentials();
+                            await FirebaseAuth.instance.signOut();
+                            if (!context.mounted) return;
+                            Navigator.of(context, rootNavigator: true)
+                                .pushAndRemoveUntil<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    const LoginScreen(clearCredentials: true),
+                              ),
+                              (route) => false,
+                            );
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Unable to log out: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.logout_rounded, size: 18),
+                        label: const Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF5F3FF),
+                          foregroundColor: const Color(0xFF7C3AED),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                              color: Color(0xFFDDD6FE),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
