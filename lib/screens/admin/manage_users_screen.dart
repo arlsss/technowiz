@@ -973,18 +973,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
               children: [
                 actionButton(
-                  icon: Icons.edit_outlined,
-
-                  color: primaryPurple,
-
-                  tooltip: "Edit User",
-
-                  onPressed: () {},
-                ),
-
-                const SizedBox(width: 6),
-
-                actionButton(
                   icon: Icons.delete_outline_rounded,
 
                   color: red,
