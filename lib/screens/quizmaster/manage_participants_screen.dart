@@ -944,71 +944,7 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                       allSessions: const [],
                     ),
                     Expanded(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                        child: Center(
-                          child: Container(
-                            width: double.infinity,
-                            constraints: const BoxConstraints(maxWidth: 500),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 36,
-                              horizontal: 20,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: const Color(0xFFDCEAF5),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.03),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 64,
-                                  height: 64,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFEAF5FD),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.people_outline_rounded,
-                                    size: 32,
-                                    color: primaryBlue,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                const Text(
-                                  'No Active Quiz',
-                                  style: TextStyle(
-                                    color: darkBlue,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Participants will appear here once an active quiz begins.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFF6B7280),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                      child: _buildNoActiveQuizCard(),
                     ),
                   ],
                 );
@@ -1042,71 +978,7 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                     allSessions: const [],
                   ),
                   Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                      child: Center(
-                        child: Container(
-                          width: double.infinity,
-                          constraints: const BoxConstraints(maxWidth: 500),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 36,
-                            horizontal: 20,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFFDCEAF5),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 64,
-                                height: 64,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEAF5FD),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.people_outline_rounded,
-                                  size: 32,
-                                  color: primaryBlue,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              const Text(
-                                'No Active Quiz',
-                                style: TextStyle(
-                                  color: darkBlue,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Participants will appear here once an active quiz begins.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Color(0xFF6B7280),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    child: _buildNoActiveQuizCard(),
                   ),
                 ],
               );
@@ -1276,48 +1148,173 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                         Expanded(
                           child: participantsList.isEmpty
                               ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 72,
-                                        height: 72,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEAF5FD),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: const Color(0xFFD4E8F8),
+                                  child: SingleChildScrollView(
+                                    physics: const BouncingScrollPhysics(),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 24,
+                                      horizontal: 16,
+                                    ),
+                                    child: Container(
+                                      width: double.infinity,
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 520,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 36,
+                                        horizontal: 24,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(22),
+                                        border: Border.all(
+                                          color: const Color(0xFFDCEAF5),
+                                          width: 1.2,
+                                        ),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x0C168BEB),
+                                            blurRadius: 18,
+                                            offset: Offset(0, 6),
                                           ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.people_outline_rounded,
-                                          size: 36,
-                                          color: Color(0xFF168BEB),
-                                        ),
+                                          BoxShadow(
+                                            color: Color(0x05000000),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 14),
-                                      Text(
-                                        isViewingHistoryQuiz
-                                            ? 'No Participants'
-                                            : 'No Participants Yet',
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: darkBlue,
-                                        ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 76,
+                                            height: 76,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE0F2FE),
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(
+                                                    0xFF168BEB,
+                                                  ).withValues(alpha: 0.18),
+                                                  blurRadius: 18,
+                                                  offset: const Offset(0, 6),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Center(
+                                              child: Container(
+                                                width: 56,
+                                                height: 56,
+                                                decoration: const BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      Color(0xFF168BEB),
+                                                      Color(0xFF0F4C81),
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.groups_rounded,
+                                                  size: 28,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isViewingHistoryQuiz
+                                                  ? const Color(0xFFF1F5F9)
+                                                  : const Color(0xFFE5F4FF),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: isViewingHistoryQuiz
+                                                    ? const Color(0xFFCBD5E1)
+                                                    : const Color(0xFFB9E0FF),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 6,
+                                                  height: 6,
+                                                  decoration: BoxDecoration(
+                                                    color: isViewingHistoryQuiz
+                                                        ? const Color(
+                                                          0xFF64748B,
+                                                        )
+                                                        : const Color(
+                                                          0xFF168BEB,
+                                                        ),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  isViewingHistoryQuiz
+                                                      ? 'PAST SESSION'
+                                                      : 'AWAITING CONTESTANTS',
+                                                  style: TextStyle(
+                                                    color: isViewingHistoryQuiz
+                                                        ? const Color(
+                                                          0xFF64748B,
+                                                        )
+                                                        : const Color(
+                                                          0xFF168BEB,
+                                                        ),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.6,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            isViewingHistoryQuiz
+                                                ? 'No Participants'
+                                                : 'No Participants Yet',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              color: darkBlue,
+                                              letterSpacing: -0.2,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              maxWidth: 400,
+                                            ),
+                                            child: Text(
+                                              isViewingHistoryQuiz
+                                                  ? 'No participants found in this past quiz session.'
+                                                  : 'Contestants who enter quiz code "$effectiveCode" will appear here live.',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 12.5,
+                                                height: 1.45,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        isViewingHistoryQuiz
-                                            ? 'No participants found in this past quiz session.'
-                                            : 'Contestants who enter quiz code "$effectiveCode" will appear here live.',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          color: Colors.black54,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 )
                               : ListView.builder(
@@ -1693,6 +1690,320 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
     ),
   );
 }
+
+  // ============================================================
+  // NO ACTIVE QUIZ CARD
+  // ============================================================
+
+  Widget _buildNoActiveQuizCard() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Center(
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 580),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFDCEAF5), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0C168BEB),
+                blurRadius: 20,
+                offset: Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Color(0x05000000),
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Column(
+              children: [
+                // Top Accent Cyber Gradient Bar
+                Container(
+                  height: 3.5,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 38,
+                    horizontal: 24,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Layered Glowing Circle Illustration
+                      Container(
+                        width: 78,
+                        height: 78,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0F2FE),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF168BEB).withValues(
+                                alpha: 0.20,
+                              ),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 58,
+                            height: 58,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF168BEB), Color(0xFF0F4C81)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.groups_rounded,
+                              size: 28,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Standby Badge Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5F4FF),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFB9E0FF)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF168BEB),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'PARTICIPANTS STANDBY',
+                              style: TextStyle(
+                                color: Color(0xFF168BEB),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Title
+                      const Text(
+                        'No Active Quiz Right Now',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: darkBlue,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Subtitle
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: const Text(
+                          'Contestants and teams who join your quiz session will automatically appear and stream here in real-time once a quiz session begins.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12.5,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+
+                      // Action Buttons
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 10,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF168BEB),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () => _handleBottomNavigation(1),
+                            icon: const Icon(
+                              Icons.rocket_launch_rounded,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Go to Quiz Sessions',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF168BEB),
+                              side: const BorderSide(
+                                color: Color(0xFFB9E0FF),
+                                width: 1.2,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () {
+                              setState(() => _showHistory = true);
+                              _saveLastPage('participants_history');
+                            },
+                            icon: const Icon(Icons.history_rounded, size: 16),
+                            label: const Text(
+                              'View Quiz History',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Capability Highlights
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 520),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFD),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.bolt_rounded,
+                                    size: 14,
+                                    color: Color(0xFF168BEB),
+                                  ),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'Real-time Join Sync',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '•',
+                                style: TextStyle(color: Color(0xFFCBD5E1)),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.verified_user_rounded,
+                                    size: 14,
+                                    color: Color(0xFF168BEB),
+                                  ),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'Ready Status Check',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '•',
+                                style: TextStyle(color: Color(0xFFCBD5E1)),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.group_work_rounded,
+                                    size: 14,
+                                    color: Color(0xFF168BEB),
+                                  ),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'Solo & Team Support',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   // ============================================================
   // BOTTOM NAVIGATION
