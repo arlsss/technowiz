@@ -1386,18 +1386,13 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   }
 
   // ============================================================
-
   // STATS
-
   // ============================================================
 
   Widget _buildStats({
     required int totalQuizzes,
-
     required int totalParticipants,
-
     required int liveQuizzes,
-
     required int totalQuestions,
   }) {
     final width = MediaQuery.of(context).size.width;
@@ -1405,44 +1400,47 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
     final cards = [
       _StatData(
         title: "Total Quizzes",
-
         value: "$totalQuizzes",
-
-        icon: Icons.quiz_outlined,
-
-        percentage: "+12.3%",
+        icon: Icons.quiz_rounded,
+        badgeText: liveQuizzes > 0 ? "$liveQuizzes LIVE" : "ACTIVE HUB",
+        subtitle: "Tap to manage quiz sessions",
+        primaryColor: const Color(0xFF168BEB),
+        secondaryColor: const Color(0xFF0F4C81),
+        onTap: () => openQuizSessions(context),
       ),
 
       _StatData(
         title: "Total Participants",
-
         value: _formatNumber(totalParticipants),
-
-        icon: Icons.people_outline,
-
-        percentage: "+10.1%",
+        icon: Icons.groups_rounded,
+        badgeText: "ATTENDANCE",
+        subtitle: "Registered contestants & teams",
+        primaryColor: const Color(0xFF0284C7),
+        secondaryColor: const Color(0xFF075985),
+        onTap: () => _openManageParticipants(context),
       ),
     ];
 
     final columns = 2;
+    final double childAspectRatio;
+    if (width < 600) {
+      childAspectRatio = 1.85;
+    } else if (width < 900) {
+      childAspectRatio = 2.4;
+    } else {
+      childAspectRatio = 3.3;
+    }
 
     return GridView.builder(
       shrinkWrap: true,
-
       physics: const NeverScrollableScrollPhysics(),
-
       itemCount: cards.length,
-
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
-
-        crossAxisSpacing: 12,
-
-        mainAxisSpacing: 12,
-
-        childAspectRatio: width < 600 ? 1.9 : 2.5,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+        childAspectRatio: childAspectRatio,
       ),
-
       itemBuilder: (context, index) {
         return _statCard(cards[index]);
       },
@@ -1450,93 +1448,218 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   }
 
   // ============================================================
-
   // STAT CARD
-
   // ============================================================
 
   Widget _statCard(_StatData stat) {
     final width = MediaQuery.of(context).size.width;
-
     final mobile = width < 600;
 
     return Container(
-      padding: EdgeInsets.all(mobile ? 12 : 16),
-
       decoration: BoxDecoration(
         color: Colors.white,
-
-        borderRadius: BorderRadius.circular(14),
-
-        border: Border.all(color: borderColor),
-
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD6E8F7), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-
-            blurRadius: 8,
-
-            offset: const Offset(0, 3),
+            color: stat.primaryColor.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
-
-      child: Row(
-        children: [
-          Container(
-            width: mobile ? 32 : 36,
-
-            height: mobile ? 32 : 36,
-
-            decoration: BoxDecoration(
-              color: lightBlue,
-
-              borderRadius: BorderRadius.circular(11),
-            ),
-
-            child: Icon(stat.icon, color: primaryBlue, size: mobile ? 16 : 18),
-          ),
-
-          SizedBox(width: mobile ? 8 : 12),
-
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-
-              crossAxisAlignment: CrossAxisAlignment.start,
-
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: stat.onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
               children: [
-                Text(
-                  stat.title,
-
-                  maxLines: 2,
-
-                  overflow: TextOverflow.ellipsis,
-
-                  style: TextStyle(
-                    color: textMuted,
-
-                    fontSize: mobile ? 8.5 : 10,
+                // Top accent gradient bar
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 3.5,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [stat.primaryColor, stat.secondaryColor],
+                      ),
+                    ),
                   ),
                 ),
 
-                const SizedBox(height: 3),
+                // Decorative faint watermark icon on wide screens
+                if (!mobile)
+                  Positioned(
+                    right: -10,
+                    bottom: -15,
+                    child: IgnorePointer(
+                      child: Icon(
+                        stat.icon,
+                        size: 96,
+                        color: stat.primaryColor.withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ),
 
-                Text(
-                  stat.value,
+                // Main content
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    mobile ? 12 : 18,
+                    mobile ? 14 : 18,
+                    mobile ? 12 : 18,
+                    mobile ? 12 : 16,
+                  ),
+                  child: Row(
+                    children: [
+                      // Gradient Icon Container
+                      Container(
+                        width: mobile ? 42 : 52,
+                        height: mobile ? 42 : 52,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [stat.primaryColor, stat.secondaryColor],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(mobile ? 13 : 15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: stat.primaryColor.withValues(alpha: 0.32),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          stat.icon,
+                          color: Colors.white,
+                          size: mobile ? 22 : 26,
+                        ),
+                      ),
+                      SizedBox(width: mobile ? 10 : 16),
 
-                  style: TextStyle(
-                    color: darkBlue,
-
-                    fontSize: mobile ? 19 : 22,
-
-                    fontWeight: FontWeight.bold,
+                      // Text details
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    stat.title.toUpperCase(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: const Color(0xFF64748B),
+                                      fontSize: mobile ? 9 : 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ),
+                                if (!mobile) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: stat.primaryColor.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: stat.primaryColor.withValues(
+                                          alpha: 0.25,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: stat.primaryColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          stat.badgeText,
+                                          style: TextStyle(
+                                            color: stat.primaryColor,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            SizedBox(height: mobile ? 2 : 4),
+                            Text(
+                              stat.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: const Color(0xFF0F2B48),
+                                fontSize: mobile ? 22 : 28,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                                height: 1.1,
+                              ),
+                            ),
+                            SizedBox(height: mobile ? 2 : 4),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    stat.subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: const Color(0xFF94A3B8),
+                                      fontSize: mobile ? 9 : 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: mobile ? 11 : 13,
+                                  color: stat.primaryColor.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1907,15 +2030,10 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       final isFinished = {
         'finished',
-
         'finish',
-
         'completed',
-
         'complete',
-
         'ended',
-
         'end',
       }.contains(status);
 
@@ -1928,47 +2046,174 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
     return Container(
       width: double.infinity,
-
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
-
       decoration: BoxDecoration(
         color: Colors.white,
-
-        borderRadius: BorderRadius.circular(15),
-
-        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD6E8F7), width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C1E88E5),
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
-
-      child: Column(
-        children: [
-          const Row(
-            children: [
-              Text(
-                "Recent Quizzes",
-                style: TextStyle(
-                  color: darkBlue,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Accent Bar
+            Container(
+              height: 3.5,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
                 ),
               ),
-            ],
-          ),
-
-          if (recentDocs.isEmpty)
-            _emptyQuizState()
-          else
-            Column(
-              children: [...recentDocs.take(5).map((doc) => _quizRow(doc))],
             ),
-        ],
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1E88E5), Color(0xFF0F5AA6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(11),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1E88E5).withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.history_edu_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              "Recent Quizzes",
+                              style: TextStyle(
+                                color: Color(0xFF0F2B48),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (recentDocs.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE5F4FF),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFB9E0FF),
+                                  ),
+                                ),
+                                child: Text(
+                                  "${recentDocs.length}",
+                                  style: const TextStyle(
+                                    color: Color(0xFF168BEB),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          "Active & ongoing quiz sessions",
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Header Action Button
+                  InkWell(
+                    onTap: () => openQuizSessions(context),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F7FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFD6E8F7)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "View All",
+                            style: TextStyle(
+                              color: Color(0xFF168BEB),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 13,
+                            color: Color(0xFF168BEB),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            // Body: Empty State or Quiz List
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+              child: recentDocs.isEmpty
+                  ? _emptyQuizState()
+                  : Column(
+                      children: recentDocs
+                          .take(5)
+                          .map((doc) => _quizRow(doc))
+                          .toList(),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ============================================================
-
   // QUIZ ROW
-
   // ============================================================
 
   Widget _quizRow(QueryDocumentSnapshot doc) {
@@ -2004,29 +2249,19 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
     if ({
       "finished",
-
       "finish",
-
       "completed",
-
       "complete",
-
       "ended",
-
       "end",
     }.contains(normalized)) {
       badgeText = "Finished";
     } else if ({
       "active",
-
       "live",
-
       "started",
-
       "ongoing",
-
       "in_progress",
-
       "inprogress",
     }.contains(normalized)) {
       badgeText = "Ongoing";
@@ -2034,11 +2269,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
       badgeText = "Waiting";
     } else if ({
       "paused",
-
       "pause",
-
       "level_pause",
-
       "on_hold",
     }.contains(normalized)) {
       badgeText = "Paused";
@@ -2048,207 +2280,205 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
       badgeText = "Upcoming";
     }
 
-    return InkWell(
-      onTap: () {
-        openQuizSessions(context);
-      },
+    final isLiveOrOngoing = normalized == "active" ||
+        normalized == "live" ||
+        normalized == "ongoing" ||
+        normalized == "started";
 
-      borderRadius: BorderRadius.circular(10),
-
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: borderColor)),
-        ),
-
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-
-              height: 38,
-
-              decoration: BoxDecoration(
-                color: normalized == "active" || normalized == "live"
-                    ? const Color(0xFFE8F7EF)
-                    : lightBlue,
-
-                borderRadius: BorderRadius.circular(10),
-              ),
-
-              child: Icon(
-                Icons.quiz_rounded,
-
-                size: 18,
-
-                color: normalized == "active" || normalized == "live"
-                    ? Colors.green
-                    : primaryBlue,
-              ),
-            ),
-
-            const SizedBox(width: 11),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  Text(
-                    title,
-
-                    maxLines: 1,
-
-                    overflow: TextOverflow.ellipsis,
-
-                    style: const TextStyle(
-                      color: darkBlue,
-
-                      fontSize: 12,
-
-                      fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            openQuizSessions(context);
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Icon Container
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isLiveOrOngoing
+                          ? const [Color(0xFF22C55E), Color(0xFF15803D)]
+                          : const [Color(0xFF1E88E5), Color(0xFF0F5AA6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isLiveOrOngoing
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFF1E88E5))
+                            .withValues(alpha: 0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    dateText.isEmpty
-                        ? "$participants participants"
-                        : "$dateText • $participants participants",
-
-                    style: const TextStyle(color: textMuted, fontSize: 9),
+                  child: Icon(
+                    isLiveOrOngoing
+                        ? Icons.play_circle_filled_rounded
+                        : Icons.quiz_rounded,
+                    size: 20,
+                    color: Colors.white,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0F2B48),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (dateText.isNotEmpty) ...[
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              dateText,
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                          const Icon(
+                            Icons.groups_rounded,
+                            size: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            "$participants participant${participants == 1 ? '' : 's'}",
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _statusBadge(badgeText, normalized),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 12,
+                  color: Color(0xFF94A3B8),
+                ),
+              ],
             ),
-
-            const SizedBox(width: 8),
-
-            _statusBadge(badgeText, normalized),
-          ],
+          ),
         ),
       ),
     );
   }
 
   // ============================================================
-
   // STATUS
-
   // ============================================================
 
   Widget _statusBadge(String text, String status) {
-    Color bg = lightBlue;
-
-    Color fg = primaryBlue;
+    Color bg = const Color(0xFFE5F4FF);
+    Color fg = const Color(0xFF168BEB);
+    Color dotColor = const Color(0xFF168BEB);
 
     if ({
       "active",
-
       "live",
-
       "started",
-
       "ongoing",
-
       "in_progress",
-
       "inprogress",
     }.contains(status)) {
-      bg = const Color(0xFFE8F7EF);
-
-      fg = Colors.green.shade800;
+      bg = const Color(0xFFDCFCE7);
+      fg = const Color(0xFF15803D);
+      dotColor = const Color(0xFF22C55E);
     } else if ({
       "finished",
-
       "finish",
-
       "completed",
-
       "complete",
-
       "ended",
-
       "end",
     }.contains(status)) {
-      bg = const Color(0xFFF0F1F4);
-
-      fg = textMuted;
-    } else if ({"paused", "pause", "level_pause", "on_hold"}.contains(status)) {
-      bg = const Color(0xFFFFF3E0);
-
-      fg = Colors.orange.shade800;
-    } else if (status == "draft") {
-      bg = const Color(0xFFFFF3E0);
-
-      fg = Colors.orange.shade800;
+      bg = const Color(0xFFF1F5F9);
+      fg = const Color(0xFF64748B);
+      dotColor = const Color(0xFF94A3B8);
+    } else if ({
+      "paused",
+      "pause",
+      "level_pause",
+      "on_hold",
+      "draft",
+    }.contains(status)) {
+      bg = const Color(0xFFFEF3C7);
+      fg = const Color(0xFFB45309);
+      dotColor = const Color(0xFFF59E0B);
+    } else if ({"waiting", "countdown"}.contains(status)) {
+      bg = const Color(0xFFEDE9FE);
+      fg = const Color(0xFF6D28D9);
+      dotColor = const Color(0xFF8B5CF6);
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
-
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: dotColor.withValues(alpha: 0.3)),
       ),
-
-      child: Text(
-        text,
-
-        style: TextStyle(color: fg, fontSize: 9, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  // ============================================================
-
-  // EMPTY
-
-  // ============================================================
-
-  Widget _emptyQuizState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 35),
-
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 60,
-
-            height: 60,
-
-            decoration: const BoxDecoration(
-              color: lightBlue,
-
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: dotColor,
               shape: BoxShape.circle,
             ),
-
-            child: const Icon(
-              Icons.quiz_outlined,
-
-              color: primaryBlue,
-
-              size: 28,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(
+              color: fg,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          const Text(
-            "No quizzes yet",
-
-            style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
-          ),
-
-          const SizedBox(height: 4),
-
-          const Text(
-            "Your recent quizzes will appear here.",
-
-            style: TextStyle(color: textMuted, fontSize: 11),
           ),
         ],
       ),
@@ -2256,7 +2486,110 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   }
 
   // ============================================================
+  // EMPTY
+  // ============================================================
 
+  Widget _emptyQuizState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Layered circular illustration
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2FE),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF1E88E5), Color(0xFF0284C7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.quiz_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "No Active Quizzes Right Now",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF0F2B48),
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: const Text(
+              "Finished quizzes are automatically archived in Quiz History. Create or launch a new quiz session to monitor it live from here.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF168BEB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => openQuizSessions(context),
+            icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+            label: const Text(
+              "Go to Quiz Sessions",
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // HELPERS
 
   // ============================================================
@@ -2341,12 +2674,20 @@ class _StatData {
   final String title;
   final String value;
   final IconData icon;
-  final String percentage;
+  final String badgeText;
+  final String subtitle;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final VoidCallback? onTap;
 
   const _StatData({
     required this.title,
     required this.value,
     required this.icon,
-    required this.percentage,
+    required this.badgeText,
+    required this.subtitle,
+    required this.primaryColor,
+    required this.secondaryColor,
+    this.onTap,
   });
 }

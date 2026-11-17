@@ -1093,54 +1093,138 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   Widget _waitingLiveStandingsCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 34),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDCEAF5), width: 1.2),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0617245A),
-            blurRadius: 10,
-            offset: Offset(0, 3),
+            color: Color(0x0C1689E8),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: const BoxDecoration(
-              color: Color(0xFFEFF6FF),
-              shape: BoxShape.circle,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            Container(
+              height: 3.5,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+                ),
+              ),
             ),
-            child: const Icon(
-              Icons.hourglass_empty_rounded,
-              size: 30,
-              color: primaryPurple,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1689E8).withValues(alpha: 0.18),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF1E88E5), Color(0xFF0F5AA6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.hourglass_top_rounded,
+                          size: 26,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF59E0B),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'AWAITING SUBMISSIONS',
+                          style: TextStyle(
+                            color: Color(0xFFB45309),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Waiting for Contestant Answers',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F2B48),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: const Text(
+                      'Scores and rank positions will dynamically stream and update here in real-time as contestants submit their answers.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Waiting for Quiz Submissions',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: textDark,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Scores and rankings will update here live in real-time as contestants answer questions.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: textMuted,
-              height: 1.4,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1148,54 +1232,289 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   Widget _noActiveQuizCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor),
-        boxShadow: [
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDCEAF5), width: 1.2),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Color(0x0C1689E8),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              color: Color(0xFFEAF5FD),
-              shape: BoxShape.circle,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            // Top Accent Cyber Gradient Bar
+            Container(
+              height: 3.5,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+                ),
+              ),
             ),
-            child: const Icon(
-              Icons.leaderboard_outlined,
-              size: 32,
-              color: primaryPurple,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 38, horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Layered Glowing Circle Illustration
+                  Container(
+                    width: 78,
+                    height: 78,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1689E8).withValues(alpha: 0.20),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF168BEB), Color(0xFF0F4C81)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.leaderboard_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Standby Badge Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5F4FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFB9E0FF)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF168BEB),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'LEADERBOARD STANDBY',
+                          style: TextStyle(
+                            color: Color(0xFF168BEB),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Title
+                  const Text(
+                    'No Active Quiz Right Now',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF0F2B48),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Subtitle
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: const Text(
+                      'Live rankings and contestant standings will automatically appear and stream here in real-time once an active quiz begins.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12.5,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // Action Buttons
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF168BEB),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => _handleBottomNavigationTap(1),
+                        icon: const Icon(Icons.rocket_launch_rounded, size: 16),
+                        label: const Text(
+                          'Go to Quiz Sessions',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF168BEB),
+                          side: const BorderSide(
+                            color: Color(0xFFB9E0FF),
+                            width: 1.2,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            showHistory = true;
+                          });
+                        },
+                        icon: const Icon(Icons.history_rounded, size: 16),
+                        label: const Text(
+                          'View Quiz History',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Capability Highlights
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 540),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFD),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.bolt_rounded,
+                                size: 14,
+                                color: Color(0xFF168BEB),
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                'Real-time Live Sync',
+                                style: TextStyle(
+                                  color: Color(0xFF475569),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.groups_rounded,
+                                size: 14,
+                                color: Color(0xFF168BEB),
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                'Solo & Team Standings',
+                                style: TextStyle(
+                                  color: Color(0xFF475569),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.military_tech_rounded,
+                                size: 14,
+                                color: Color(0xFF168BEB),
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                'Multi-Level Scoring',
+                                style: TextStyle(
+                                  color: Color(0xFF475569),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'No Active Quiz',
-            style: TextStyle(
-              color: textDark,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Live rankings and standings will appear here once an active quiz begins.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: textMuted,
-              fontSize: 13,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
