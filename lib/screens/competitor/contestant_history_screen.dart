@@ -889,13 +889,6 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
                             chipColor: rankBgColor,
                             textColor: rankTextColor,
                           ),
-                        if (isEliminated)
-                          _historyChip(
-                            icon: Icons.cancel_rounded,
-                            text: 'Eliminated',
-                            chipColor: const Color(0xFFFEE2E2),
-                            textColor: const Color(0xFFDC2626),
-                          ),
                       ],
                     ),
                   ],
