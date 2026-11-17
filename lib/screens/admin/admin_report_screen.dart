@@ -33,7 +33,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
   String? selectedQuizCode;
   String _selectedReportTab = 'rankings'; // 'rankings', 'scores', 'participants'
-  String _quizFilter = 'all'; // 'all', 'completed', 'ongoing'
   String _quizSearchQuery = '';
   String _participantSearchQuery = '';
 
@@ -1532,10 +1531,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 final title = (d['title'] ?? d['quizName'] ?? '').toString().toLowerCase();
                 final code = (d['quizCode'] ?? doc.id).toString().toLowerCase();
                 final status = (d['status'] ?? '').toString().toLowerCase();
-                final isCompleted = status == 'finished' || status == 'completed';
-
-                if (_quizFilter == 'completed' && !isCompleted) return false;
-                if (_quizFilter == 'ongoing' && isCompleted) return false;
 
                 if (_quizSearchQuery.isNotEmpty) {
                   final q = _quizSearchQuery.toLowerCase();
@@ -1754,52 +1749,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   ],
                 ),
               ],
-              const SizedBox(height: 10),
-
-              // Filter chips (SingleChildScrollView to never overflow on phone)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: [
-                    _buildFilterChip('all', 'All Quizzes (${allQuizzes.length})'),
-                    const SizedBox(width: 6),
-                    _buildFilterChip('completed', 'Completed Quizzes'),
-                    const SizedBox(width: 6),
-                    _buildFilterChip('ongoing', 'Ongoing Quizzes'),
-                  ],
-                ),
-              ),
             ],
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String key, String label) {
-    final bool isSelected = _quizFilter == key;
-    return InkWell(
-      onTap: () => setState(() => _quizFilter = key),
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? AdminThemeColors.primary : AdminThemeColors.pillBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? AdminThemeColors.primary : AdminThemeColors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? Colors.white : AdminThemeColors.textPrimary,
-          ),
-        ),
       ),
     );
   }
