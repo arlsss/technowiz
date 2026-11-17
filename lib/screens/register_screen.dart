@@ -1236,43 +1236,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: isLoading ? null : registerUser,
                 ),
 
-                const SizedBox(height: 16),
-
-                // OR Divider
-                const Row(
-                  children: [
-                    Expanded(
-                      child: Divider(
-                        color: Color(0xFFE2E8F0),
-                        thickness: 1,
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        "OR",
-                        style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Divider(
-                        color: Color(0xFFE2E8F0),
-                        thickness: 1,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Continue with Google Button
-                _buildGoogleButton(),
-
-                const SizedBox(height: 18),
+                const SizedBox(height: 20),
 
                 // 8. Already have an account? Log In >
                 FittedBox(
@@ -1658,78 +1622,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // =========================================================
-  // CONTINUE WITH GOOGLE BUTTON
-  // =========================================================
-  Widget _buildGoogleButton() {
-    String roleLabel = selectedRole;
-    if (selectedRole == "Contestant") {
-      roleLabel =
-          contestantType == "Team" ? "Team Contestant" : "Solo Contestant";
-    }
-
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFCBD5E1),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: isLoading ? null : registerWithGoogle,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF1F5F9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Text(
-                      "G",
-                      style: TextStyle(
-                        color: Color(0xFF4285F4),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  "Continue with Google as $roleLabel",
-                  style: const TextStyle(
-                    color: Color(0xFF1E293B),
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
