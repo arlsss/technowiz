@@ -43,6 +43,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   final TextEditingController _participantSearchController =
       TextEditingController();
 
+  final Map<String, Map<int, int>> _levelScoresCache = {};
+  final Set<String> _syncingUids = {};
+  final Set<String> _checkedUids = {};
+  String? _lastSyncedQuizCode;
+
   @override
   void initState() {
     super.initState();
@@ -1203,6 +1208,73 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   // =========================================================
+  // SYNC & FETCH LEVEL SCORES CACHE
+  // =========================================================
+
+  void _syncOrFetchLevelScores(
+    String quizCode,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs,
+  ) {
+    if (quizCode.isEmpty) return;
+
+    if (_lastSyncedQuizCode != quizCode) {
+      _lastSyncedQuizCode = quizCode;
+      _levelScoresCache.clear();
+      _syncingUids.clear();
+      _checkedUids.clear();
+    }
+
+    for (final doc in scoreDocs) {
+      final data = doc.data();
+      final uid = (data['uid'] ?? doc.id).toString();
+
+      if (_checkedUids.contains(uid) || _syncingUids.contains(uid)) continue;
+      _syncingUids.add(uid);
+      _checkedUids.add(uid);
+
+      FirebaseFirestore.instance
+          .collection('quiz_sessions')
+          .doc(quizCode)
+          .collection('answers')
+          .doc(uid)
+          .collection('responses')
+          .get()
+          .then((responsesSnap) {
+        if (!mounted) return;
+        final Map<int, int> userLevelScores = {};
+        for (final r in responsesSnap.docs) {
+          final rData = r.data();
+          final lvl = (rData['level'] as num?)?.toInt() ?? 1;
+          final pts = (rData['points'] as num?)?.toInt() ?? 0;
+          final isCorrect = rData['isCorrect'] == true ||
+              (rData['answerStatus'] ?? '').toString().toLowerCase() ==
+                  'correct';
+          if (pts > 0 && isCorrect) {
+            userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
+          }
+        }
+
+        if (userLevelScores.isNotEmpty) {
+          setState(() {
+            _levelScoresCache[uid] = userLevelScores;
+          });
+
+          final updateData = <String, dynamic>{};
+          for (final entry in userLevelScores.entries) {
+            updateData['level${entry.key}Score'] = entry.value;
+            updateData['levelScores.Level ${entry.key}'] = entry.value;
+          }
+          doc.reference
+              .set(updateData, SetOptions(merge: true))
+              .catchError((_) {});
+        }
+      }).catchError((_) {}).whenComplete(() {
+        _syncingUids.remove(uid);
+      });
+    }
+  }
+
+  // =========================================================
   // DATA PARSER FOR PARTICIPANTS, SCORES & RANKINGS
   // =========================================================
 
@@ -1287,13 +1359,52 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           d['eliminated'] == true;
 
       final total = _toInt(d['score'] ?? d['totalScore'] ?? d['points'] ?? 0);
-      final l1 = _toInt(d['level1Score'] ?? d['level_1'] ?? (d['levelScores'] is Map ? d['levelScores']['Level 1'] : 0));
-      final l2 = _toInt(d['level2Score'] ?? d['level_2'] ?? (d['levelScores'] is Map ? d['levelScores']['Level 2'] : 0));
-      final l3 = _toInt(d['level3Score'] ?? d['level_3'] ?? (d['levelScores'] is Map ? d['levelScores']['Level 3'] : 0));
+
+      // Extract all level scores dynamically (Level 1, 2, 3, 4, 5, etc.)
+      final Map<int, int> extractedLevels = {};
+      final cached = _levelScoresCache[uid];
+      if (cached != null && cached.isNotEmpty) {
+        extractedLevels.addAll(cached);
+      }
+
+      if (d['levelScores'] is Map) {
+        final m = d['levelScores'] as Map;
+        for (final entry in m.entries) {
+          final k = entry.key.toString();
+          final match = RegExp(r'\d+').firstMatch(k);
+          if (match != null) {
+            final lvlNum = int.tryParse(match.group(0)!);
+            if (lvlNum != null) {
+              extractedLevels[lvlNum] = _toInt(entry.value);
+            }
+          }
+        }
+      }
+
+      for (final entry in d.entries) {
+        final k = entry.key;
+        final match = RegExp(r'^level[_\s]*(\d+)(?:Score)?$', caseSensitive: false).firstMatch(k);
+        if (match != null) {
+          final lvlNum = int.tryParse(match.group(1)!);
+          if (lvlNum != null && !extractedLevels.containsKey(lvlNum)) {
+            extractedLevels[lvlNum] = _toInt(entry.value);
+          }
+        }
+      }
+
+      final l1 = extractedLevels[1] ?? _toInt(d['level1Score'] ?? d['level_1']);
+      final l2 = extractedLevels[2] ?? _toInt(d['level2Score'] ?? d['level_2']);
+      final l3 = extractedLevels[3] ?? _toInt(d['level3Score'] ?? d['level_3']);
+      extractedLevels[1] = l1;
+      extractedLevels[2] = l2;
+      extractedLevels[3] = l3;
 
       int finalTotal = total;
-      if (finalTotal == 0 && (l1 > 0 || l2 > 0 || l3 > 0)) {
-        finalTotal = l1 + l2 + l3;
+      final sumLevels = extractedLevels.values.fold<int>(0, (acc, pts) => acc + pts);
+      if (finalTotal == 0 && sumLevels > 0) {
+        finalTotal = sumLevels;
+      } else if (finalTotal > 0 && sumLevels == 0) {
+        extractedLevels[1] = finalTotal;
       }
 
       int timeMs = 0;
@@ -1312,6 +1423,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         level1Score: l1,
         level2Score: l2,
         level3Score: l3,
+        levelScores: extractedLevels,
         isEliminated: isElim || (existing?.isEliminated ?? false),
         eliminatedLevel: d['eliminatedLevel'] != null ? _toInt(d['eliminatedLevel']) : null,
         status: (d['status'] ?? existing?.status ?? 'active').toString(),
@@ -1838,6 +1950,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 final reqDocs = requestSnap.data?.docs ?? [];
                 final scoreDocs = scoreSnap.data?.docs ?? [];
                 final partDocs = participantSnap.data?.docs ?? [];
+
+                _syncOrFetchLevelScores(quizCode, scoreDocs);
 
                 // Accurate extraction
                 final contestants = _computeContestants(
@@ -2491,36 +2605,88 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                const SizedBox(height: 3),
-                // Level scores breakdown
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    Text('L1: ${c.level1Score}', style: const TextStyle(fontSize: 9.5, color: AdminThemeColors.textMuted)),
-                    Text('L2: ${c.level2Score}', style: const TextStyle(fontSize: 9.5, color: AdminThemeColors.textMuted)),
-                    Text('L3: ${c.level3Score}', style: const TextStyle(fontSize: 9.5, color: AdminThemeColors.textMuted)),
-                  ],
+                const SizedBox(height: 4),
+                // Level scores breakdown: Each level clearly displays the points earned
+                Builder(
+                  builder: (_) {
+                    final Map<int, int> levelsMap = c.levelScores.isNotEmpty
+                        ? c.levelScores
+                        : {1: c.level1Score, 2: c.level2Score, 3: c.level3Score};
+                    final sortedKeys = levelsMap.keys.toList()..sort();
+                    final allKeys = {...sortedKeys, 1, 2, 3}.toList()..sort();
+
+                    return Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      children: allKeys.map((lvl) {
+                        final pts = levelsMap[lvl] ??
+                            (lvl == 1
+                                ? c.level1Score
+                                : (lvl == 2
+                                    ? c.level2Score
+                                    : (lvl == 3 ? c.level3Score : 0)));
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: const Color(0xFFE2E8F0), width: 0.8),
+                          ),
+                          child: Text(
+                            'L$lvl: $pts pts',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
 
-          // Total Points badge
+          // Total Overall Points badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0EBFF),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFDDD6FE)),
-            ),
-            child: Text(
-              '${c.totalScore} pts',
-              style: const TextStyle(
-                color: AdminThemeColors.primary,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w900,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF3E8FF), Color(0xFFEDE9FE)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFDDD6FE), width: 1.2),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'TOTAL OVERALL',
+                  style: TextStyle(
+                    color: Color(0xFF7E22CE),
+                    fontSize: 7.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '${c.totalScore} pts',
+                  style: const TextStyle(
+                    color: Color(0xFF581C87),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 4),
@@ -3130,6 +3296,7 @@ class ReportContestant {
   final int level1Score;
   final int level2Score;
   final int level3Score;
+  final Map<int, int> levelScores;
   final bool isEliminated;
   final int? eliminatedLevel;
   final String status;
@@ -3146,6 +3313,7 @@ class ReportContestant {
     this.level1Score = 0,
     this.level2Score = 0,
     this.level3Score = 0,
+    this.levelScores = const {},
     this.isEliminated = false,
     this.eliminatedLevel,
     this.status = 'active',
