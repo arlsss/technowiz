@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,18 +30,37 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
 
   bool _loading = true;
   String? _error;
-  String _filter = 'all'; // 'all', 'correct', 'wrong'
+  String _filter = 'all'; // 'all', 'correct', 'wrong', 'unanswered', 'contested'
   int? _selectedLevel; // null means 'All Levels', otherwise 1, 2, 3...
 
   Map<String, dynamic> _sessionData = {};
   List<Map<String, dynamic>> _reviewedQuestions = [];
   int _totalScore = 0;
 
+  StreamSubscription? _responsesSub;
+  StreamSubscription? _contestRequestsSub;
+  StreamSubscription? _scoreSub;
+  StreamSubscription? _sessionSub;
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _rawQuestions = [];
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _rawResponses = [];
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _rawContests = [];
+  Map<String, dynamic>? _rawScoreData;
+
   @override
   void initState() {
     super.initState();
     _saveCurrentState();
     _loadQuizHistory();
+  }
+
+  @override
+  void dispose() {
+    _responsesSub?.cancel();
+    _contestRequestsSub?.cancel();
+    _scoreSub?.cancel();
+    _sessionSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _saveCurrentState() async {
@@ -166,6 +186,116 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
     return "Multiple Choice";
   }
 
+  int _getPointsForLevel(int level) {
+    switch (level) {
+      case 1:
+        return 1;
+      case 2:
+        return 2;
+      case 3:
+        return 3;
+      case 4:
+        return 5;
+      default:
+        return 1;
+    }
+  }
+
+  String _normalizeAnswer(String input) {
+    var s = input.trim().toLowerCase();
+    s = s.replaceFirst(RegExp(r'^[a-d][\.\)\:\-]\s*'), '');
+    s = s.replaceAll(RegExp(r'[^\w\s]'), '');
+    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return s;
+  }
+
+  bool _isAnswerMatch(String submitted, String accepted) {
+    final subTrim = submitted.trim();
+    final accTrim = accepted.trim();
+    if (subTrim.isEmpty || accTrim.isEmpty) return false;
+
+    // 1. Exact case-insensitive match
+    if (subTrim.toLowerCase() == accTrim.toLowerCase()) return true;
+
+    // 2. Normalized match
+    final normSub = _normalizeAnswer(subTrim);
+    final normAcc = _normalizeAnswer(accTrim);
+    if (normSub == normAcc && normSub.isNotEmpty) return true;
+
+    // 3. Option letter prefix match
+    if (subTrim.length == 1 && RegExp(r'^[a-d]$', caseSensitive: false).hasMatch(subTrim)) {
+      final prefix = subTrim.toLowerCase();
+      if (accTrim.toLowerCase().startsWith('$prefix.') ||
+          accTrim.toLowerCase().startsWith('$prefix)') ||
+          accTrim.toLowerCase().startsWith('$prefix ')) {
+        return true;
+      }
+    }
+    if (accTrim.length == 1 && RegExp(r'^[a-d]$', caseSensitive: false).hasMatch(accTrim)) {
+      final prefix = accTrim.toLowerCase();
+      if (subTrim.toLowerCase().startsWith('$prefix.') ||
+          subTrim.toLowerCase().startsWith('$prefix)') ||
+          subTrim.toLowerCase().startsWith('$prefix ')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  List<String> _getAcceptedAnswers(Map<String, dynamic> question) {
+    final accepted = <String>{};
+
+    void addAnswer(dynamic value) {
+      if (value == null) return;
+      if (value is List) {
+        for (final item in value) {
+          addAnswer(item);
+        }
+        return;
+      }
+      final raw = value.toString().trim();
+      if (raw.isNotEmpty) {
+        accepted.add(raw);
+        final norm = _normalizeAnswer(raw);
+        if (norm.isNotEmpty) accepted.add(norm);
+      }
+    }
+
+    addAnswer(question['correctAnswer']);
+    final resolved = _getCorrectAnswer(question);
+    if (resolved.isNotEmpty) addAnswer(resolved);
+    addAnswer(question['correctAnswers']);
+    addAnswer(question['acceptedAnswers']);
+    addAnswer(question['alternateAnswers']);
+
+    return accepted.toList();
+  }
+
+  bool _isAnswerCorrect(Map<String, dynamic> question, String submittedAnswer) {
+    if (submittedAnswer.trim().isEmpty) return false;
+
+    final type = _getQuestionType(question);
+
+    if (type == "True or False") {
+      final sub = submittedAnswer.trim().toLowerCase();
+      final cor = _getCorrectAnswer(question).trim().toLowerCase();
+      if (sub == cor) return true;
+      if ((sub == "true" || sub == "t") && (cor == "true" || cor == "t")) return true;
+      if ((sub == "false" || sub == "f") && (cor == "false" || cor == "f")) return true;
+      return _isAnswerMatch(submittedAnswer, cor);
+    }
+
+    final acceptedList = _getAcceptedAnswers(question);
+    for (final accepted in acceptedList) {
+      if (_isAnswerMatch(submittedAnswer, accepted)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _sortSessionQuestions(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -174,7 +304,14 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
     int getLevel(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
       final data = doc.data();
       final raw = data['sessionLevel'] ?? data['level'];
-      return _parseLevel(raw);
+      if (raw is num && raw.toInt() > 0) return raw.toInt();
+      final text = raw?.toString().trim().toLowerCase() ?? '';
+      final match = RegExp(r'\d+').firstMatch(text);
+      if (match != null) {
+        final parsed = int.tryParse(match.group(0)!);
+        if (parsed != null && parsed > 0) return parsed;
+      }
+      return 999999;
     }
 
     int? getOrder(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -248,112 +385,62 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
 
       _sessionData = sessionDoc.data() ?? {};
 
-      // 1. Fetch questions
+      // 1. Fetch questions and sort them
       final questionsSnap = await sessionRef.collection('questions').get();
-      final sortedQuestions = _sortSessionQuestions(questionsSnap.docs);
+      _rawQuestions = _sortSessionQuestions(questionsSnap.docs);
 
-      // 2. Fetch contestant responses
-      final responsesSnap = await sessionRef
+      // Cancel previous listeners if any
+      await _responsesSub?.cancel();
+      await _contestRequestsSub?.cancel();
+      await _scoreSub?.cancel();
+      await _sessionSub?.cancel();
+
+      // 2. Real-time Responses listener
+      _responsesSub = sessionRef
           .collection('answers')
           .doc(currentUser.uid)
           .collection('responses')
-          .get();
+          .snapshots()
+          .listen((snap) {
+        _rawResponses = snap.docs;
+        _recomputeReviewList();
+      }, onError: (e) {
+        debugPrint('Responses snapshot error: $e');
+      });
 
-      final responsesByDocId = <String, Map<String, dynamic>>{};
-      final responsesByNumber = <int, Map<String, dynamic>>{};
+      // 3. Real-time Contest Requests listener
+      _contestRequestsSub = sessionRef
+          .collection('contest_requests')
+          .where('contestantUid', isEqualTo: currentUser.uid)
+          .snapshots()
+          .listen((snap) {
+        _rawContests = snap.docs;
+        _recomputeReviewList();
+      }, onError: (e) {
+        debugPrint('Contest requests snapshot error: $e');
+      });
 
-      for (final doc in responsesSnap.docs) {
-        final data = doc.data();
-        responsesByDocId[doc.id] = data;
-        final qNum = int.tryParse(data['questionNumber']?.toString() ?? '');
-        if (qNum != null) {
-          responsesByNumber[qNum] = data;
+      // 4. Real-time Score listener
+      _scoreSub = sessionRef
+          .collection('scores')
+          .doc(currentUser.uid)
+          .snapshots()
+          .listen((snap) {
+        if (snap.exists) {
+          _rawScoreData = snap.data();
         }
-      }
+        _recomputeReviewList();
+      }, onError: (e) {
+        debugPrint('Score snapshot error: $e');
+      });
 
-      // 3. Fetch score doc
-      final scoreDoc =
-          await sessionRef.collection('scores').doc(currentUser.uid).get();
-      if (scoreDoc.exists) {
-        _totalScore =
-            int.tryParse(scoreDoc.data()?['score']?.toString() ?? '') ?? 0;
-      }
-
-      // 4. Build combined review list
-      final reviewList = <Map<String, dynamic>>[];
-      int calculatedScore = 0;
-
-      for (int i = 0; i < sortedQuestions.length; i++) {
-        final qDoc = sortedQuestions[i];
-        final qData = qDoc.data();
-        final qNumber = i + 1;
-
-        final response =
-            responsesByDocId['question_$i'] ?? responsesByNumber[qNumber];
-
-        final questionText = qData['question']?.toString().trim().isNotEmpty ==
-                true
-            ? qData['question'].toString().trim()
-            : (qData['questionText']?.toString().trim().isNotEmpty == true
-                ? qData['questionText'].toString().trim()
-                : (qData['title']?.toString().trim().isNotEmpty == true
-                    ? qData['title'].toString().trim()
-                    : 'Question $qNumber'));
-
-        final questionType = response?['questionType']?.toString().trim() ??
-            _getQuestionType(qData);
-
-        final expectedCorrect =
-            response?['correctAnswer']?.toString().trim().isNotEmpty == true
-                ? response!['correctAnswer'].toString().trim()
-                : _getCorrectAnswer(qData);
-
-        final alternateAnswers = response?['correctAnswers'] ?? qData['correctAnswers'];
-
-        final selectedAnswer =
-            response?['selectedAnswer']?.toString().trim() ?? '';
-        final hasAnswer = selectedAnswer.isNotEmpty;
-        final isCorrect = response?['isCorrect'] == true ||
-            response?['answerStatus'] == 'correct';
-        final isTimedOut = response?['timedOut'] == true;
-        final points = int.tryParse(response?['points']?.toString() ?? '') ??
-            (isCorrect ? 1 : 0);
-
-        final level = _parseLevel(
-          response?['level'] ?? qData['level'] ?? qData['sessionLevel'],
-        );
-
-        if (isCorrect) {
-          calculatedScore += points;
+      // 5. Real-time Session doc listener
+      _sessionSub = sessionRef.snapshots().listen((snap) {
+        if (snap.exists) {
+          _sessionData = snap.data() ?? {};
+          if (mounted) setState(() {});
         }
-
-        reviewList.add({
-          'questionIndex': i,
-          'questionNumber': qNumber,
-          'level': level,
-          'questionText': questionText,
-          'questionType': questionType,
-          'options': _getQuestionOptions(qData),
-          'selectedAnswer': selectedAnswer,
-          'correctAnswer': expectedCorrect,
-          'alternateAnswers': alternateAnswers,
-          'isCorrect': isCorrect,
-          'hasAnswer': hasAnswer,
-          'isTimedOut': isTimedOut,
-          'points': points,
-        });
-      }
-
-      if (_totalScore == 0 && calculatedScore > 0) {
-        _totalScore = calculatedScore;
-      }
-
-      if (mounted) {
-        setState(() {
-          _reviewedQuestions = reviewList;
-          _loading = false;
-        });
-      }
+      });
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -361,6 +448,168 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
           _error = 'Error loading quiz history: $e';
         });
       }
+    }
+  }
+
+  void _recomputeReviewList() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final responsesByDocId = <String, Map<String, dynamic>>{};
+    final responsesByQNumber = <int, Map<String, dynamic>>{};
+    final responsesByQId = <String, Map<String, dynamic>>{};
+    final responsesByText = <String, Map<String, dynamic>>{};
+
+    for (final doc in _rawResponses) {
+      final data = doc.data();
+      responsesByDocId[doc.id] = data;
+
+      final qNum = int.tryParse(data['questionNumber']?.toString() ?? '');
+      if (qNum != null) responsesByQNumber[qNum] = data;
+
+      final qId = data['questionId']?.toString().trim();
+      if (qId != null && qId.isNotEmpty) responsesByQId[qId] = data;
+
+      final qText = data['questionText']?.toString().trim().toLowerCase();
+      if (qText != null && qText.isNotEmpty) responsesByText[qText] = data;
+    }
+
+    final contestsByQNumber = <int, Map<String, dynamic>>{};
+    final contestsByQId = <String, Map<String, dynamic>>{};
+    final contestsByDocId = <String, Map<String, dynamic>>{};
+
+    for (final doc in _rawContests) {
+      final data = doc.data();
+      contestsByDocId[doc.id] = data;
+
+      final qNum = int.tryParse(data['questionNumber']?.toString() ?? '');
+      if (qNum != null) contestsByQNumber[qNum] = data;
+
+      final qId = data['questionId']?.toString().trim();
+      if (qId != null && qId.isNotEmpty) contestsByQId[qId] = data;
+    }
+
+    int calculatedScore = 0;
+    final reviewList = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < _rawQuestions.length; i++) {
+      final qDoc = _rawQuestions[i];
+      final qData = qDoc.data();
+      final qNumber = i + 1;
+      final qDocId = qDoc.id;
+
+      final questionText = qData['question']?.toString().trim().isNotEmpty == true
+          ? qData['question'].toString().trim()
+          : (qData['questionText']?.toString().trim().isNotEmpty == true
+              ? qData['questionText'].toString().trim()
+              : (qData['title']?.toString().trim().isNotEmpty == true
+                  ? qData['title'].toString().trim()
+                  : 'Question $qNumber'));
+
+      // Match response using multiple strategies:
+      final response = responsesByDocId[qDocId] ??
+          responsesByQId[qDocId] ??
+          responsesByDocId['question_$i'] ??
+          responsesByQNumber[qNumber] ??
+          responsesByText[questionText.toLowerCase()];
+
+      // Match contest request:
+      final contest = contestsByQId[qDocId] ??
+          contestsByQNumber[qNumber] ??
+          contestsByDocId['${currentUser.uid}_question_$i'];
+
+      final questionType = response?['questionType']?.toString().trim() ??
+          _getQuestionType(qData);
+
+      final expectedCorrect = response?['correctAnswer']?.toString().trim().isNotEmpty == true
+          ? response!['correctAnswer'].toString().trim()
+          : _getCorrectAnswer(qData);
+
+      final alternateAnswers = response?['correctAnswers'] ?? qData['correctAnswers'];
+
+      final rawSelected = response?['selectedAnswer'] ??
+          response?['answer'] ??
+          response?['contestantAnswer'] ??
+          response?['selectedOption'] ??
+          response?['value'];
+      final selectedAnswer = rawSelected?.toString().trim() ?? '';
+
+      final bool hasAnswer = selectedAnswer.isNotEmpty &&
+          selectedAnswer.toLowerCase() != '(no answer / timed out)' &&
+          selectedAnswer.toLowerCase() != 'no answer' &&
+          selectedAnswer.toLowerCase() != 'unanswered';
+
+      final isTimedOut = response?['timedOut'] == true || (!hasAnswer && response != null);
+
+      final level = _parseLevel(
+        response?['level'] ?? qData['level'] ?? qData['sessionLevel'],
+      );
+
+      final levelPoints = _getPointsForLevel(level);
+
+      final rawContestStatus = contest?['status']?.toString().toLowerCase() ??
+          response?['contestStatus']?.toString().toLowerCase() ??
+          (response?['answerStatus'] == 'contested' ? 'pending' : 'none');
+
+      final String contestStatus;
+      if (rawContestStatus == 'approved') {
+        contestStatus = 'approved';
+      } else if (rawContestStatus == 'rejected' || rawContestStatus == 'declined') {
+        contestStatus = 'rejected';
+      } else if (rawContestStatus == 'pending' || rawContestStatus == 'contested') {
+        contestStatus = 'pending';
+      } else {
+        contestStatus = 'none';
+      }
+
+      final bool isContested = contestStatus != 'none' || contest != null;
+      final String contestExplanation = contest?['explanation']?.toString().trim() ??
+          response?['contestExplanation']?.toString().trim() ??
+          '';
+
+      final bool isCorrect = contestStatus == 'approved' ||
+          response?['isCorrect'] == true ||
+          response?['answerStatus'] == 'correct' ||
+          (hasAnswer && _isAnswerCorrect(qData, selectedAnswer));
+
+      final int points = isCorrect
+          ? (int.tryParse(response?['points']?.toString() ?? '') ?? levelPoints)
+          : 0;
+
+      if (isCorrect) {
+        calculatedScore += (points > 0 ? points : levelPoints);
+      }
+
+      reviewList.add({
+        'questionIndex': i,
+        'questionNumber': qNumber,
+        'questionId': qDocId,
+        'level': level,
+        'questionText': questionText,
+        'questionType': questionType,
+        'options': _getQuestionOptions(qData),
+        'selectedAnswer': hasAnswer ? selectedAnswer : '(No Answer / Timed Out)',
+        'correctAnswer': expectedCorrect,
+        'alternateAnswers': alternateAnswers,
+        'isCorrect': isCorrect,
+        'hasAnswer': hasAnswer,
+        'isTimedOut': isTimedOut,
+        'points': points > 0 ? points : (isCorrect ? levelPoints : 0),
+        'isContested': isContested,
+        'contestStatus': contestStatus,
+        'contestExplanation': contestExplanation,
+      });
+    }
+
+    final recordedScore = int.tryParse(_rawScoreData?['score']?.toString() ?? '') ?? 0;
+    _totalScore = recordedScore > 0 ? recordedScore : calculatedScore;
+
+    if (mounted) {
+      setState(() {
+        _reviewedQuestions = reviewList;
+        _loading = false;
+        _error = null;
+      });
     }
   }
 
@@ -385,8 +634,11 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         .where((q) => q['isCorrect'] != true && q['hasAnswer'] == true)
         .length;
     final unanswered = questions.where((q) => q['hasAnswer'] != true).length;
-    final score =
-        questions.fold<int>(0, (totalPoints, q) => totalPoints + (q['points'] as int));
+    final contested = questions.where((q) => q['isContested'] == true).length;
+    final score = (level == null && _totalScore > 0)
+        ? _totalScore
+        : questions.fold<int>(
+            0, (totalPoints, q) => totalPoints + (q['points'] as int));
     final accuracy = total > 0 ? ((correct / total) * 100).toStringAsFixed(0) : '0';
 
     return {
@@ -394,6 +646,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
       'correct': correct,
       'wrong': wrong,
       'unanswered': unanswered,
+      'contested': contested,
       'score': score,
       'accuracy': accuracy,
       'questions': questions,
@@ -433,6 +686,15 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
               }
             },
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: primaryGreen),
+              tooltip: 'Refresh Scores',
+              onPressed: () {
+                _loadQuizHistory();
+              },
+            ),
+          ],
           iconTheme: const IconThemeData(color: primaryGreen),
           title: const Text(
             "Quiz History Score",
@@ -726,7 +988,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
 
           const SizedBox(height: 18),
 
-          // STATS ROW: CORRECT • WRONG • SCORE
+          // STATS ROW: CORRECT • WRONG • UNANSWERED • SCORE
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             decoration: BoxDecoration(
@@ -738,14 +1000,14 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
               children: [
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: _buildSummaryStat(
                         icon: Icons.check_circle_rounded,
                         iconColor: Colors.greenAccent.shade400,
                         value: '${currentStats['correct']}',
-                        label: isSingleLevel ? 'Level Correct' : 'Total Correct',
+                        label: isSingleLevel ? 'Level Correct' : 'Correct',
                       ),
                     ),
                   ),
@@ -757,14 +1019,14 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: _buildSummaryStat(
                         icon: Icons.cancel_rounded,
                         iconColor: Colors.redAccent.shade100,
                         value: '${currentStats['wrong']}',
-                        label: isSingleLevel ? 'Level Wrong' : 'Total Wrong',
+                        label: isSingleLevel ? 'Level Wrong' : 'Wrong',
                       ),
                     ),
                   ),
@@ -776,7 +1038,26 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildSummaryStat(
+                        icon: Icons.hourglass_empty_rounded,
+                        iconColor: Colors.amberAccent.shade100,
+                        value: '${currentStats['unanswered']}',
+                        label: 'Unanswered',
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 34,
+                  color: Colors.white24,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: _buildSummaryStat(
@@ -791,6 +1072,34 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
               ],
             ),
           ),
+
+          // CONTEST SUMMARY PILL (If any questions were contested)
+          if ((currentStats['contested'] as int? ?? 0) > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purpleAccent.shade100.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.gavel_rounded, color: Colors.purpleAccent, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${currentStats['contested']} Question(s) Contested',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // PER-LEVEL BREAKDOWN ROW (Shown when viewing all levels)
           if (!isSingleLevel && uniqueLevels.length > 1) ...[
@@ -916,32 +1225,54 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
     );
   }
 
-  /// Status Filter Chips (All, Correct, Wrong)
+  /// Status Filter Chips (All, Correct, Wrong, Unanswered, Contested)
   Widget _buildFilterChips() {
     final currentStats = _getLevelStats(_selectedLevel);
     final total = currentStats['total'] as int;
     final correct = currentStats['correct'] as int;
     final wrong = currentStats['wrong'] as int;
+    final unanswered = currentStats['unanswered'] as int;
+    final contested = currentStats['contested'] as int;
 
-    return Row(
-      children: [
-        _buildFilterChip(
-          id: 'all',
-          label: 'All ($total)',
+    return ScrollConfiguration(
+      behavior: const _HistorySwipeableScrollBehavior(),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(right: 16, top: 2, bottom: 4),
+        child: Row(
+          children: [
+            _buildFilterChip(
+              id: 'all',
+              label: 'All ($total)',
+            ),
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              id: 'correct',
+              label: 'Correct ($correct)',
+              activeColor: primaryGreen,
+            ),
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              id: 'wrong',
+              label: 'Wrong ($wrong)',
+              activeColor: Colors.red.shade600,
+            ),
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              id: 'unanswered',
+              label: 'Unanswered ($unanswered)',
+              activeColor: Colors.orange.shade700,
+            ),
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              id: 'contested',
+              label: 'Contested ($contested)',
+              activeColor: const Color(0xFF7C3AED),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        _buildFilterChip(
-          id: 'correct',
-          label: 'Correct ($correct)',
-          activeColor: primaryGreen,
-        ),
-        const SizedBox(width: 8),
-        _buildFilterChip(
-          id: 'wrong',
-          label: 'Wrong ($wrong)',
-          activeColor: Colors.red.shade600,
-        ),
-      ],
+      ),
     );
   }
 
@@ -952,47 +1283,39 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
   }) {
     final isSelected = _filter == id;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _filter = id;
-          });
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-          decoration: BoxDecoration(
-            color: isSelected ? activeColor : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected ? activeColor : borderGreen,
-              width: 1.4,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : null,
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _filter = id;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? activeColor : borderGreen,
+            width: 1.4,
           ),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : textDark,
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                ),
-              ),
-            ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          style: TextStyle(
+            color: isSelected ? Colors.white : textDark,
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
           ),
         ),
       ),
@@ -1001,13 +1324,19 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
 
   /// Questions Content: Grouped by level if 'All Levels', or showing only selected level
   Widget _buildQuestionsContent(List<int> uniqueLevels) {
+    bool matchesFilter(Map<String, dynamic> q) {
+      if (_filter == 'correct') return q['isCorrect'] == true;
+      if (_filter == 'wrong') return q['isCorrect'] != true && q['hasAnswer'] == true;
+      if (_filter == 'unanswered') return q['hasAnswer'] != true;
+      if (_filter == 'contested') return q['isContested'] == true;
+      return true;
+    }
+
     if (_selectedLevel != null) {
       // SINGLE LEVEL VIEW
       final questions = _reviewedQuestions.where((q) {
         if (q['level'] != _selectedLevel) return false;
-        if (_filter == 'correct') return q['isCorrect'] == true;
-        if (_filter == 'wrong') return q['isCorrect'] != true;
-        return true;
+        return matchesFilter(q);
       }).toList();
 
       if (questions.isEmpty) {
@@ -1025,9 +1354,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
     for (final lvl in uniqueLevels) {
       final levelQuestions = _reviewedQuestions.where((q) {
         if (q['level'] != lvl) return false;
-        if (_filter == 'correct') return q['isCorrect'] == true;
-        if (_filter == 'wrong') return q['isCorrect'] != true;
-        return true;
+        return matchesFilter(q);
       }).toList();
 
       if (levelQuestions.isEmpty) continue;
@@ -1145,6 +1472,17 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
   }
 
   Widget _buildEmptyState() {
+    String msg = 'No questions found.';
+    if (_filter == 'correct') {
+      msg = 'No correct answers in this section.';
+    } else if (_filter == 'wrong') {
+      msg = 'No incorrect answers in this section! All correct or unanswered.';
+    } else if (_filter == 'unanswered') {
+      msg = 'No unanswered questions in this section! All questions were answered.';
+    } else if (_filter == 'contested') {
+      msg = 'No contested questions in this section.';
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       margin: const EdgeInsets.symmetric(vertical: 20),
@@ -1155,11 +1493,8 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
       ),
       child: Center(
         child: Text(
-          _filter == 'correct'
-              ? 'No correct answers in this section.'
-              : _filter == 'wrong'
-                  ? 'No incorrect answers in this section! Perfect score!'
-                  : 'No questions found.',
+          msg,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             color: Colors.black54,
             fontSize: 14,
@@ -1181,20 +1516,47 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
     final int level = item['level'] as int;
     final int points = item['points'] as int;
     final String questionType = item['questionType'] as String;
+    final bool isContested = item['isContested'] == true;
+    final String contestStatus = item['contestStatus']?.toString().toLowerCase() ?? 'none';
+    final String contestExplanation = item['contestExplanation']?.toString().trim() ?? '';
 
-    final Color statusColor = isCorrect
-        ? primaryGreen
-        : (!hasAnswer ? Colors.orange.shade700 : Colors.red.shade600);
+    final Color statusColor;
+    final Color statusBg;
+    final String statusLabel;
 
-    final Color statusBg = isCorrect
-        ? const Color(0xFFE8F8EE)
-        : (!hasAnswer ? const Color(0xFFFFF7ED) : const Color(0xFFFEE2E2));
+    if (contestStatus == 'approved') {
+      statusColor = const Color(0xFF0D9488); // Teal
+      statusBg = const Color(0xFFCCFBF1);
+      statusLabel = '⭐ CONTEST APPROVED (+$points pt${points != 1 ? 's' : ''})';
+    } else if (isCorrect) {
+      statusColor = primaryGreen;
+      statusBg = const Color(0xFFE8F8EE);
+      statusLabel = '✓ CORRECT (+$points pt${points != 1 ? 's' : ''})';
+    } else if (contestStatus == 'pending') {
+      statusColor = const Color(0xFF7C3AED); // Purple
+      statusBg = const Color(0xFFEDE9FE);
+      statusLabel = '⚖ CONTEST PENDING';
+    } else if (contestStatus == 'rejected') {
+      statusColor = Colors.red.shade700;
+      statusBg = const Color(0xFFFEE2E2);
+      statusLabel = '✗ CONTEST REJECTED (0 pts)';
+    } else if (hasAnswer) {
+      statusColor = Colors.red.shade600;
+      statusBg = const Color(0xFFFEE2E2);
+      statusLabel = '✗ INCORRECT (0 pts)';
+    } else {
+      statusColor = Colors.orange.shade800;
+      statusBg = const Color(0xFFFFF7ED);
+      statusLabel = '⏱ UNANSWERED (0 pts)';
+    }
 
-    final String statusLabel = isCorrect
-        ? '✓ CORRECT (+$points pt${points != 1 ? 's' : ''})'
-        : (!hasAnswer
-            ? '⏱ UNANSWERED (0 pts)'
-            : '✗ INCORRECT (0 pts)');
+    final Color cardBorderColor = contestStatus == 'approved'
+        ? Colors.teal.shade300
+        : (isCorrect
+            ? borderGreen
+            : (isContested
+                ? (contestStatus == 'rejected' ? Colors.red.shade300 : Colors.purple.shade200)
+                : (hasAnswer ? Colors.red.shade200 : Colors.orange.shade200)));
 
     return Container(
       width: double.infinity,
@@ -1204,9 +1566,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isCorrect
-              ? borderGreen
-              : (hasAnswer ? Colors.red.shade200 : Colors.orange.shade200),
+          color: cardBorderColor,
           width: 1.4,
         ),
         boxShadow: [
@@ -1444,6 +1804,81 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
+          ],
+
+          // CONTEST DETAILS BOX (Shown if contest submitted)
+          if (isContested) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: contestStatus == 'approved'
+                    ? const Color(0xFFF0FDFA)
+                    : (contestStatus == 'rejected'
+                        ? const Color(0xFFFEF2F2)
+                        : const Color(0xFFFAF5FF)),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: contestStatus == 'approved'
+                      ? Colors.teal.shade300
+                      : (contestStatus == 'rejected'
+                          ? Colors.red.shade300
+                          : Colors.purple.shade300),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.gavel_rounded,
+                        size: 16,
+                        color: contestStatus == 'approved'
+                            ? Colors.teal.shade700
+                            : (contestStatus == 'rejected'
+                                ? Colors.red.shade700
+                                : const Color(0xFF7C3AED)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          contestStatus == 'approved'
+                              ? 'Contest Status: APPROVED (Points Credited)'
+                              : (contestStatus == 'rejected'
+                                  ? 'Contest Status: REJECTED by Quizmaster'
+                                  : 'Contest Status: PENDING REVIEW by Quizmaster'),
+                          style: TextStyle(
+                            color: contestStatus == 'approved'
+                                ? Colors.teal.shade900
+                                : (contestStatus == 'rejected'
+                                    ? Colors.red.shade900
+                                    : const Color(0xFF5B21B6)),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (contestExplanation.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24),
+                      child: Text(
+                        'Reason: "$contestExplanation"',
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
