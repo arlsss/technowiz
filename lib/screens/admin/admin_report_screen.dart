@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -155,6 +156,19 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         ? teamName.trim()
         : (contestantName.trim().isNotEmpty ? contestantName.trim() : 'Contestant');
 
+    final String fullQuizTitle = quizTitle.trim().isNotEmpty
+        ? quizTitle.trim()
+        : 'TechNoWiz Quiz Competition';
+    final String dateString = quizDate.trim().isNotEmpty ? quizDate.trim() : _dateText();
+
+    pw.MemoryImage? certLogoImage;
+    try {
+      final bytes = await rootBundle.load('assets/images/certificate_logo.jpg');
+      certLogoImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (e) {
+      debugPrint('Error loading certificate logo asset: $e');
+    }
+
     final String darkCorner;
     final String midCorner;
     final String lightCorner;
@@ -183,8 +197,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       ribbonTitle = '1ST PLACE';
       ribbonTextColor = const PdfColor.fromInt(0xFF1E293B);
       ribbonFontSize = 24;
-      citation1 = 'for outstanding performance in the TechNoWiz Quiz Competition.';
-      citation2 = 'Keep up the great work!';
+      citation1 = 'In highest recognition of exemplary mastery, critical thinking, and outstanding intellect for securing 1ST PLACE (CHAMPION) in the $fullQuizTitle${totalScore > 0 ? ' with an impressive score of $totalScore points' : ''}.';
+      citation2 = 'Awarded on $dateString in commendation of extraordinary competence, dedication, and academic excellence in technology.';
       centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
   <path d="M 54,55 C 42,44 42,22 54,6" stroke="#D97706" stroke-width="2.5" fill="none" stroke-linecap="round" />
   <polygon points="46,46 36,44 42,52" fill="#D97706" />
@@ -236,8 +250,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       ribbonTitle = '2ND PLACE';
       ribbonTextColor = const PdfColor.fromInt(0xFF0F172A);
       ribbonFontSize = 24;
-      citation1 = 'for outstanding performance in the TechNoWiz Quiz Competition.';
-      citation2 = 'Keep up the great work!';
+      citation1 = 'In meritorious recognition of exemplary skill, teamwork, and superior performance for securing 2ND PLACE (1ST RUNNER-UP) in the $fullQuizTitle${totalScore > 0 ? ' with a total score of $totalScore points' : ''}.';
+      citation2 = 'Awarded on $dateString in commendation of outstanding competence, perseverance, and dedication to technical knowledge.';
       centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
   <path d="M 54,55 C 42,44 42,22 54,6" stroke="#94A3B8" stroke-width="2.5" fill="none" stroke-linecap="round" />
   <polygon points="46,46 36,44 42,52" fill="#94A3B8" />
@@ -289,8 +303,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       ribbonTitle = '3RD PLACE';
       ribbonTextColor = const PdfColor.fromInt(0xFF1E293B);
       ribbonFontSize = 24;
-      citation1 = 'for outstanding performance in the TechNoWiz Quiz Competition.';
-      citation2 = 'Keep up the great work!';
+      citation1 = 'In distinguished recognition of remarkable dedication, perseverance, and excellent performance for securing 3RD PLACE (2ND RUNNER-UP) in the $fullQuizTitle${totalScore > 0 ? ' with a total score of $totalScore points' : ''}.';
+      citation2 = 'Awarded on $dateString in recognition of commendable achievement, competitive spirit, and passion for excellence.';
       centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
   <path d="M 54,55 C 42,44 42,22 54,6" stroke="#C2410C" stroke-width="2.5" fill="none" stroke-linecap="round" />
   <polygon points="46,46 36,44 42,52" fill="#C2410C" />
@@ -342,8 +356,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       ribbonTitle = 'APPRECIATION';
       ribbonTextColor = const PdfColor.fromInt(0xFFFFFFFF);
       ribbonFontSize = 21;
-      citation1 = 'for your participation and support in the TechNoWiz Quiz Competition.';
-      citation2 = 'Thank you for being a part of TechNoWiz!';
+      citation1 = 'In sincere appreciation of enthusiastic participation, sportsmanship, and commendable effort in the $fullQuizTitle${totalScore > 0 ? ' with a total score of $totalScore points' : ''}.';
+      citation2 = 'Awarded on $dateString in recognition of dedication, active engagement, and passion for technology and continuous learning.';
       centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
   <path d="M 54,55 C 42,44 42,22 54,6" stroke="#16A34A" stroke-width="2.5" fill="none" stroke-linecap="round" />
   <polygon points="46,46 36,44 42,52" fill="#16A34A" />
@@ -422,52 +436,71 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
-                      // Header: TechNoWiz QUIZ COMPETITION
-                      pw.Column(
-                        children: [
-                          pw.Row(
-                            mainAxisAlignment: pw.MainAxisAlignment.center,
-                            children: [
-                              pw.Text(
-                                'TechNo',
-                                style: pw.TextStyle(
-                                  fontSize: 27,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: const PdfColor.fromInt(0xFF0F172A),
-                                ),
-                              ),
-                              pw.Text(
-                                'Wiz',
-                                style: pw.TextStyle(
-                                  fontSize: 27,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: const PdfColor.fromInt(0xFF0284C7),
-                                ),
-                              ),
-                            ],
+                      // Header: TechNoWiz 3D Mascot & Brand Logo (Replaces plain text)
+                      if (certLogoImage != null)
+                        pw.Container(
+                          margin: const pw.EdgeInsets.only(bottom: 2),
+                          decoration: pw.BoxDecoration(
+                            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                            border: pw.Border.all(color: borderColor, width: 1.2),
                           ),
-                          pw.SizedBox(height: 2),
-                          pw.Row(
-                            mainAxisAlignment: pw.MainAxisAlignment.center,
-                            children: [
-                              pw.Container(width: 44, height: 1.2, color: const PdfColor.fromInt(0xFF0F172A)),
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.symmetric(horizontal: 10),
-                                child: pw.Text(
-                                  'QUIZ COMPETITION',
+                          child: pw.ClipRRect(
+                            horizontalRadius: 7,
+                            verticalRadius: 7,
+                            child: pw.Image(
+                              certLogoImage,
+                              width: 110,
+                              height: 75,
+                              fit: pw.BoxFit.contain,
+                            ),
+                          ),
+                        )
+                      else
+                        pw.Column(
+                          children: [
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.center,
+                              children: [
+                                pw.Text(
+                                  'TechNo',
                                   style: pw.TextStyle(
-                                    fontSize: 9.5,
+                                    fontSize: 27,
                                     fontWeight: pw.FontWeight.bold,
-                                    letterSpacing: 2,
                                     color: const PdfColor.fromInt(0xFF0F172A),
                                   ),
                                 ),
-                              ),
-                              pw.Container(width: 44, height: 1.2, color: const PdfColor.fromInt(0xFF0F172A)),
-                            ],
-                          ),
-                        ],
-                      ),
+                                pw.Text(
+                                  'Wiz',
+                                  style: pw.TextStyle(
+                                    fontSize: 27,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: const PdfColor.fromInt(0xFF0284C7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.center,
+                              children: [
+                                pw.Container(width: 44, height: 1.2, color: const PdfColor.fromInt(0xFF0F172A)),
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10),
+                                  child: pw.Text(
+                                    'QUIZ COMPETITION',
+                                    style: pw.TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      letterSpacing: 2,
+                                      color: const PdfColor.fromInt(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                                pw.Container(width: 44, height: 1.2, color: const PdfColor.fromInt(0xFF0F172A)),
+                              ],
+                            ),
+                          ],
+                        ),
 
                       // Center Graphic: Trophy & Laurels or Star & Laurels
                       pw.SvgImage(
@@ -531,13 +564,39 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                             effectiveName.toUpperCase(),
                             textAlign: pw.TextAlign.center,
                             style: pw.TextStyle(
-                              fontSize: 25,
+                              fontSize: 24,
                               fontWeight: pw.FontWeight.bold,
                               color: const PdfColor.fromInt(0xFF0F172A),
                               letterSpacing: 1.2,
                             ),
                           ),
-                          pw.SizedBox(height: 5),
+                          if (teamName.trim().isNotEmpty &&
+                              contestantName.trim().isNotEmpty &&
+                              contestantName.trim().toLowerCase() != teamName.trim().toLowerCase()) ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              'Team Leader / Contestant: ${contestantName.trim()}',
+                              textAlign: pw.TextAlign.center,
+                              style: const pw.TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromInt(0xFF475569),
+                              ),
+                            ),
+                          ],
+                          if (school.trim().isNotEmpty) ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              school.trim(),
+                              textAlign: pw.TextAlign.center,
+                              style: const pw.TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromInt(0xFF475569),
+                              ),
+                            ),
+                          ],
+                          pw.SizedBox(height: 4),
                           pw.Container(
                             width: 440,
                             height: 1.5,
@@ -546,30 +605,34 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                         ],
                       ),
 
-                      // Citations
-                      pw.Column(
-                        children: [
-                          pw.Text(
-                            citation1,
-                            textAlign: pw.TextAlign.center,
-                            style: const pw.TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColor.fromInt(0xFF1E293B),
+                      // Words & Citations Under Name
+                      pw.Container(
+                        width: 530,
+                        child: pw.Column(
+                          children: [
+                            pw.Text(
+                              citation1,
+                              textAlign: pw.TextAlign.center,
+                              style: const pw.TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromInt(0xFF1E293B),
+                                lineSpacing: 2,
+                              ),
                             ),
-                          ),
-                          pw.SizedBox(height: 3),
-                          pw.Text(
-                            citation2,
-                            textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: pw.FontWeight.bold,
-                              fontStyle: pw.FontStyle.italic,
-                              color: const PdfColor.fromInt(0xFF0F172A),
+                            pw.SizedBox(height: 3),
+                            pw.Text(
+                              citation2,
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                fontStyle: pw.FontStyle.italic,
+                                color: const PdfColor.fromInt(0xFF334155),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
 
                       // Signatures: Event Organizer & TechNoWiz Host
