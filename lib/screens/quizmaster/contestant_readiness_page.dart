@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'quizmaster_theme.dart';
+import '../../navigation_persistence.dart';
 
 class ContestantReadinessPage extends StatefulWidget {
   final String quizCode;
@@ -38,21 +38,11 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
   }
 
   Future<void> _saveCurrentPage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'technowiz_quizmaster_last_page',
-        'participant_readiness',
-      );
-      await prefs.setString(
-        'technowiz_quizmaster_current_quiz_code',
-        widget.quizCode,
-      );
-      await prefs.setInt(
-        'technowiz_quizmaster_readiness_level',
-        widget.startLevel,
-      );
-    } catch (_) {}
+    await QuizMasterNavPersistence.savePage(
+      'participant_readiness',
+      quizCode: widget.quizCode,
+      readinessLevel: widget.startLevel,
+    );
   }
 
   static const Color _primaryBlue = QuizMasterColors.primaryBlue;
@@ -317,12 +307,7 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
           // After a browser refresh, this page may be the first route,
           // so there may be nothing for maybePop() to pop. Restore Quiz
           // Sessions explicitly without changing quiz state or readiness.
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-            'technowiz_quizmaster_last_page',
-            'quiz_sessions',
-          );
-          await prefs.remove('technowiz_quizmaster_current_quiz_code');
+          await QuizMasterNavPersistence.savePage('quiz_sessions');
 
           if (!context.mounted) return;
           final returnToSessions = onReturnToSessions;
@@ -554,6 +539,10 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
 
                               // The callback handles navigation to Quiz Control.
                               // Keep the readiness page in place until it succeeds.
+                              await QuizMasterNavPersistence.savePage(
+                                'quiz_control',
+                                quizCode: widget.quizCode,
+                              );
                               await onStartQuiz();
                             }
                           : null,

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'quizmaster_dashboard.dart';
 import 'quiz_sessions_screen.dart';
@@ -30,9 +29,6 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
   final Set<int> _hoveredBottomItems = <int>{};
   final Map<String, String> _nameCache = {};
 
-  static const String _lastPageKey = 'technowiz_quizmaster_last_page';
-  static const String _quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
-
   String? _selectedQuizCode;
   bool _showHistory = false;
   bool _isViewingFromHistory = false;
@@ -52,14 +48,11 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
   }
 
   Future<void> _saveLastPage(String page, {String? savedQuizCode}) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastPageKey, page);
-
-    if (savedQuizCode != null && savedQuizCode.trim().isNotEmpty) {
-      await prefs.setString(_quizCodeKey, savedQuizCode.trim());
-    } else {
-      await prefs.remove(_quizCodeKey);
-    }
+    await QuizMasterNavPersistence.savePage(
+      page,
+      quizCode: savedQuizCode ?? _selectedQuizCode ?? widget.quizCode,
+      participantsShowHistory: _showHistory,
+    );
   }
 
   static const Color primaryBlue = Color(0xFF168BEB);
@@ -818,7 +811,10 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
           child: _showHistory
               ? ParticipantsHistoryScreen(
                   onBack: () {
-                    if (mounted) setState(() => _showHistory = false);
+                    if (mounted) {
+                      setState(() => _showHistory = false);
+                      _saveLastPage('participants');
+                    }
                   },
                   onSelectQuiz: (quizCode) {
                     if (!mounted) return;
@@ -827,6 +823,7 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                       _isViewingFromHistory = true;
                       _showHistory = false;
                     });
+                    _saveLastPage('participants', savedQuizCode: quizCode);
                   },
                 )
               : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -1950,6 +1947,7 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
     if (index == 3) {
       if (_showHistory) {
         setState(() => _showHistory = false);
+        _saveLastPage('participants');
       }
       return; // Already on Participants.
     }

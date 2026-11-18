@@ -55,8 +55,20 @@ void showQuizMasterProfileSideSheet(BuildContext context) {
 }
 
 /// Fallback full-screen route for legacy navigation (if directly invoked)
-class QuizMasterProfileScreen extends StatelessWidget {
+class QuizMasterProfileScreen extends StatefulWidget {
   const QuizMasterProfileScreen({super.key});
+
+  @override
+  State<QuizMasterProfileScreen> createState() =>
+      _QuizMasterProfileScreenState();
+}
+
+class _QuizMasterProfileScreenState extends State<QuizMasterProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    QuizMasterNavPersistence.savePage('profile');
+  }
 
   @override
   Widget build(BuildContext context) {

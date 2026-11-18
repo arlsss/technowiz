@@ -58,15 +58,10 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
   }
 
   Future<void> _saveCurrentPage() async {
-    String page = 'quiz_sessions';
-
-    if (widget.resultMode == 'leaderboard') {
-      page = 'leaderboard';
-    } else if (widget.resultMode == 'ranking') {
-      page = 'ranking';
-    }
-
-    await QuizMasterNavPersistence.savePage(page);
+    await QuizMasterNavPersistence.savePage(
+      'quiz_sessions',
+      resultMode: widget.resultMode,
+    );
   }
 
   Future<void> _saveChildPage(String page, String quizCode) async {

@@ -553,7 +553,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
+          MaterialPageRoute(
+            builder: (_) => const QuizMasterDashboard(restoreLastPage: false),
+          ),
           (route) => false,
         );
       } else {

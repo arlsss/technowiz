@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
 import 'quizmaster_dashboard.dart';
 import 'quizmaster_theme.dart';
+import '../../navigation_persistence.dart';
 
 class FinalRankingScreen extends StatefulWidget {
   final String quizCode;
@@ -148,19 +148,12 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
   }
 
   Future<void> _saveCurrentPage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('technowiz_quizmaster_last_page', 'ranking');
-      await prefs.setString(
-        'technowiz_quizmaster_current_quiz_code',
-        widget.quizCode,
-      );
-      await prefs.setInt('technowiz_quizmaster_ranking_level', widget.level);
-      await prefs.setBool(
-        'technowiz_quizmaster_ranking_is_final',
-        widget.isFinal,
-      );
-    } catch (_) {}
+    await QuizMasterNavPersistence.savePage(
+      'ranking',
+      quizCode: widget.quizCode,
+      rankingLevel: widget.level,
+      rankingIsFinal: widget.isFinal,
+    );
   }
 
   static const Color primaryBlue = Color(0xFF1565D8);
@@ -726,10 +719,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
         'finishedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('technowiz_quizmaster_last_page', 'dashboard');
-      await prefs.remove('technowiz_quizmaster_current_quiz_code');
-      await prefs.remove('technowiz_quizmaster_result_mode');
+      await QuizMasterNavPersistence.savePage('dashboard');
     } catch (e) {
       debugPrint('Error saving dashboard state: $e');
     }

@@ -13,6 +13,7 @@ import 'contestant_readiness_page.dart';
 import 'quizmaster_dashboard.dart';
 import 'quizmaster_theme.dart';
 import '../../utils/refresh_blocker.dart';
+import '../../navigation_persistence.dart';
 
 class QuizControlScreen extends StatefulWidget {
   final String quizCode;
@@ -110,9 +111,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
   Future<void> _rememberQuizControlPage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_quizMasterLastPageKey, 'quiz_control');
-      await prefs.setString(_quizMasterCurrentQuizCodeKey, widget.quizCode);
+      await QuizMasterNavPersistence.savePage(
+        'quiz_control',
+        quizCode: widget.quizCode,
+      );
     } catch (e) {
       debugPrint('Quiz Master control page save error: $e');
     }
@@ -1087,9 +1089,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       });
 
       // Remember that the Quiz Master is on the readiness page for this event.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_quizMasterLastPageKey, 'participant_readiness');
-      await prefs.setString(_quizMasterCurrentQuizCodeKey, widget.quizCode);
+      await QuizMasterNavPersistence.savePage(
+        'participant_readiness',
+        quizCode: widget.quizCode,
+        readinessLevel: nextLevel,
+      );
 
       if (!mounted) return;
 
@@ -2237,9 +2241,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         debugPrint('NOTIFICATION ADD ERROR: $e');
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_quizMasterLastPageKey, 'ranking');
-      await prefs.setString(_quizMasterCurrentQuizCodeKey, widget.quizCode);
+      await QuizMasterNavPersistence.savePage(
+        'ranking',
+        quizCode: widget.quizCode,
+        rankingLevel: _currentLevel,
+        rankingIsFinal: true,
+      );
 
       if (!mounted) return;
 
@@ -2323,6 +2330,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           reverseTransitionDuration: Duration.zero,
         ),
       );
+      if (mounted) {
+        await _rememberQuizControlPage();
+      }
     } finally {
       _finalRankingOpening = false;
     }
@@ -4946,20 +4956,14 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   height: 48,
                                   child: ElevatedButton.icon(
                                     onPressed: () async {
-                                      final prefs =
-                                          await SharedPreferences.getInstance();
-                                      await prefs.setString(
-                                        _quizMasterLastPageKey,
-                                        'dashboard',
-                                      );
-                                      await prefs.remove(
-                                        _quizMasterCurrentQuizCodeKey,
-                                      );
+                                      await QuizMasterNavPersistence.savePage('dashboard');
                                       if (!context.mounted) return;
                                       Navigator.of(context).pushAndRemoveUntil(
                                         MaterialPageRoute(
                                           builder: (_) =>
-                                              const QuizMasterDashboard(),
+                                              const QuizMasterDashboard(
+                                            restoreLastPage: false,
+                                          ),
                                         ),
                                         (route) => false,
                                       );

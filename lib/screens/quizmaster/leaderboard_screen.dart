@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'quizmaster_dashboard.dart';
 import 'quiz_sessions_screen.dart';
@@ -68,23 +67,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   final Set<String> _checkedUids = {};
   String? _lastSyncedQuizCode;
 
-  static const String _lastPageKey = 'technowiz_quizmaster_last_page';
-  static const String _quizCodeKey = 'technowiz_quizmaster_current_quiz_code';
-  static const String _leaderboardLevelKey =
-      'technowiz_quizmaster_leaderboard_level';
-
   Future<void> _savePage(String page, {String? quizCode}) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastPageKey, page);
-    if (quizCode != null && quizCode.trim().isNotEmpty) {
-      await prefs.setString(_quizCodeKey, quizCode.trim());
-    }
+    await QuizMasterNavPersistence.savePage(
+      page,
+      quizCode: quizCode ?? _activeQuizCode,
+      leaderboardLevel: selectedLevel,
+      leaderboardShowHistory: showHistory,
+    );
   }
 
   Future<void> _saveDashboardPage() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastPageKey, 'dashboard');
-    await prefs.remove(_quizCodeKey);
+    await QuizMasterNavPersistence.savePage('dashboard');
   }
 
   @override
@@ -1530,9 +1523,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         onTap: () {
           if (selectedLevel != level) {
             setState(() => selectedLevel = level);
-            SharedPreferences.getInstance().then((prefs) {
-              prefs.setString(_leaderboardLevelKey, level);
-            });
+            _savePage(showHistory ? 'leaderboard_history' : 'leaderboard');
           }
         },
 

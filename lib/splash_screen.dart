@@ -374,19 +374,24 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // 3. Quizzes / Quiz Sessions
     if (page == 'quiz_sessions') {
-      _replaceWith(const QuizSessionsScreen());
+      final savedResultMode =
+          prefs.getString(QuizMasterNavPersistence.resultModeKey);
+      _replaceWith(QuizSessionsScreen(resultMode: savedResultMode));
       return;
     }
 
     // 4. Leaderboard & Leaderboard History (works with or without a specific quiz code)
     if (page == 'leaderboard' || page == 'leaderboard_history') {
       final String savedLevel =
-          prefs.getString('technowiz_quizmaster_leaderboard_level') ??
-          'Level 1';
+          prefs.getString(QuizMasterNavPersistence.leaderboardLevelKey) ??
+          'Overall';
+      final bool showHist = (page == 'leaderboard_history') ||
+          (prefs.getBool(QuizMasterNavPersistence.leaderboardShowHistoryKey) ??
+              false);
       _replaceWith(
         LeaderboardScreen(
           quizCode: quizCode,
-          initialShowHistory: page == 'leaderboard_history',
+          initialShowHistory: showHist,
           initialLevel: savedLevel,
         ),
       );
@@ -397,10 +402,13 @@ class _SplashScreenState extends State<SplashScreen> {
     if (page == 'participants' ||
         page == 'contestant' ||
         page == 'participants_history') {
+      final bool showHist = (page == 'participants_history') ||
+          (prefs.getBool(QuizMasterNavPersistence.participantsShowHistoryKey) ??
+              false);
       _replaceWith(
         ManageParticipantsScreen(
           quizCode: quizCode,
-          initialShowHistory: page == 'participants_history',
+          initialShowHistory: showHist,
         ),
       );
       return;

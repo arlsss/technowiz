@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'profile_screen.dart';
 import 'quizmaster_theme.dart';
 
@@ -11,13 +12,19 @@ import 'quiz_sessions_screen.dart';
 import 'leaderboard_screen.dart';
 
 import 'manage_participants_screen.dart';
+import 'quiz_control_screen.dart';
+import 'contestant_readiness_page.dart';
+import 'final_ranking_screen.dart';
+import 'submitted_answers_screen.dart';
 
 import '../login_screen.dart';
 import '../../navigation_persistence.dart';
 import '../../services/user_presence_service.dart';
 
 class QuizMasterDashboard extends StatefulWidget {
-  const QuizMasterDashboard({super.key});
+  const QuizMasterDashboard({super.key, this.restoreLastPage = true});
+
+  final bool restoreLastPage;
 
   @override
   State<QuizMasterDashboard> createState() => _QuizMasterDashboardState();
@@ -43,12 +50,169 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   int selectedMenu = 0;
   final Set<int> _hoveredMenuItems = <int>{};
   bool _navigationInProgress = false;
+  bool _isRestoringQuizMasterPage = false;
 
   @override
   void initState() {
     super.initState();
     UserPresenceService.instance.setOnline();
-    _saveLastPage('dashboard');
+
+    if (widget.restoreLastPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreLastQuizMasterPage();
+      });
+    } else {
+      _saveLastPage('dashboard');
+    }
+  }
+
+  Future<void> _restoreLastQuizMasterPage() async {
+    if (!mounted || _isRestoringQuizMasterPage) return;
+    _isRestoringQuizMasterPage = true;
+
+    try {
+      final String? savedPage = await QuizMasterNavPersistence.getPage();
+      debugPrint('🔥 QUIZMASTER DASHBOARD CHECKING RESTORE: $savedPage');
+
+      if (!mounted) return;
+
+      if (savedPage == null || savedPage.isEmpty || savedPage == 'dashboard') {
+        await _saveLastPage('dashboard');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final String? rawQuizCode =
+          prefs.getString(QuizMasterNavPersistence.quizCodeKey);
+      final String quizCode = rawQuizCode?.trim() ?? '';
+
+      late final Widget page;
+      switch (savedPage) {
+        case 'quiz_sessions':
+          final savedResultMode =
+              prefs.getString(QuizMasterNavPersistence.resultModeKey);
+          page = QuizSessionsScreen(resultMode: savedResultMode);
+          break;
+        case 'leaderboard':
+        case 'leaderboard_history':
+          final savedLevel =
+              prefs.getString(QuizMasterNavPersistence.leaderboardLevelKey) ??
+                  'Overall';
+          final showHist = (savedPage == 'leaderboard_history') ||
+              (prefs.getBool(
+                      QuizMasterNavPersistence.leaderboardShowHistoryKey) ??
+                  false);
+          page = LeaderboardScreen(
+            quizCode: quizCode,
+            initialShowHistory: showHist,
+            initialLevel: savedLevel,
+          );
+          break;
+        case 'participants':
+        case 'contestant':
+        case 'participants_history':
+          final showHist = (savedPage == 'participants_history') ||
+              (prefs.getBool(
+                      QuizMasterNavPersistence.participantsShowHistoryKey) ??
+                  false);
+          page = ManageParticipantsScreen(
+            quizCode: quizCode,
+            initialShowHistory: showHist,
+          );
+          break;
+        case 'quiz_control':
+          if (quizCode.isNotEmpty) {
+            page = QuizControlScreen(quizCode: quizCode);
+          } else {
+            page = const QuizSessionsScreen();
+          }
+          break;
+        case 'participant_readiness':
+        case 'contestant_readiness':
+        case 'quizmaster_overview':
+          if (quizCode.isNotEmpty) {
+            final savedLevel = prefs.getInt(
+                    QuizMasterNavPersistence.readinessLevelKey) ??
+                1;
+            page = ContestantReadinessPage(
+              quizCode: quizCode,
+              startLevel: savedLevel,
+              onStartQuiz: () async {
+                if (!mounted) return;
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => QuizControlScreen(quizCode: quizCode),
+                  ),
+                );
+              },
+              onReturnToSessions: () async {
+                if (!mounted) return;
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const QuizSessionsScreen()),
+                );
+              },
+            );
+          } else {
+            page = const QuizSessionsScreen();
+          }
+          break;
+        case 'ranking':
+        case 'final_ranking':
+          if (quizCode.isNotEmpty) {
+            final savedLevel =
+                prefs.getInt(QuizMasterNavPersistence.rankingLevelKey) ?? 1;
+            final isFinal =
+                prefs.getBool(QuizMasterNavPersistence.rankingIsFinalKey) ??
+                    true;
+            page = FinalRankingScreen(
+              quizCode: quizCode,
+              level: savedLevel,
+              isFinal: isFinal,
+            );
+          } else {
+            page = const QuizSessionsScreen();
+          }
+          break;
+        case 'submitted_answers':
+          if (quizCode.isNotEmpty) {
+            final qIndex = prefs.getInt(
+                QuizMasterNavPersistence.submittedQuestionIndexKey);
+            page = SubmittedAnswersScreen(
+              quizCode: quizCode,
+              questionIndex: qIndex,
+            );
+          } else {
+            page = const QuizSessionsScreen();
+          }
+          break;
+        case 'profile':
+          page = const QuizMasterProfileScreen();
+          break;
+        default:
+          await _saveLastPage('dashboard');
+          return;
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder<void>(
+            pageBuilder: (_, _, _) => page,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            transitionsBuilder: (_, animation, secondaryAnimation, child) =>
+                child,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ QuizMasterDashboard restore error: $e');
+      if (mounted) {
+        await _saveLastPage('dashboard');
+      }
+    } finally {
+      _isRestoringQuizMasterPage = false;
+    }
   }
 
   // ============================================================
@@ -92,8 +256,16 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
   // ============================================================
 
-  Future<void> _saveLastPage(String page, {String? resultMode}) async {
-    await QuizMasterNavPersistence.savePage(page, resultMode: resultMode);
+  Future<void> _saveLastPage(
+    String page, {
+    String? resultMode,
+    String? quizCode,
+  }) async {
+    await QuizMasterNavPersistence.savePage(
+      page,
+      resultMode: resultMode,
+      quizCode: quizCode,
+    );
   }
 
   Future<void> _clearLastPage() async {
@@ -701,7 +873,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       if (!context.mounted) return;
 
-      await _saveLastPage('leaderboard');
+      await _saveLastPage('leaderboard', quizCode: quizCode);
       if (!mounted || !context.mounted) return;
 
       await Navigator.push(
@@ -827,7 +999,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       if (!context.mounted) return;
 
-      await _saveLastPage('participants');
+      await _saveLastPage('participants', quizCode: activeQuizCode);
       if (!mounted || !context.mounted) return;
 
       await Navigator.push(

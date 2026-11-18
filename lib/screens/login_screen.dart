@@ -330,7 +330,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
+          MaterialPageRoute(
+            builder: (_) => const QuizMasterDashboard(restoreLastPage: false),
+          ),
         );
       } else if (normalizedRole == "competitor" ||
           normalizedRole == "contestant") {
@@ -628,7 +630,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const QuizMasterDashboard()),
+          MaterialPageRoute(
+            builder: (_) => const QuizMasterDashboard(restoreLastPage: false),
+          ),
         );
       } else {
         await AuthNavPersistence.saveSession(uid: uid, role: 'contestant');

@@ -239,6 +239,10 @@ class QuizMasterNavPersistence {
   static const String resultModeKey = 'technowiz_quizmaster_result_mode';
   static const String leaderboardLevelKey =
       'technowiz_quizmaster_leaderboard_level';
+  static const String leaderboardShowHistoryKey =
+      'technowiz_quizmaster_leaderboard_show_history';
+  static const String participantsShowHistoryKey =
+      'technowiz_quizmaster_participants_show_history';
   static const String rankingLevelKey = 'technowiz_quizmaster_ranking_level';
   static const String rankingIsFinalKey =
       'technowiz_quizmaster_ranking_is_final';
@@ -253,6 +257,8 @@ class QuizMasterNavPersistence {
     String? quizCode,
     String? resultMode,
     String? leaderboardLevel,
+    bool? leaderboardShowHistory,
+    bool? participantsShowHistory,
     int? rankingLevel,
     bool? rankingIsFinal,
     int? readinessLevel,
@@ -270,12 +276,21 @@ class QuizMasterNavPersistence {
 
       if (resultMode != null) {
         await prefs.setString(resultModeKey, resultMode);
-      } else {
+      } else if (pageKey != 'quiz_sessions') {
         await prefs.remove(resultModeKey);
       }
 
-      if (leaderboardLevel != null) {
+      if (leaderboardLevel != null && leaderboardLevel.isNotEmpty) {
         await prefs.setString(leaderboardLevelKey, leaderboardLevel);
+      }
+      if (leaderboardShowHistory != null) {
+        await prefs.setBool(leaderboardShowHistoryKey, leaderboardShowHistory);
+      }
+      if (participantsShowHistory != null) {
+        await prefs.setBool(
+          participantsShowHistoryKey,
+          participantsShowHistory,
+        );
       }
       if (rankingLevel != null) {
         await prefs.setInt(rankingLevelKey, rankingLevel);
@@ -297,7 +312,8 @@ class QuizMasterNavPersistence {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.reload();
-      return prefs.getString(lastPageKey);
+      final page = prefs.getString(lastPageKey);
+      return (page == null || page.trim().isEmpty) ? null : page.trim();
     } catch (_) {
       return null;
     }
@@ -311,6 +327,8 @@ class QuizMasterNavPersistence {
       await prefs.remove(quizCodeKey);
       await prefs.remove(resultModeKey);
       await prefs.remove(leaderboardLevelKey);
+      await prefs.remove(leaderboardShowHistoryKey);
+      await prefs.remove(participantsShowHistoryKey);
       await prefs.remove(rankingLevelKey);
       await prefs.remove(rankingIsFinalKey);
       await prefs.remove(readinessLevelKey);
