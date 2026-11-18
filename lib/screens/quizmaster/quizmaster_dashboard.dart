@@ -2155,41 +2155,6 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                       ],
                     ),
                   ),
-                  // Header Action Button
-                  InkWell(
-                    onTap: () => openQuizSessions(context),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F7FF),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFD6E8F7)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            "View All",
-                            style: TextStyle(
-                              color: Color(0xFF168BEB),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 13,
-                            color: Color(0xFF168BEB),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -2560,27 +2525,6 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                 color: Color(0xFF64748B),
                 fontSize: 12,
                 height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF168BEB),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () => openQuizSessions(context),
-            icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-            label: const Text(
-              "Go to Quiz Sessions",
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
               ),
             ),
           ),
