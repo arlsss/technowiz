@@ -1368,9 +1368,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                   _dashboardMetricCard(
                     icon: Icons.emoji_events_rounded,
-                    title: "Total Quiz Sessions",
+                    title: "Total Quiz Events",
                     collection: "quiz_sessions",
-                    onlyLastWeek: true,
                     color: const Color(0xFF10A86B),
                     background: const Color(0xFFE2F9ED),
                   ),
@@ -1784,14 +1783,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AdminThemeColors.textMuted,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: AdminThemeColors.textMuted,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
