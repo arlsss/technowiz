@@ -843,7 +843,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             ),
           ),
           pw.SizedBox(height: 6),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: [
               'Total Contestants',
               'Active / Completed',
@@ -896,7 +896,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               ),
             )
           else
-            pw.Table.fromTextArray(
+            pw.TableHelper.fromTextArray(
               headers: [
                 'Rank',
                 'Contestant Name',
@@ -970,7 +970,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               ),
             )
           else
-            pw.Table.fromTextArray(
+            pw.TableHelper.fromTextArray(
               headers: ['#', 'Contestant / Team', 'Members', 'School Name', 'Status'],
               data: participants.asMap().entries.map((entry) {
                 final p = entry.value;
@@ -1045,7 +1045,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
     await Printing.layoutPdf(
       onLayout: (format) async => pdf.save(),
-      name: 'TechNoWiz_Official_Report_${quizCode}.pdf',
+      name: 'TechNoWiz_Official_Report_$quizCode.pdf',
     );
   }
 
@@ -1530,7 +1530,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 final d = doc.data();
                 final title = (d['title'] ?? d['quizName'] ?? '').toString().toLowerCase();
                 final code = (d['quizCode'] ?? doc.id).toString().toLowerCase();
-                final status = (d['status'] ?? '').toString().toLowerCase();
 
                 if (_quizSearchQuery.isNotEmpty) {
                   final q = _quizSearchQuery.toLowerCase();
