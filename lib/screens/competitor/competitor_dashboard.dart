@@ -4199,22 +4199,53 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return fallback;
   }
 
-  String _getLeaderboardLevelTitle(int level) {
+  String _getLeaderboardLevelTitle(int level, [Map<String, dynamic>? sessionData]) {
+    if (sessionData != null) {
+      final rawSettings = sessionData['levelSettings'];
+      if (rawSettings is Map) {
+        final setting = rawSettings['Level $level'] ??
+            rawSettings['level $level'] ??
+            rawSettings['$level'] ??
+            rawSettings['Level$level'] ??
+            rawSettings['level_$level'];
+        if (setting is Map) {
+          final diff = setting['difficulty']?.toString().trim();
+          if (diff != null && diff.isNotEmpty) {
+            return diff;
+          }
+        }
+      }
+      final topDiff = sessionData['level${level}Difficulty']?.toString().trim();
+      if (topDiff != null && topDiff.isNotEmpty) {
+        return topDiff;
+      }
+    }
+
     switch (level) {
       case 1:
-        return 'Level 1 (Easy)';
+        return 'Easy';
       case 2:
-        return 'Level 2 (Moderate)';
+        return 'Moderate';
       case 3:
-        return 'Level 3 (Difficult)';
+        return 'Difficult';
       case 4:
-        return 'Level 4 (Clincher)';
+        return 'Clincher';
       default:
         return 'Level $level';
     }
   }
 
-  Color _getLeaderboardLevelColor(int level) {
+  Color _getLeaderboardLevelColor(int level, [Map<String, dynamic>? sessionData]) {
+    final title = _getLeaderboardLevelTitle(level, sessionData).toLowerCase();
+    if (title.contains('easy')) return const Color(0xFF16A34A);
+    if (title.contains('moderate') || title.contains('medium')) {
+      return const Color(0xFFD97706);
+    }
+    if (title.contains('difficult') || title.contains('hard')) {
+      return const Color(0xFFDC2626);
+    }
+    if (title.contains('clincher')) return const Color(0xFF7C3AED);
+
     switch (level) {
       case 1:
         return const Color(0xFF16A34A);
@@ -4464,10 +4495,14 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   Widget _buildLeaderboardLevelSelectorBar(
     DocumentSnapshot<Map<String, dynamic>> sessionDoc,
   ) {
+    final sessionData = sessionDoc.data() ?? {};
+
     return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
       future: sessionDoc.reference.collection('questions').get(),
       builder: (context, questionsSnapshot) {
         final distinctLevels = <int>{};
+
+        // 1. Check questions in this session
         if (questionsSnapshot.hasData &&
             questionsSnapshot.data!.docs.isNotEmpty) {
           for (final qDoc in questionsSnapshot.data!.docs) {
@@ -4475,6 +4510,22 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             final lvl = _parseLeaderboardLevel(
               qData['sessionLevel'] ?? qData['level'],
             );
+            if (lvl > 0) distinctLevels.add(lvl);
+          }
+        }
+
+        // 2. Check admin-configured levels and levelSettings
+        final rawSettings = sessionData['levelSettings'];
+        if (rawSettings is Map) {
+          for (final key in rawSettings.keys) {
+            final lvl = _parseLeaderboardLevel(key);
+            if (lvl > 0) distinctLevels.add(lvl);
+          }
+        }
+        final rawLevels = sessionData['levels'];
+        if (rawLevels is List) {
+          for (final item in rawLevels) {
+            final lvl = _parseLeaderboardLevel(item);
             if (lvl > 0) distinctLevels.add(lvl);
           }
         }
@@ -4503,9 +4554,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: _buildLeaderboardLevelPill(
-                      title: _getLeaderboardLevelTitle(lvl),
+                      title: _getLeaderboardLevelTitle(lvl, sessionData),
                       level: lvl,
-                      color: _getLeaderboardLevelColor(lvl),
+                      color: _getLeaderboardLevelColor(lvl, sessionData),
                       isSelected: _leaderboardSelectedLevel == lvl,
                     ),
                   );
@@ -4650,7 +4701,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   isLive: isLive,
                   isWaiting: isWaiting,
                   levelTitle:
-                      _getLeaderboardLevelTitle(_leaderboardSelectedLevel!),
+                      _getLeaderboardLevelTitle(_leaderboardSelectedLevel!, session.data()),
                 );
               },
             );

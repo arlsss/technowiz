@@ -97,21 +97,50 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
   }
 
   String _getLevelTitle(int level) {
+    final rawSettings = _sessionData['levelSettings'];
+    if (rawSettings is Map) {
+      final setting = rawSettings['Level $level'] ??
+          rawSettings['level $level'] ??
+          rawSettings['$level'] ??
+          rawSettings['Level$level'] ??
+          rawSettings['level_$level'];
+      if (setting is Map) {
+        final diff = setting['difficulty']?.toString().trim();
+        if (diff != null && diff.isNotEmpty) {
+          return diff;
+        }
+      }
+    }
+    final topDiff = _sessionData['level${level}Difficulty']?.toString().trim();
+    if (topDiff != null && topDiff.isNotEmpty) {
+      return topDiff;
+    }
+
     switch (level) {
       case 1:
-        return 'Level 1 (Easy)';
+        return 'Easy';
       case 2:
-        return 'Level 2 (Moderate)';
+        return 'Moderate';
       case 3:
-        return 'Level 3 (Difficult)';
+        return 'Difficult';
       case 4:
-        return 'Level 4 (Clincher)';
+        return 'Clincher';
       default:
         return 'Level $level';
     }
   }
 
   Color _getLevelColor(int level) {
+    final title = _getLevelTitle(level).toLowerCase();
+    if (title.contains('easy')) return const Color(0xFF16A34A); // Green
+    if (title.contains('moderate') || title.contains('medium')) {
+      return const Color(0xFFD97706); // Amber
+    }
+    if (title.contains('difficult') || title.contains('hard')) {
+      return const Color(0xFFDC2626); // Red
+    }
+    if (title.contains('clincher')) return const Color(0xFF7C3AED); // Purple
+
     switch (level) {
       case 1:
         return const Color(0xFF16A34A); // Green
@@ -781,7 +810,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                 padding: const EdgeInsets.only(right: 8),
                 child: _buildLevelPill(
                   level: lvl,
-                  label: 'Level $lvl • ${stats['score']} pts',
+                  label: '${_getLevelTitle(lvl)} • ${stats['score']} pts',
                   color: _getLevelColor(lvl),
                 ),
               );
@@ -1150,7 +1179,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'Level $lvl: ',
+                                  '${_getLevelTitle(lvl)}: ',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 11.5,
