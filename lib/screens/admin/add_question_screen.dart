@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'admin_dashboard.dart';
 import 'manage_users_screen.dart';
 import 'question_list_screen.dart';
@@ -2191,8 +2190,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
     final pageKey = pageKeys[destinationKey];
     if (pageKey != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('technowiz_admin_last_page', pageKey);
+      await AdminNavPersistence.savePage(pageKey);
     }
 
     if (!mounted) return;

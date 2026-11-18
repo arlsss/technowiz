@@ -72,6 +72,10 @@ class AdminNavPersistence {
   static const String historyDocIdKey = 'technowiz_admin_history_doc_id';
   static const String editQuestionIdKey = 'technowiz_admin_edit_question_id';
   static const String leaderboardQuizCodeKey = 'technowiz_admin_leaderboard_quiz_code';
+  static const String leaderboardLevelKey = 'technowiz_admin_leaderboard_level';
+  static const String leaderboardShowHistoryKey = 'technowiz_admin_leaderboard_show_history';
+  static const String reportTabKey = 'technowiz_admin_report_tab';
+  static const String reportQuizCodeKey = 'technowiz_admin_report_quiz_code';
 
   /// Saves the current Admin page and any optional contextual identifiers.
   static Future<void> savePage(
@@ -83,6 +87,10 @@ class AdminNavPersistence {
     String? historyDocId,
     String? editQuestionId,
     String? leaderboardQuizCode,
+    String? leaderboardLevel,
+    bool? leaderboardShowHistory,
+    String? reportTab,
+    String? reportQuizCode,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -90,7 +98,10 @@ class AdminNavPersistence {
 
       if (detailQuizCode != null && detailQuizCode.isNotEmpty) {
         await prefs.setString(detailQuizCodeKey, detailQuizCode);
+      } else if (pageKey != 'quiz_session_detail') {
+        await prefs.remove(detailQuizCodeKey);
       }
+
       if (historyQuizCode != null && historyQuizCode.isNotEmpty) {
         await prefs.setString(historyQuizCodeKey, historyQuizCode);
       }
@@ -109,6 +120,18 @@ class AdminNavPersistence {
       if (leaderboardQuizCode != null && leaderboardQuizCode.isNotEmpty) {
         await prefs.setString(leaderboardQuizCodeKey, leaderboardQuizCode);
       }
+      if (leaderboardLevel != null && leaderboardLevel.isNotEmpty) {
+        await prefs.setString(leaderboardLevelKey, leaderboardLevel);
+      }
+      if (leaderboardShowHistory != null) {
+        await prefs.setBool(leaderboardShowHistoryKey, leaderboardShowHistory);
+      }
+      if (reportTab != null && reportTab.isNotEmpty) {
+        await prefs.setString(reportTabKey, reportTab);
+      }
+      if (reportQuizCode != null && reportQuizCode.isNotEmpty) {
+        await prefs.setString(reportQuizCodeKey, reportQuizCode);
+      }
     } catch (_) {
       // SharedPreferences failures should not crash the UI
     }
@@ -118,7 +141,9 @@ class AdminNavPersistence {
   static Future<String?> getPage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(lastPageKey);
+      await prefs.reload();
+      final page = prefs.getString(lastPageKey);
+      return (page == null || page.trim().isEmpty) ? null : page.trim();
     } catch (_) {
       return null;
     }
@@ -136,9 +161,15 @@ class AdminNavPersistence {
       await prefs.remove(historyDocIdKey);
       await prefs.remove(editQuestionIdKey);
       await prefs.remove(leaderboardQuizCodeKey);
+      await prefs.remove(leaderboardLevelKey);
+      await prefs.remove(leaderboardShowHistoryKey);
+      await prefs.remove(reportTabKey);
+      await prefs.remove(reportQuizCodeKey);
     } catch (_) {}
     await AuthNavPersistence.clearSession();
   }
+
+  static Future<void> clearAll() => clear();
 }
 
 /// Centralized navigation state persistence for all Competitor screens and tabs.

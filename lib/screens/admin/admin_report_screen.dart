@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'admin_dashboard.dart';
 import 'manage_users_screen.dart';
@@ -23,7 +24,14 @@ import '../../navigation_persistence.dart';
 // ============================================================================
 
 class AdminReportScreen extends StatefulWidget {
-  const AdminReportScreen({super.key});
+  final String? initialTab;
+  final String? initialQuizCode;
+
+  const AdminReportScreen({
+    super.key,
+    this.initialTab,
+    this.initialQuizCode,
+  });
 
   @override
   State<AdminReportScreen> createState() => _AdminReportScreenState();
@@ -49,7 +57,45 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   @override
   void initState() {
     super.initState();
-    AdminNavPersistence.savePage('reports');
+    if (widget.initialTab != null && widget.initialTab!.isNotEmpty) {
+      _selectedReportTab = widget.initialTab!;
+    }
+    if (widget.initialQuizCode != null && widget.initialQuizCode!.isNotEmpty) {
+      selectedQuizCode = widget.initialQuizCode;
+    }
+    _restorePreferencesAndSave();
+  }
+
+  Future<void> _restorePreferencesAndSave() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      if (widget.initialTab == null &&
+          prefs.containsKey(AdminNavPersistence.reportTabKey)) {
+        final savedTab = prefs.getString(AdminNavPersistence.reportTabKey);
+        if (savedTab != null && savedTab.isNotEmpty) {
+          _selectedReportTab = savedTab;
+        }
+      }
+      if (widget.initialQuizCode == null &&
+          prefs.containsKey(AdminNavPersistence.reportQuizCodeKey)) {
+        final savedCode =
+            prefs.getString(AdminNavPersistence.reportQuizCodeKey);
+        if (savedCode != null && savedCode.isNotEmpty) {
+          selectedQuizCode = savedCode;
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() {});
+    await _savePage();
+  }
+
+  Future<void> _savePage() async {
+    await AdminNavPersistence.savePage(
+      'reports',
+      reportTab: _selectedReportTab,
+      reportQuizCode: selectedQuizCode,
+    );
   }
 
   @override
@@ -1735,6 +1781,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           onChanged: (newCode) {
             if (newCode != null) {
               setState(() => selectedQuizCode = newCode);
+              _savePage();
             }
           },
         ),
@@ -2103,7 +2150,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           final isSelected = _selectedReportTab == t['key'];
           return Expanded(
             child: InkWell(
-              onTap: () => setState(() => _selectedReportTab = t['key'] as String),
+              onTap: () {
+                setState(() => _selectedReportTab = t['key'] as String);
+                _savePage();
+              },
               borderRadius: BorderRadius.circular(11),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),

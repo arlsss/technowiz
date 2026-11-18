@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'admin_dashboard.dart';
 
 import 'add_question_screen.dart';
@@ -2129,9 +2127,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     BuildContext context,
     String destination,
   ) async {
-    // Keep the same saved-page keys used by the existing navigation.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('technowiz_admin_last_page', destination);
+    await AdminNavPersistence.savePage(destination);
 
     if (!context.mounted) return;
 

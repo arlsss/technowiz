@@ -56,7 +56,8 @@ class RoleSelectionScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const AdminDashboard(),
+                            builder: (_) =>
+                                const AdminDashboard(restoreLastPage: false),
                           ),
                         );
                       }

@@ -166,10 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
         key: 'saved_login_email',
         value: normalizedEmail,
       );
-      await secureStorage.write(
-        key: 'saved_login_password',
-        value: password,
-      );
+      await secureStorage.write(key: 'saved_login_password', value: password);
     } catch (e) {
       debugPrint("Could not securely save login credentials: $e");
     }
@@ -245,8 +242,9 @@ class _LoginScreenState extends State<LoginScreen> {
             .get();
 
         if (querySnap.docs.isNotEmpty) {
-          emailToUse =
-              (querySnap.docs.first.data()['email'] ?? rawInput).toString().trim();
+          emailToUse = (querySnap.docs.first.data()['email'] ?? rawInput)
+              .toString()
+              .trim();
         } else {
           final queryNameSnap = await FirebaseFirestore.instance
               .collection('users')
@@ -261,11 +259,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
 
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailToUse,
-        password: rawPassword,
-      );
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: emailToUse, password: rawPassword);
 
       final User? loggedInUser = userCredential.user;
       if (loggedInUser == null) {
@@ -283,7 +278,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final Map<String, dynamic> userData = userDoc.data() ?? {};
-      final bool isBlocked = userData["isBlocked"] == true ||
+      final bool isBlocked =
+          userData["isBlocked"] == true ||
           (userData["status"]?.toString().trim().toLowerCase() == "blocked");
       if (isBlocked) {
         await FirebaseAuth.instance.signOut();
@@ -292,8 +288,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
       final String role = userData["role"]?.toString() ?? "";
-      final String normalizedRole =
-          role.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+      final String normalizedRole = role.trim().toLowerCase().replaceAll(
+        RegExp(r'[\s_-]+'),
+        '',
+      );
 
       if (rememberMe) {
         await saveLoginCredentials(email: emailToUse, password: rawPassword);
@@ -301,7 +299,8 @@ class _LoginScreenState extends State<LoginScreen> {
         await LoginScreen.clearSavedCredentials();
       }
 
-      final String? name = userData["name"]?.toString() ??
+      final String? name =
+          userData["name"]?.toString() ??
           userData["fullName"]?.toString() ??
           userData["displayName"]?.toString();
 
@@ -321,7 +320,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          MaterialPageRoute(
+            builder: (_) => const AdminDashboard(restoreLastPage: false),
+          ),
         );
       } else if (normalizedRole == "quizmaster") {
         await AuthNavPersistence.saveSession(uid: uid, role: 'quizmaster');
@@ -338,7 +339,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'dashboard')),
+          MaterialPageRoute(
+            builder: (_) => const CompetitorDashboard(initialPage: 'dashboard'),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -386,8 +389,9 @@ class _LoginScreenState extends State<LoginScreen> {
         googleProvider.addScope('email');
         googleProvider.addScope('profile');
         googleProvider.setCustomParameters({'prompt': 'select_account'});
-        userCredential =
-            await FirebaseAuth.instance.signInWithPopup(googleProvider);
+        userCredential = await FirebaseAuth.instance.signInWithPopup(
+          googleProvider,
+        );
       } else {
         // Native Google Sign-In for Android/iOS (uses native Google Play Services, no browser redirect or sessionStorage issues)
         final GoogleSignIn googleSignIn = GoogleSignIn(
@@ -400,8 +404,8 @@ class _LoginScreenState extends State<LoginScreen> {
           await googleSignIn.signOut();
         } catch (_) {}
 
-        final GoogleSignInAccount? googleSignInAccount =
-            await googleSignIn.signIn();
+        final GoogleSignInAccount? googleSignInAccount = await googleSignIn
+            .signIn();
 
         if (googleSignInAccount == null) {
           // User dismissed account chooser
@@ -421,8 +425,9 @@ class _LoginScreenState extends State<LoginScreen> {
           idToken: googleAuth.idToken,
         );
 
-        userCredential =
-            await FirebaseAuth.instance.signInWithCredential(credential);
+        userCredential = await FirebaseAuth.instance.signInWithCredential(
+          credential,
+        );
       }
 
       final User? googleUser = userCredential.user;
@@ -443,10 +448,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         final Map<String, dynamic>? roleSelection =
             await showDialog<Map<String, dynamic>>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogCtx) => _GoogleRoleDialog(googleUser: googleUser),
-        );
+              context: context,
+              barrierDismissible: false,
+              builder: (dialogCtx) => _GoogleRoleDialog(googleUser: googleUser),
+            );
 
         if (roleSelection == null) {
           // User clicked Cancel
@@ -461,7 +466,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final String chosenRole =
             roleSelection["role"]?.toString() ?? "Contestant";
-        final String displayName = (googleUser.displayName != null &&
+        final String displayName =
+            (googleUser.displayName != null &&
                 googleUser.displayName!.trim().isNotEmpty)
             ? googleUser.displayName!.trim()
             : (email.isNotEmpty ? email.split('@').first : chosenRole);
@@ -486,12 +492,13 @@ class _LoginScreenState extends State<LoginScreen> {
           if (cType == "Team") {
             final String teamName =
                 roleSelection["teamName"]?.toString() ?? displayName;
-            final List<String> teamMembers =
-                List<String>.from(roleSelection["teamMembers"] ?? []);
+            final List<String> teamMembers = List<String>.from(
+              roleSelection["teamMembers"] ?? [],
+            );
             final int teamSize = teamMembers.isNotEmpty
                 ? teamMembers.length
                 : (int.tryParse(roleSelection["teamSize"]?.toString() ?? "2") ??
-                    2);
+                      2);
 
             newUserData["contestantType"] = "team";
             newUserData["isTeam"] = true;
@@ -531,11 +538,13 @@ class _LoginScreenState extends State<LoginScreen> {
             .set(newUserData);
 
         // Add welcome notification
-        final String notifUserName = (chosenRole == "Contestant" &&
+        final String notifUserName =
+            (chosenRole == "Contestant" &&
                 roleSelection["contestantType"] == "Team")
             ? (roleSelection["teamName"] ?? displayName)
             : displayName;
-        final String notifMessage = (chosenRole == "Contestant" &&
+        final String notifMessage =
+            (chosenRole == "Contestant" &&
                 roleSelection["contestantType"] == "Team")
             ? "$notifUserName registered via Google as Team Contestant with ${roleSelection["teamMembers"]?.length ?? 2} members."
             : "$displayName registered via Google as $chosenRole in TechNoWiz.";
@@ -557,7 +566,8 @@ class _LoginScreenState extends State<LoginScreen> {
         role = chosenRole;
       } else {
         final Map<String, dynamic> userData = userDoc.data() ?? {};
-        final bool isBlocked = userData["isBlocked"] == true ||
+        final bool isBlocked =
+            userData["isBlocked"] == true ||
             (userData["status"]?.toString().trim().toLowerCase() == "blocked");
         if (isBlocked) {
           await FirebaseAuth.instance.signOut();
@@ -583,10 +593,13 @@ class _LoginScreenState extends State<LoginScreen> {
             .update(updateData);
       }
 
-      final String normalizedRole =
-          role.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+      final String normalizedRole = role.trim().toLowerCase().replaceAll(
+        RegExp(r'[\s_-]+'),
+        '',
+      );
 
-      final String name = googleUser.displayName ??
+      final String name =
+          googleUser.displayName ??
           (email.isNotEmpty ? email.split('@').first : "Contestant");
 
       await setUserOnline(uid);
@@ -605,7 +618,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          MaterialPageRoute(
+            builder: (_) => const AdminDashboard(restoreLastPage: false),
+          ),
         );
       } else if (normalizedRole == "quizmaster") {
         await AuthNavPersistence.saveSession(uid: uid, role: 'quizmaster');
@@ -621,12 +636,16 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CompetitorDashboard(initialPage: 'dashboard')),
+          MaterialPageRoute(
+            builder: (_) => const CompetitorDashboard(initialPage: 'dashboard'),
+          ),
         );
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      debugPrint("Firebase Auth Exception (Google Sign-In): ${e.code} - ${e.message}");
+      debugPrint(
+        "Firebase Auth Exception (Google Sign-In): ${e.code} - ${e.message}",
+      );
 
       if (e.code == 'popup-closed-by-user' || e.code == 'cancelled') {
         // User closed the popup, no error message needed
@@ -640,8 +659,9 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (e.code == 'unauthorized-domain' ||
           message.toLowerCase().contains('domain is not authorized') ||
           message.toLowerCase().contains('authorized domain')) {
-        final currentHost =
-            kIsWeb && Uri.base.host.isNotEmpty ? Uri.base.host : 'vercel.app';
+        final currentHost = kIsWeb && Uri.base.host.isNotEmpty
+            ? Uri.base.host
+            : 'vercel.app';
         message =
             "Domain not authorized ($currentHost)! Palihug i-add ang '$currentHost' ug 'vercel.app' sa Firebase Console > Authentication > Settings > Authorized domains.";
         if (mounted) {
@@ -649,7 +669,8 @@ class _LoginScreenState extends State<LoginScreen> {
             context: context,
             builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: const Row(
                 children: [
                   Icon(Icons.security_rounded, color: Colors.orange, size: 28),
@@ -657,8 +678,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   Expanded(
                     child: Text(
                       "Domain Authorization",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -675,7 +698,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
@@ -695,15 +720,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text(
                     "Mga Lakang:\n1. Ablihi ang Firebase Console (technowiz-73132)\n2. Adto sa Authentication > Settings > Authorized domains\n3. I-click ang 'Add domain'\n4. I-paste ang domain sa ibabaw ug i-add pud ang 'vercel.app'",
                     style: TextStyle(
-                        fontSize: 12.5, height: 1.5, color: Color(0xFF334155)),
+                      fontSize: 12.5,
+                      height: 1.5,
+                      color: Color(0xFF334155),
+                    ),
                   ),
                 ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text("OK",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "OK",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -719,10 +749,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
       );
     } catch (e) {
       if (!mounted) return;
@@ -746,8 +773,9 @@ class _LoginScreenState extends State<LoginScreen> {
   // FORGOT PASSWORD DIALOG
   // =========================================================
   void _showForgotPasswordDialog() {
-    final TextEditingController resetEmailController =
-        TextEditingController(text: emailController.text.trim());
+    final TextEditingController resetEmailController = TextEditingController(
+      text: emailController.text.trim(),
+    );
 
     showDialog(
       context: context,
@@ -777,7 +805,11 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             const Text(
               'Enter your registered email address and we will send you a password reset link.',
-              style: TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 18),
             Container(
@@ -793,9 +825,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Enter your email',
                   hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                  prefixIcon: Icon(Icons.email_outlined, color: Color(0xFF2563EB), size: 20),
+                  prefixIcon: Icon(
+                    Icons.email_outlined,
+                    color: Color(0xFF2563EB),
+                    size: 20,
+                  ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 12,
+                  ),
                 ),
               ),
             ),
@@ -804,7 +843,10 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -820,7 +862,9 @@ class _LoginScreenState extends State<LoginScreen> {
               if (email.isEmpty) return;
               Navigator.pop(dialogCtx);
               try {
-                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                await FirebaseAuth.instance.sendPasswordResetEmail(
+                  email: email,
+                );
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -831,7 +875,10 @@ class _LoginScreenState extends State<LoginScreen> {
               } catch (e) {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
               }
             },
@@ -866,12 +913,13 @@ class _LoginScreenState extends State<LoginScreen> {
           final double screenWidth = constraints.maxWidth;
           final double screenHeight = constraints.maxHeight;
           final bool isCompact = screenHeight < 720 || screenWidth < 360;
-          final bool isLandscape = screenWidth > screenHeight && screenHeight < 550;
+          final bool isLandscape =
+              screenWidth > screenHeight && screenHeight < 550;
 
           final double horizontalPadding = screenWidth < 360 ? 12.0 : 18.0;
           final double maxCardWidth = screenWidth > 800 ? 440.0 : 410.0;
-          final double cardWidth =
-              (screenWidth - (horizontalPadding * 2)).clamp(260.0, maxCardWidth);
+          final double cardWidth = (screenWidth - (horizontalPadding * 2))
+              .clamp(260.0, maxCardWidth);
           final double verticalSpacing = isLandscape
               ? 10.0
               : (isCompact ? 14.0 : 20.0);
@@ -898,9 +946,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
 
               // 2. High-Tech PCB Electronic Circuit Traces & Microchip Nodes
-              CustomPaint(
-                painter: _TechCircuitBackgroundPainter(),
-              ),
+              CustomPaint(painter: _TechCircuitBackgroundPainter()),
 
               // 3. Foreground Scrollable Content
               SafeArea(
@@ -923,7 +969,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           SizedBox(height: verticalSpacing),
 
                           // Clean Light Glass Card
-                          _buildLoginCard(isCompact: isCompact, screenWidth: screenWidth),
+                          _buildLoginCard(
+                            isCompact: isCompact,
+                            screenWidth: screenWidth,
+                          ),
 
                           SizedBox(height: verticalSpacing),
 
@@ -1001,7 +1050,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     foreground: Paint()
                       ..style = PaintingStyle.fill
                       ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35)
-                      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+                      ..maskFilter = const MaskFilter.blur(
+                        BlurStyle.normal,
+                        16,
+                      ),
                   ),
                 ),
               ),
@@ -1105,10 +1157,7 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFFBFDBFE),
-              width: 1.2,
-            ),
+            border: Border.all(color: const Color(0xFFBFDBFE), width: 1.2),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF2563EB).withValues(alpha: 0.10),
@@ -1149,10 +1198,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: const Color(0xFFBFDBFE),
-          width: 1.5,
-        ),
+        border: Border.all(color: const Color(0xFFBFDBFE), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1E40AF).withValues(alpha: 0.09),
@@ -1182,10 +1228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFF93C5FD),
-                  width: 1.4,
-                ),
+                border: Border.all(color: const Color(0xFF93C5FD), width: 1.4),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF2563EB).withValues(alpha: 0.35),
@@ -1312,8 +1355,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 boxShadow: rememberMe
                                     ? [
                                         BoxShadow(
-                                          color: const Color(0xFF2563EB)
-                                              .withValues(alpha: 0.35),
+                                          color: const Color(
+                                            0xFF2563EB,
+                                          ).withValues(alpha: 0.35),
                                           blurRadius: 6,
                                         ),
                                       ]
@@ -1347,7 +1391,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(6),
                         onTap: _showForgotPasswordDialog,
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                          padding: EdgeInsets.symmetric(
+                            vertical: 4,
+                            horizontal: 2,
+                          ),
                           child: Text(
                             "Forgot Password?",
                             style: TextStyle(
@@ -1395,7 +1442,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F6FD),
                           borderRadius: BorderRadius.circular(8),
@@ -1510,8 +1560,8 @@ class _LoginScreenState extends State<LoginScreen> {
           color: isFocused
               ? const Color(0xFF2563EB)
               : hasText
-                  ? const Color(0xFF60A5FA)
-                  : const Color(0xFFCFE0F5),
+              ? const Color(0xFF60A5FA)
+              : const Color(0xFFCFE0F5),
           width: isFocused ? 1.8 : 1.2,
         ),
         boxShadow: isFocused
@@ -1580,19 +1630,12 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 52,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF3B82F6),
-            Color(0xFF2563EB),
-            Color(0xFF1D4ED8),
-          ],
+          colors: [Color(0xFF3B82F6), Color(0xFF2563EB), Color(0xFF1D4ED8)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: const Color(0xFF93C5FD),
-          width: 1.3,
-        ),
+        border: Border.all(color: const Color(0xFF93C5FD), width: 1.3),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2563EB).withValues(alpha: 0.38),
@@ -1689,10 +1732,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFCBD5E1),
-          width: 1.2,
-        ),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F172A).withValues(alpha: 0.04),
@@ -1783,7 +1823,11 @@ class _TechCircuitBackgroundPainter extends CustomPainter {
       ..color = const Color(0xFF3B82F6).withValues(alpha: 0.25)
       ..style = PaintingStyle.fill;
 
-    void drawCircuitTrace(List<Offset> points, {bool drawGlow = true, bool endRing = true}) {
+    void drawCircuitTrace(
+      List<Offset> points, {
+      bool drawGlow = true,
+      bool endRing = true,
+    }) {
       if (points.length < 2) return;
       final path = Path()..moveTo(points[0].dx, points[0].dy);
       for (int i = 1; i < points.length; i++) {
@@ -1802,8 +1846,17 @@ class _TechCircuitBackgroundPainter extends CustomPainter {
       }
     }
 
-    void drawChipFootprint(Offset center, double width, double height, int pinsPerSide) {
-      final chipRect = Rect.fromCenter(center: center, width: width, height: height);
+    void drawChipFootprint(
+      Offset center,
+      double width,
+      double height,
+      int pinsPerSide,
+    ) {
+      final chipRect = Rect.fromCenter(
+        center: center,
+        width: width,
+        height: height,
+      );
       final chipPaint = Paint()
         ..color = const Color(0xFF1E40AF).withValues(alpha: 0.16)
         ..style = PaintingStyle.fill;
@@ -1812,8 +1865,14 @@ class _TechCircuitBackgroundPainter extends CustomPainter {
         ..strokeWidth = 1.2
         ..style = PaintingStyle.stroke;
 
-      canvas.drawRRect(RRect.fromRectAndRadius(chipRect, const Radius.circular(3)), chipPaint);
-      canvas.drawRRect(RRect.fromRectAndRadius(chipRect, const Radius.circular(3)), chipBorder);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(chipRect, const Radius.circular(3)),
+        chipPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(chipRect, const Radius.circular(3)),
+        chipBorder,
+      );
 
       final pinPaint = Paint()
         ..color = const Color(0xFF2563EB).withValues(alpha: 0.35)
@@ -1821,8 +1880,16 @@ class _TechCircuitBackgroundPainter extends CustomPainter {
       final pinStep = height / (pinsPerSide + 1);
       for (int i = 1; i <= pinsPerSide; i++) {
         final py = chipRect.top + i * pinStep;
-        canvas.drawLine(Offset(chipRect.left - 4, py), Offset(chipRect.left, py), pinPaint);
-        canvas.drawLine(Offset(chipRect.right, py), Offset(chipRect.right + 4, py), pinPaint);
+        canvas.drawLine(
+          Offset(chipRect.left - 4, py),
+          Offset(chipRect.left, py),
+          pinPaint,
+        );
+        canvas.drawLine(
+          Offset(chipRect.right, py),
+          Offset(chipRect.right + 4, py),
+          pinPaint,
+        );
       }
     }
 
@@ -1961,8 +2028,9 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
   String contestantType = "Solo";
 
   final TextEditingController teamNameController = TextEditingController();
-  final TextEditingController teamSizeController =
-      TextEditingController(text: "2");
+  final TextEditingController teamSizeController = TextEditingController(
+    text: "2",
+  );
   final List<TextEditingController> memberNameControllers = [
     TextEditingController(),
     TextEditingController(),
@@ -2027,15 +2095,15 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
       return;
     }
 
-    Navigator.of(context).pop({
-      "role": selectedRole,
-      "contestantType": contestantType,
-    });
+    Navigator.of(
+      context,
+    ).pop({"role": selectedRole, "contestantType": contestantType});
   }
 
   @override
   Widget build(BuildContext context) {
-    final String displayName = widget.googleUser.displayName ??
+    final String displayName =
+        widget.googleUser.displayName ??
         (widget.googleUser.email != null
             ? widget.googleUser.email!.split('@').first
             : "Contestant");
@@ -2111,8 +2179,11 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
               // Title: SELECT YOUR ROLE
               const Row(
                 children: [
-                  Icon(Icons.workspace_premium_rounded,
-                      color: Color(0xFF2563EB), size: 16),
+                  Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 16,
+                  ),
                   SizedBox(width: 6),
                   Text(
                     "CHOOSE YOUR ROLE",
@@ -2167,8 +2238,11 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                 const SizedBox(height: 16),
                 const Row(
                   children: [
-                    Icon(Icons.category_rounded,
-                        color: Color(0xFF2563EB), size: 15),
+                    Icon(
+                      Icons.category_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 15,
+                    ),
                     SizedBox(width: 6),
                     Text(
                       "CONTESTANT PARTICIPATION TYPE",
@@ -2221,8 +2295,11 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                     controller: teamNameController,
                     decoration: InputDecoration(
                       hintText: "Team Name",
-                      prefixIcon: const Icon(Icons.shield_rounded,
-                          color: Color(0xFF2563EB), size: 20),
+                      prefixIcon: const Icon(
+                        Icons.shield_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 20,
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(
@@ -2236,10 +2313,14 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: const BorderSide(
-                            color: Color(0xFF2563EB), width: 1.5),
+                          color: Color(0xFF2563EB),
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -2250,8 +2331,11 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: "Number of members",
-                      prefixIcon: const Icon(Icons.group_add_rounded,
-                          color: Color(0xFF2563EB), size: 20),
+                      prefixIcon: const Icon(
+                        Icons.group_add_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 20,
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(
@@ -2265,22 +2349,29 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: const BorderSide(
-                            color: Color(0xFF2563EB), width: 1.5),
+                          color: Color(0xFF2563EB),
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       suffixIcon: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             icon: const Icon(
-                                Icons.remove_circle_outline_rounded,
-                                size: 20,
-                                color: Color(0xFF2563EB)),
+                              Icons.remove_circle_outline_rounded,
+                              size: 20,
+                              color: Color(0xFF2563EB),
+                            ),
                             onPressed: () {
                               final current =
-                                  int.tryParse(teamSizeController.text.trim()) ??
-                                      2;
+                                  int.tryParse(
+                                    teamSizeController.text.trim(),
+                                  ) ??
+                                  2;
                               if (current > 2) {
                                 final next = current - 1;
                                 teamSizeController.text = next.toString();
@@ -2291,12 +2382,17 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                             },
                           ),
                           IconButton(
-                            icon: const Icon(Icons.add_circle_outline_rounded,
-                                size: 20, color: Color(0xFF2563EB)),
+                            icon: const Icon(
+                              Icons.add_circle_outline_rounded,
+                              size: 20,
+                              color: Color(0xFF2563EB),
+                            ),
                             onPressed: () {
                               final current =
-                                  int.tryParse(teamSizeController.text.trim()) ??
-                                      2;
+                                  int.tryParse(
+                                    teamSizeController.text.trim(),
+                                  ) ??
+                                  2;
                               final next = current + 1;
                               teamSizeController.text = next.toString();
                               setState(() {
@@ -2327,22 +2423,29 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                         controller: memberNameControllers[i],
                         decoration: InputDecoration(
                           hintText: "Member ${i + 1} Name",
-                          prefixIcon: const Icon(Icons.person_outline_rounded,
-                              color: Color(0xFF64748B), size: 18),
+                          prefixIcon: const Icon(
+                            Icons.person_outline_rounded,
+                            color: Color(0xFF64748B),
+                            size: 18,
+                          ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFCBD5E1)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFCBD5E1),
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE2E8F0)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                         ),
                       ),
                     );
@@ -2360,7 +2463,8 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         side: const BorderSide(color: Color(0xFFCBD5E1)),
                       ),
                       onPressed: () => Navigator.of(context).pop(null),
@@ -2386,8 +2490,9 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                const Color(0xFF2563EB).withValues(alpha: 0.35),
+                            color: const Color(
+                              0xFF2563EB,
+                            ).withValues(alpha: 0.35),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -2399,7 +2504,8 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                           shadowColor: Colors.transparent,
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: _confirm,
                         child: const Row(
@@ -2414,8 +2520,11 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
                               ),
                             ),
                             SizedBox(width: 6),
-                            Icon(Icons.arrow_forward_rounded,
-                                color: Colors.white, size: 16),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ],
                         ),
                       ),
@@ -2463,8 +2572,9 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
           children: [
             Icon(
               icon,
-              color:
-                  selected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+              color: selected
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFF64748B),
               size: 24,
             ),
             const SizedBox(height: 6),
@@ -2521,11 +2631,13 @@ class _GoogleRoleDialogState extends State<_GoogleRoleDialog> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 16,
-                color: selected
-                    ? const Color(0xFF2563EB)
-                    : const Color(0xFF64748B)),
+            Icon(
+              icon,
+              size: 16,
+              color: selected
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFF64748B),
+            ),
             const SizedBox(width: 6),
             Text(
               label,

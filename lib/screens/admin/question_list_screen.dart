@@ -3,7 +3,6 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'edit_question_screen.dart';
 
@@ -1067,7 +1066,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                 onSelected: (value) async {
                   if (value == 'edit') {
                     await AdminNavPersistence.savePage('edit_question', editQuestionId: doc.id);
-                    if (!context.mounted) return;
+                    if (!mounted) return;
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1080,9 +1079,11 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                     if (mounted) {
                       await AdminNavPersistence.savePage('question_list');
                     }
+                    return;
                   }
 
                   if (value == 'delete') {
+                    if (!mounted) return;
                     confirmDelete(context, doc.id, question);
                   }
                 },
@@ -1425,8 +1426,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
 
     final pageKey = pageKeys[destination];
     if (pageKey != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('technowiz_admin_last_page', pageKey);
+      await AdminNavPersistence.savePage(pageKey);
     }
 
     if (!context.mounted) return;

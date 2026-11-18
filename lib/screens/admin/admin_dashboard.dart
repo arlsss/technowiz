@@ -18,6 +18,10 @@ import 'admin_report_screen.dart';
 import 'admin_leaderboard_screen.dart';
 
 import 'manage_quiz_sessions_screen.dart';
+import 'create_quiz_screen.dart';
+import 'manage_quiz_screen.dart';
+import 'edit_question_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../navigation_persistence.dart';
 
 import 'admin_sidebar.dart';
@@ -27,9 +31,8 @@ import '../../services/user_presence_service.dart';
 import '../login_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key, this.restoreLastPage = false});
+  const AdminDashboard({super.key, this.restoreLastPage = true});
 
-  /// Retained for backwards compatibility across existing navigation calls.
   final bool restoreLastPage;
 
   @override
@@ -78,12 +81,160 @@ class _AdminDashboardState extends State<AdminDashboard> {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   notificationSubscription;
 
+  bool _isRestoringAdminPage = false;
+
   @override
   void initState() {
     super.initState();
 
     startNotificationListener();
-    AdminNavPersistence.savePage('dashboard');
+
+    if (widget.restoreLastPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreLastAdminPage();
+      });
+    } else {
+      AdminNavPersistence.savePage('dashboard');
+    }
+  }
+
+  Future<void> _restoreLastAdminPage() async {
+    if (!mounted || _isRestoringAdminPage) return;
+    _isRestoringAdminPage = true;
+
+    try {
+      final String? savedPage = await AdminNavPersistence.getPage();
+      debugPrint('🔥 ADMIN DASHBOARD CHECKING RESTORE: $savedPage');
+
+      if (!mounted) return;
+
+      if (savedPage == null || savedPage.isEmpty || savedPage == 'dashboard') {
+        await AdminNavPersistence.savePage('dashboard');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      Widget? page;
+      switch (savedPage) {
+        case 'manage_users':
+          page = const ManageUsersScreen();
+          break;
+        case 'leaderboard':
+        case 'admin_leaderboard_history':
+          final savedLevel =
+              prefs.getString(AdminNavPersistence.leaderboardLevelKey) ??
+                  'Overall';
+          final savedQuizCode =
+              prefs.getString(AdminNavPersistence.leaderboardQuizCodeKey);
+          final showHist = (savedPage == 'admin_leaderboard_history') ||
+              (prefs.getBool(AdminNavPersistence.leaderboardShowHistoryKey) ??
+                  false);
+          page = AdminLeaderboardScreen(
+            initialShowHistory: showHist,
+            initialQuizCode: savedQuizCode,
+            initialLevel: savedLevel,
+          );
+          break;
+        case 'add_question':
+          page = const AddQuestionScreen();
+          break;
+        case 'question_list':
+          page = const QuestionListScreen();
+          break;
+        case 'quiz_sessions':
+          page = const ManageQuizSessionsScreen();
+          break;
+        case 'reports':
+          final savedTab = prefs.getString(AdminNavPersistence.reportTabKey);
+          final savedQuizCode =
+              prefs.getString(AdminNavPersistence.reportQuizCodeKey);
+          page = AdminReportScreen(
+            initialTab: savedTab,
+            initialQuizCode: savedQuizCode,
+          );
+          break;
+        case 'create_quiz':
+          page = const CreateQuizScreen();
+          break;
+        case 'manage_quiz':
+          page = const ManageQuizScreen();
+          break;
+        case 'quiz_history':
+          page = const AdminQuizHistoryScreen();
+          break;
+        case 'quiz_history_results':
+          final hCode =
+              prefs.getString(AdminNavPersistence.historyQuizCodeKey);
+          final hTitle =
+              prefs.getString(AdminNavPersistence.historyQuizTitleKey) ??
+                  'Quiz Results';
+          final hDate =
+              prefs.getString(AdminNavPersistence.historyQuizDateKey) ?? '';
+          final hDocId = prefs.getString(AdminNavPersistence.historyDocIdKey) ??
+              (hCode ?? '');
+          if (hCode != null && hCode.isNotEmpty) {
+            page = AdminFinishedQuizResultsScreen(
+              quizCode: hCode,
+              quizTitle: hTitle,
+              quizDate: hDate,
+              docId: hDocId.isNotEmpty ? hDocId : hCode,
+            );
+          } else {
+            page = const AdminQuizHistoryScreen();
+          }
+          break;
+        case 'quiz_session_detail':
+          final qCode =
+              prefs.getString(AdminNavPersistence.detailQuizCodeKey);
+          if (qCode != null && qCode.isNotEmpty) {
+            final doc = await FirebaseFirestore.instance
+                .collection('quiz_sessions')
+                .doc(qCode)
+                .get();
+            if (doc.exists) {
+              page = QuizSessionDetailScreen(
+                quizCode: qCode,
+                quizData: doc.data() ?? <String, dynamic>{},
+              );
+            } else {
+              page = const ManageQuizSessionsScreen();
+            }
+          } else {
+            page = const ManageQuizSessionsScreen();
+          }
+          break;
+        case 'edit_question':
+          final editId =
+              prefs.getString(AdminNavPersistence.editQuestionIdKey);
+          if (editId != null && editId.isNotEmpty) {
+            final doc = await FirebaseFirestore.instance
+                .collection('questions')
+                .doc(editId)
+                .get();
+            page = EditQuestionScreen(
+              questionId: editId,
+              questionData: doc.data() ?? const <String, dynamic>{},
+            );
+          } else {
+            page = const QuestionListScreen();
+          }
+          break;
+        default:
+          await AdminNavPersistence.savePage('dashboard');
+          return;
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(adminPageRoute(page));
+      }
+    } catch (e) {
+      debugPrint('⚠️ AdminDashboard restore error: $e');
+      if (mounted) {
+        await AdminNavPersistence.savePage('dashboard');
+      }
+    } finally {
+      _isRestoringAdminPage = false;
+    }
   }
 
   void startNotificationListener() {
@@ -328,12 +479,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  void openPage(
+  Future<void> openPage(
     BuildContext context,
     Widget page,
     String pageKey,
-  ) {
-    unawaited(_saveLastAdminPage(pageKey));
+  ) async {
+    await _saveLastAdminPage(pageKey);
     if (!context.mounted) return;
 
     debugPrint('TECHNOWIZ ADMIN NAVIGATING TO: $pageKey');

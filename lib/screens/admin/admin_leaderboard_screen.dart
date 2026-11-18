@@ -16,7 +16,16 @@ import '../../navigation_persistence.dart';
 // ============================================================================
 
 class AdminLeaderboardScreen extends StatefulWidget {
-  const AdminLeaderboardScreen({super.key});
+  final bool initialShowHistory;
+  final String? initialQuizCode;
+  final String? initialLevel;
+
+  const AdminLeaderboardScreen({
+    super.key,
+    this.initialShowHistory = false,
+    this.initialQuizCode,
+    this.initialLevel,
+  });
 
   @override
   State<AdminLeaderboardScreen> createState() => _AdminLeaderboardScreenState();
@@ -38,9 +47,51 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   @override
   void initState() {
     super.initState();
-    AdminNavPersistence.savePage('leaderboard');
+    showHistory = widget.initialShowHistory;
+    _selectedQuizCode = widget.initialQuizCode;
+    selectedLevel = widget.initialLevel ?? 'Overall';
+    _restorePreferencesAndSave();
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
+  }
+
+  Future<void> _restorePreferencesAndSave() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      if (!widget.initialShowHistory &&
+          prefs.containsKey(AdminNavPersistence.leaderboardShowHistoryKey)) {
+        showHistory =
+            prefs.getBool(AdminNavPersistence.leaderboardShowHistoryKey) ??
+                false;
+      }
+      if (widget.initialLevel == null &&
+          prefs.containsKey(AdminNavPersistence.leaderboardLevelKey)) {
+        selectedLevel =
+            prefs.getString(AdminNavPersistence.leaderboardLevelKey) ??
+                'Overall';
+      }
+      if (widget.initialQuizCode == null &&
+          prefs.containsKey(AdminNavPersistence.leaderboardQuizCodeKey)) {
+        final savedCode =
+            prefs.getString(AdminNavPersistence.leaderboardQuizCodeKey);
+        if (savedCode != null && savedCode.isNotEmpty) {
+          _selectedQuizCode = savedCode;
+          _isViewingFromHistory = true;
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() {});
+    await _savePage();
+  }
+
+  Future<void> _savePage() async {
+    await AdminNavPersistence.savePage(
+      showHistory ? 'admin_leaderboard_history' : 'leaderboard',
+      leaderboardQuizCode: _selectedQuizCode,
+      leaderboardLevel: selectedLevel,
+      leaderboardShowHistory: showHistory,
+    );
   }
 
   // =========================================================
@@ -63,9 +114,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
 
     final pageKey = pageKeys[destination];
     if (pageKey != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('technowiz_admin_last_page', pageKey);
-      await prefs.remove('technowiz_admin_detail_quiz_code');
+      await AdminNavPersistence.savePage(pageKey);
     }
 
     if (!context.mounted || destination == 'leaderboard') return;
@@ -142,6 +191,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 tooltip: 'Back',
                 onPressed: () {
                   setState(() => showHistory = false);
+                  _savePage();
                 },
               )
             : null,
@@ -293,7 +343,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         child: showHistory
             ? AdminLeaderboardHistoryView(
                 onBack: () {
-                  if (mounted) setState(() => showHistory = false);
+                  if (mounted) {
+                    setState(() => showHistory = false);
+                    _savePage();
+                  }
                 },
                 onOverview: (quizCode) {
                   if (!mounted) return;
@@ -303,6 +356,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     selectedLevel = 'Overall';
                     showHistory = false;
                   });
+                  _savePage();
                 },
               )
             : SafeArea(
@@ -749,6 +803,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 InkWell(
                   onTap: () {
                     setState(() => showHistory = true);
+                    _savePage();
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -1429,6 +1484,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         onTap: () {
           if (selectedLevel != level) {
             setState(() => selectedLevel = level);
+            _savePage();
           }
         },
         child: AnimatedContainer(
@@ -2936,6 +2992,6 @@ class AdminQuizLeaderboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AdminLeaderboardScreen();
+    return AdminLeaderboardScreen(initialQuizCode: quizCode);
   }
 }

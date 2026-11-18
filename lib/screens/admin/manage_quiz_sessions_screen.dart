@@ -682,19 +682,9 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
   // BUILD
   // =========================================================
 
-  Future<void> _saveAdminPage(String pageKey) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('technowiz_admin_last_page', pageKey);
-
-    // Leaving the quiz detail screen should not restore an old quiz detail.
-    if (pageKey != 'quiz_session_detail') {
-      await prefs.remove('technowiz_admin_detail_quiz_code');
-    }
-  }
-
   void _navigateFromAdminSidebar(String destination) {
     // Preserve the existing saved-page key and clear stale detail restoration.
-    unawaited(_saveAdminPage(destination));
+    unawaited(AdminNavPersistence.savePage(destination));
     if (!mounted) return;
 
     // Do not navigate to another copy of the page already open.
@@ -1204,20 +1194,16 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
   // ADMIN PAGE PERSISTENCE
   // =========================================================
-  static const String _lastAdminPageKey = 'technowiz_admin_last_page';
-  static const String _adminDetailQuizCodeKey =
-      'technowiz_admin_detail_quiz_code';
 
   Future<void> _rememberDetailPage() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastAdminPageKey, 'quiz_session_detail');
-    await prefs.setString(_adminDetailQuizCodeKey, widget.quizCode);
+    await AdminNavPersistence.savePage(
+      'quiz_session_detail',
+      detailQuizCode: widget.quizCode,
+    );
   }
 
   Future<void> _rememberQuizSessionsPage() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastAdminPageKey, 'quiz_sessions');
-    await prefs.remove(_adminDetailQuizCodeKey);
+    await AdminNavPersistence.savePage('quiz_sessions');
   }
 
   Future<void> _handleDetailBack() async {

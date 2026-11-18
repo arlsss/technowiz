@@ -542,7 +542,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          MaterialPageRoute(
+            builder: (_) => const AdminDashboard(restoreLastPage: false),
+          ),
           (route) => false,
         );
       } else if (normalizedRole == "quizmaster") {
