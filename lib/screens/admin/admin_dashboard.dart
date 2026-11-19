@@ -2824,11 +2824,15 @@ class _AdminFinishedQuizResultsScreenState
         final cfg = settingsByLevel[n] ?? const <String, dynamic>{};
         final configuredTimer = _asInt(cfg['timerSeconds']);
         final hasTimer = configuredTimer != null && configuredTimer > 0;
+        final proceedVal = _asInt(cfg['proceedCount']) ??
+            _asInt(cfg['participantsToProceed']) ??
+            _asInt(cfg['eliminateCount']);
         return _HistoryLevel(
           number: n,
           timerSeconds: hasTimer ? configuredTimer : _defaultTimerSeconds,
           timerIsDefault: !hasTimer,
-          eliminateCount: _asInt(cfg['eliminateCount']),
+          eliminateCount: proceedVal,
+          proceedCount: proceedVal,
           pointsPerCorrect: _asInt(cfg['pointsPerCorrectAnswer']),
           difficulty: _text(cfg, const ['difficulty']),
           questionCount: questions.where((q) => _levelOfQuestion(q) == n).length,
@@ -3532,9 +3536,9 @@ class _AdminFinishedQuizResultsScreenState
                     if (level.pointsPerCorrect != null)
                       _levelFact(Icons.star_outline_rounded,
                           '+${level.pointsPerCorrect} pt / correct'),
-                    if (level.eliminateCount != null)
-                      _levelFact(Icons.content_cut_rounded,
-                          'Eliminate ${level.eliminateCount}'),
+                    if (level.proceedCount != null)
+                      _levelFact(Icons.how_to_reg_outlined,
+                          'Top ${level.proceedCount} proceed'),
                     _levelFact(Icons.person_off_outlined,
                         '$eliminatedCount eliminated'),
                   ],
@@ -4192,7 +4196,8 @@ class _HistoryLevel {
     required this.number,
     required this.timerSeconds,
     required this.timerIsDefault,
-    required this.eliminateCount,
+    this.eliminateCount,
+    this.proceedCount,
     required this.pointsPerCorrect,
     required this.difficulty,
     required this.questionCount,
@@ -4202,6 +4207,7 @@ class _HistoryLevel {
   final int timerSeconds;
   final bool timerIsDefault;
   final int? eliminateCount;
+  final int? proceedCount;
   final int? pointsPerCorrect;
   final String difficulty;
   final int questionCount;

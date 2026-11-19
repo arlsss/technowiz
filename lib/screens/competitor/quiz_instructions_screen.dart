@@ -431,10 +431,13 @@ class QuizInstructionsScreen extends StatelessWidget {
       fallback: 30,
     );
 
-    final eliminations = _readInt(
-      settings['eliminateCount'] ??
+    final proceedCount = _readInt(
+      settings['proceedCount'] ??
+          settings['participantsToProceed'] ??
+          settings['eliminateCount'] ??
           settings['eliminationCount'] ??
           settings['eliminations'] ??
+          quizData['level${instructionLevel}ProceedCount'] ??
           quizData['level${instructionLevel}EliminateCount'],
       fallback: 0,
     );
@@ -532,11 +535,11 @@ class QuizInstructionsScreen extends StatelessWidget {
                       "$seconds sec per question.",
                     ),
                     _instructionItem(
-                      Icons.block_rounded,
-                      const Color(0xFFEF4444),
-                      eliminations == 0
-                          ? "Elimination: None."
-                          : "Elimination: $eliminations participant(s).",
+                      Icons.how_to_reg_rounded,
+                      const Color(0xFF10B981),
+                      proceedCount == 0
+                          ? "Advancement: All eligible participants proceed."
+                          : "Advancement: Top $proceedCount participant(s) will proceed to next level.",
                     ),
                     _instructionItem(
                       Icons.check_box_rounded,

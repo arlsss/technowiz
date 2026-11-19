@@ -1778,7 +1778,10 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       isAddingLevel = true;
       addLevelController.text = number?.toString() ?? '';
       levelTimerController.text = (settings['timerSeconds'] ?? '').toString();
-      levelEliminateController.text = (settings['eliminateCount'] ?? '')
+      levelEliminateController.text = (settings['proceedCount'] ??
+              settings['participantsToProceed'] ??
+              settings['eliminateCount'] ??
+              '')
           .toString();
       levelPointsController.text = (settings['pointsPerCorrectAnswer'] ?? '1')
           .toString();
@@ -1879,7 +1882,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   Future<void> saveLevel() async {
     final number = int.tryParse(addLevelController.text.trim());
     final timerSeconds = int.tryParse(levelTimerController.text.trim());
-    final eliminateCount = int.tryParse(levelEliminateController.text.trim());
+    final proceedCount = int.tryParse(levelEliminateController.text.trim());
     final pointsPerCorrectAnswer = int.tryParse(
       levelPointsController.text.trim().isEmpty
           ? '1'
@@ -1896,8 +1899,11 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       return;
     }
 
-    if (eliminateCount == null || eliminateCount < 0) {
-      showMessage('Please enter a valid elimination count.', error: true);
+    if (proceedCount == null || proceedCount < 0) {
+      showMessage(
+        'Please enter a valid number of participants to proceed.',
+        error: true,
+      );
       return;
     }
 
@@ -1961,7 +1967,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       // Save the settings for this level.
       levelSettings[level] = {
         'timerSeconds': timerSeconds,
-        'eliminateCount': eliminateCount,
+        'proceedCount': proceedCount,
+        'participantsToProceed': proceedCount,
+        'eliminateCount': proceedCount,
         'pointsPerCorrectAnswer': pointsPerCorrectAnswer,
         'difficulty': levelDifficulty,
         'questionType': levelQuestionType,
@@ -3206,7 +3214,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
                             const SizedBox(height: 10),
 
-                            // CONTESTANT ELIMINATION
+                            // PARTICIPANTS TO PROCEED
                             TextField(
                               controller: levelEliminateController,
                               keyboardType: TextInputType.number,
@@ -3214,11 +3222,12 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
                               decoration: InputDecoration(
-                                labelText: 'Participants to Eliminate',
-                                hintText: 'Enter number of participants',
+                                labelText: 'Participants to Proceed',
+                                hintText:
+                                    'Enter number of participants to proceed',
                                 prefixIcon: const Icon(
-                                  Icons.person_remove_outlined,
-                                  color: Colors.redAccent,
+                                  Icons.how_to_reg_outlined,
+                                  color: primaryPurple,
                                 ),
                                 isDense: true,
                                 border: OutlineInputBorder(

@@ -313,6 +313,17 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     try {
       final db = FirebaseFirestore.instance;
       final sessionRef = db.collection('quiz_sessions').doc(quizCode);
+      final sessionDoc = await sessionRef.get();
+      final sessionData = sessionDoc.data() ?? {};
+      final rawLevelSettings =
+          (sessionData['levelSettings'] as Map?)?['Level $level'];
+      final int? configuredProceedCount = rawLevelSettings is Map
+          ? (int.tryParse(rawLevelSettings['proceedCount']?.toString() ?? '') ??
+              int.tryParse(
+                  rawLevelSettings['participantsToProceed']?.toString() ?? '') ??
+              int.tryParse(rawLevelSettings['eliminateCount']?.toString() ?? ''))
+          : null;
+
       final scores = await sessionRef.collection('scores').get();
       final requests = await sessionRef.collection('join_requests').get();
       final eliminatedIds = <String>{
@@ -335,8 +346,20 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
         }
 
         final assignedRank = _lockedRankOrder[r.id];
+        final bool isExplicitlyEliminated = eliminatedIds.contains(r.id);
+        final bool isExplicitlyProceeded = _isProceededForCurrentLevel(r.data());
 
-        if (!eliminatedIds.contains(r.id)) {
+        final bool shouldProceed = isExplicitlyProceeded
+            ? true
+            : isExplicitlyEliminated
+                ? false
+                : (configuredProceedCount != null &&
+                        configuredProceedCount > 0 &&
+                        assignedRank != null)
+                    ? assignedRank <= configuredProceedCount
+                    : !eliminatedIds.contains(r.id);
+
+        if (shouldProceed) {
           hasUpdates = true;
           final rData = r.data();
           final rawReadyForLevel = rData['readyForLevel'];
@@ -742,6 +765,14 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
       stream: _sessionStream,
       builder: (context, sessionSnap) {
         final sessionData = sessionSnap.data?.data();
+        final rawLevelSettings =
+            (sessionData?['levelSettings'] as Map?)?['Level $level'];
+        final int? configuredProceedCount = rawLevelSettings is Map
+            ? (int.tryParse(rawLevelSettings['proceedCount']?.toString() ?? '') ??
+                int.tryParse(
+                    rawLevelSettings['participantsToProceed']?.toString() ?? '') ??
+                int.tryParse(rawLevelSettings['eliminateCount']?.toString() ?? ''))
+            : null;
         final String sessionStatus =
             sessionData?['status']?.toString().trim().toLowerCase() ?? '';
         final bool effectiveIsFinal =
@@ -1057,6 +1088,45 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                 ],
                               ),
                               const SizedBox(height: 14),
+                              if (!effectiveIsFinal &&
+                                  configuredProceedCount != null &&
+                                  configuredProceedCount > 0) ...[
+                                Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.green.shade200,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.how_to_reg_rounded,
+                                        color: Colors.green.shade700,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'Advancement Rule: Top $configuredProceedCount participant(s) will proceed to Level ${level + 1}.',
+                                          style: TextStyle(
+                                            color: Colors.green.shade800,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               ListView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -1096,6 +1166,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                     proceeded:
                                         _isProceededForCurrentLevel(data),
                                     isFinalView: false,
+                                    configuredProceedCount:
+                                        configuredProceedCount,
                                   );
                                 },
                               ),
@@ -1652,6 +1724,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     required bool proceeded,
     bool isFinalView = false,
     List<String> members = const [],
+    int? configuredProceedCount,
   }) {
     final iconColor = rank == 1
         ? Colors.amber.shade700
@@ -1662,6 +1735,13 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
         : primaryBlue;
 
     final bool showProceededState = !isFinalView && proceeded && !eliminated;
+    final bool isAutoEligible = !isFinalView &&
+        !eliminated &&
+        !proceeded &&
+        configuredProceedCount != null &&
+        configuredProceedCount > 0;
+    final bool isWithinCutoff = isAutoEligible && rank <= configuredProceedCount;
+    final bool isBelowCutoff = isAutoEligible && rank > configuredProceedCount;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1671,8 +1751,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
             ? const Color(0xFFE5E7EB)
             : isFinalView && rank == 1
             ? const Color(0xFFFFFBEB)
-            : showProceededState
+            : (showProceededState || isWithinCutoff)
             ? const Color(0xFFF0FFF4)
+            : isBelowCutoff
+            ? const Color(0xFFFEF2F2)
             : Colors.white,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(
@@ -1680,8 +1762,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
               ? Colors.grey.shade400
               : isFinalView && rank == 1
               ? Colors.amber.shade400
-              : showProceededState
-              ? Colors.green.shade200
+              : (showProceededState || isWithinCutoff)
+              ? Colors.green.shade300
+              : isBelowCutoff
+              ? Colors.red.shade200
               : Colors.blue.shade100,
           width: isFinalView && !eliminated && rank <= 2 ? 1.6 : 1.0,
         ),
@@ -1694,8 +1778,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
             decoration: BoxDecoration(
               color: eliminated
                   ? Colors.grey.shade600
-                  : showProceededState
+                  : (showProceededState || isWithinCutoff)
                   ? Colors.green.shade600
+                  : isBelowCutoff
+                  ? Colors.red.shade400
                   : iconColor,
               shape: BoxShape.circle,
             ),
@@ -1745,6 +1831,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                       ? (team.isEmpty || team == playerName ? 'RANK $rank' : '$team - RANK $rank')
                       : showProceededState
                       ? 'PROCEEDING TO LEVEL ${level + 1}'
+                      : isWithinCutoff
+                      ? 'TOP $configuredProceedCount • QUALIFIED TO PROCEED'
+                      : isBelowCutoff
+                      ? 'BELOW TOP $configuredProceedCount CUTOFF • WILL BE ELIMINATED'
                       : (team.isEmpty || team == playerName ? 'Rank #$rank' : '$team - Rank #$rank'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1753,8 +1843,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                         ? Colors.grey.shade700
                         : isFinalView
                         ? iconColor
-                        : showProceededState
+                        : (showProceededState || isWithinCutoff)
                         ? Colors.green.shade700
+                        : isBelowCutoff
+                        ? Colors.red.shade700
                         : Colors.black54,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,

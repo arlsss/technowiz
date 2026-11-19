@@ -3872,7 +3872,9 @@ class ParticipantReadinessPage extends StatelessWidget {
                 settings['points'] ??
                 settings['pts'];
             final difficulty = settings['difficulty'];
-            final eliminateCount = settings['eliminateCount'];
+            final proceedCount = settings['proceedCount'] ??
+                settings['participantsToProceed'] ??
+                settings['eliminateCount'];
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -3925,9 +3927,9 @@ class ParticipantReadinessPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 7),
                   _levelSettingRow(
-                    Icons.person_remove_outlined,
-                    'Elimination Count',
-                    valueOrNotSet(eliminateCount),
+                    Icons.how_to_reg_outlined,
+                    'Participants to Proceed',
+                    valueOrNotSet(proceedCount),
                   ),
                 ],
               ),

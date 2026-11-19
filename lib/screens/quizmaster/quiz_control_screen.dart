@@ -70,8 +70,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
   String _status = 'waiting';
 
-  // Final ranking: how many of the lowest-ranked contestants to eliminate.
-  int _eliminateCount = 0;
+  // Final ranking: how many contestants proceed to the next level.
+  int _proceedCount = 0;
 
   // Prevent repeated taps from opening the ranking screen multiple times.
   bool _finalRankingOpening = false;
@@ -5120,13 +5120,14 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               }
             }
 
-            // Keep at least one contestant safe.
-            final maxEliminate = rows.length > 1 ? rows.length - 1 : 0;
-            final eliminate = _eliminateCount.clamp(0, maxEliminate).toInt();
-            final cutoff = rows.length - eliminate;
+            // Participants to proceed configuration
+            final maxProceed = rows.isNotEmpty ? rows.length : 1;
+            final proceed = (_proceedCount > 0 ? _proceedCount : maxProceed)
+                .clamp(1, maxProceed)
+                .toInt();
+            final cutoff = proceed;
 
             final tieAtCutoff =
-                eliminate > 0 &&
                 cutoff > 0 &&
                 cutoff < rows.length &&
                 rows[cutoff - 1]['score'] == rows[cutoff]['score'];
@@ -5160,7 +5161,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Text(
-                          'FINAL RANKING & ELIMINATION',
+                          'FINAL RANKING & PROCEEDING',
                           style: TextStyle(
                             color: darkBlue,
                             fontSize: 15,
@@ -5185,7 +5186,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       children: [
                         const Expanded(
                           child: Text(
-                            'Eliminate the lowest',
+                            'Participants to proceed',
                             style: TextStyle(
                               color: darkBlue,
                               fontWeight: FontWeight.w600,
@@ -5194,16 +5195,16 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           ),
                         ),
                         IconButton(
-                          onPressed: eliminate > 0
+                          onPressed: proceed > 1
                               ? () => setState(
-                                  () => _eliminateCount = eliminate - 1,
+                                  () => _proceedCount = proceed - 1,
                                 )
                               : null,
                           icon: const Icon(Icons.remove_circle_outline),
                           color: primaryBlue,
                         ),
                         Text(
-                          '$eliminate',
+                          '$proceed',
                           style: const TextStyle(
                             color: darkBlue,
                             fontSize: 18,
@@ -5211,9 +5212,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           ),
                         ),
                         IconButton(
-                          onPressed: eliminate < maxEliminate
+                          onPressed: proceed < maxProceed
                               ? () => setState(
-                                  () => _eliminateCount = eliminate + 1,
+                                  () => _proceedCount = proceed + 1,
                                 )
                               : null,
                           icon: const Icon(Icons.add_circle_outline),
@@ -5225,7 +5226,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   if (tieAtCutoff) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Note: there is a tie at the elimination cutoff.',
+                      'Note: there is a tie at the proceeding cutoff.',
                       style: TextStyle(
                         color: Colors.orange.shade800,
                         fontSize: 12,
@@ -5258,12 +5259,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         decoration: BoxDecoration(
                           color: eliminated
                               ? Colors.red.withValues(alpha: 0.06)
-                              : background,
+                              : Colors.green.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: eliminated
                                 ? Colors.red.shade200
-                                : Colors.blue.shade100,
+                                : Colors.green.shade200,
                           ),
                         ),
                         child: Row(
@@ -5323,6 +5324,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             if (eliminated) ...[
                               const SizedBox(width: 8),
                               _statusChipSimple('ELIMINATED', Colors.red),
+                            ] else ...[
+                              const SizedBox(width: 8),
+                              _statusChipSimple('PROCEEDING', Colors.green),
                             ],
                           ],
                         ),
@@ -5336,11 +5340,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       onPressed: _openFinalRanking,
                       icon: const Icon(Icons.how_to_reg_rounded),
                       label: const Text(
-                        'OPEN ELIMINATION SCREEN',
+                        'OPEN PROCEED & RANKING SCREEN',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: primaryBlue,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
