@@ -316,7 +316,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
     navigator.pushAndRemoveUntil(
       PageRouteBuilder(
-        pageBuilder: (_) => const LoginScreen(clearCredentials: true),
+        pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
       ),
