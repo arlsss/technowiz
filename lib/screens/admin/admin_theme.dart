@@ -448,19 +448,23 @@ class AdminTopBar extends StatelessWidget {
       ],
       onSelected: (value) async {
         if (value == 'logout') {
-          await UserPresenceService.instance.setOffline();
-          await AdminNavPersistence.clear();
-          await LoginScreen.clearSavedCredentials();
-          await FirebaseAuth.instance.signOut();
-          if (context.mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const LoginScreen(clearCredentials: true),
-              ),
-              (route) => false,
-            );
-          }
+          final navigator = Navigator.of(context, rootNavigator: true);
+          UserPresenceService.instance.setOffline().catchError((_) {});
+
+          navigator.pushAndRemoveUntil(
+            PageRouteBuilder(
+              pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+            ),
+            (route) => false,
+          );
+
+          try {
+            await AdminNavPersistence.clear();
+            await LoginScreen.clearSavedCredentials();
+            await FirebaseAuth.instance.signOut();
+          } catch (_) {}
         }
       },
     );

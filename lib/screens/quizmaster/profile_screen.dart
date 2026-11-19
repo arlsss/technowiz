@@ -125,17 +125,23 @@ class _QuizMasterProfilePanelState extends State<QuizMasterProfilePanel> {
   User? get _user => FirebaseAuth.instance.currentUser;
 
   Future<void> _logout() async {
-    await UserPresenceService.instance.setOffline();
-    await QuizMasterNavPersistence.clearAll();
-    await LoginScreen.clearSavedCredentials();
-    await FirebaseAuth.instance.signOut();
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => const LoginScreen(clearCredentials: true),
+    final navigator = Navigator.of(context, rootNavigator: true);
+    UserPresenceService.instance.setOffline().catchError((_) {});
+
+    navigator.pushAndRemoveUntil(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
       ),
       (_) => false,
     );
+
+    try {
+      await QuizMasterNavPersistence.clearAll();
+      await LoginScreen.clearSavedCredentials();
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
   }
 
   @override

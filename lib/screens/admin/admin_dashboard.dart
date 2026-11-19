@@ -462,21 +462,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> logout(BuildContext context) async {
-    await UserPresenceService.instance.setOffline();
-    await AdminNavPersistence.clear();
-    await _clearLastAdminPage();
-    await LoginScreen.clearSavedCredentials();
-    await FirebaseAuth.instance.signOut();
+    final navigator = Navigator.of(context, rootNavigator: true);
+    UserPresenceService.instance.setOffline().catchError((_) {});
 
-    if (!context.mounted) return;
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(clearCredentials: true),
+    navigator.pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
       ),
       (route) => false,
     );
+
+    try {
+      await AdminNavPersistence.clear();
+      await _clearLastAdminPage();
+      await LoginScreen.clearSavedCredentials();
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
   }
 
   Future<void> openPage(

@@ -273,20 +273,23 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   }
 
   Future<void> logout(BuildContext context) async {
-    await UserPresenceService.instance.setOffline();
-    await _clearLastPage();
-    await LoginScreen.clearSavedCredentials();
-    await FirebaseAuth.instance.signOut();
+    final navigator = Navigator.of(context, rootNavigator: true);
+    UserPresenceService.instance.setOffline().catchError((_) {});
 
-    if (!context.mounted) return;
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(clearCredentials: true),
+    navigator.pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
       ),
       (route) => false,
     );
+
+    try {
+      await _clearLastPage();
+      await LoginScreen.clearSavedCredentials();
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
   }
 
   // ============================================================

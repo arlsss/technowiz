@@ -366,28 +366,29 @@ class AdminSidebar extends StatelessWidget {
   }
 
   static Future<void> _performLogout(BuildContext context) async {
-    final scaffold = Scaffold.maybeOf(context);
-    if (scaffold != null && (scaffold.isEndDrawerOpen || scaffold.isDrawerOpen)) {
-      Navigator.of(context).pop();
-    }
+    // 1. Immediately grab root navigator before anything is unmounted
+    final navigator = Navigator.of(context, rootNavigator: true);
+
+    // 2. Mark user offline in background (never blocks UI)
+    UserPresenceService.instance.setOffline().catchError((_) {});
+
+    // 3. Immediately route to LoginScreen with zero transition delay
+    navigator.pushAndRemoveUntil<void>(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+      (route) => false,
+    );
+
+    // 4. Perform session cleanup & Firebase sign out concurrently
     try {
-      await UserPresenceService.instance.setOffline();
       await AdminNavPersistence.clear();
       await LoginScreen.clearSavedCredentials();
       await FirebaseAuth.instance.signOut();
-      if (!context.mounted) return;
-      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => const LoginScreen(clearCredentials: true),
-        ),
-        (route) => false,
-      );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to log out: $e')),
-        );
-      }
+      debugPrint('Logout cleanup error: $e');
     }
   }
 }
@@ -565,36 +566,7 @@ void showAdminProfileSidePopup(BuildContext context) {
                       width: double.infinity,
                       height: 42,
                       child: ElevatedButton.icon(
-                        onPressed: () async {
-                          Navigator.of(dialogContext).pop();
-                          final s = Scaffold.maybeOf(context);
-                          if (s != null) {
-                            if (s.isEndDrawerOpen || s.isDrawerOpen) {
-                              Navigator.of(context).pop();
-                            }
-                          }
-                          try {
-                            await UserPresenceService.instance.setOffline();
-                            await AdminNavPersistence.clear();
-                            await LoginScreen.clearSavedCredentials();
-                            await FirebaseAuth.instance.signOut();
-                            if (!context.mounted) return;
-                            Navigator.of(context, rootNavigator: true)
-                                .pushAndRemoveUntil<void>(
-                              MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    const LoginScreen(clearCredentials: true),
-                              ),
-                              (route) => false,
-                            );
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Unable to log out: $e')),
-                              );
-                            }
-                          }
-                        },
+                        onPressed: () => _performLogout(context),
                         icon: const Icon(Icons.logout_rounded, size: 18),
                         label: const Text(
                           'Logout',
