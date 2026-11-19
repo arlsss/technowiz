@@ -365,31 +365,34 @@ class AdminSidebar extends StatelessWidget {
     );
   }
 
-  static Future<void> _performLogout(BuildContext context) async {
-    // 1. Immediately grab root navigator before anything is unmounted
-    final navigator = Navigator.of(context, rootNavigator: true);
+  static Future<void> performLogout(BuildContext context) =>
+      _performLogout(context);
+}
 
-    // 2. Mark user offline in background (never blocks UI)
-    UserPresenceService.instance.setOffline().catchError((_) {});
+Future<void> _performLogout(BuildContext context) async {
+  // 1. Immediately grab root navigator before anything is unmounted
+  final navigator = Navigator.of(context, rootNavigator: true);
 
-    // 3. Immediately route to LoginScreen with zero transition delay
-    navigator.pushAndRemoveUntil<void>(
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
-      (route) => false,
-    );
+  // 2. Mark user offline in background (never blocks UI)
+  UserPresenceService.instance.setOffline().catchError((_) {});
 
-    // 4. Perform session cleanup & Firebase sign out concurrently
-    try {
-      await AdminNavPersistence.clear();
-      await LoginScreen.clearSavedCredentials();
-      await FirebaseAuth.instance.signOut();
-    } catch (e) {
-      debugPrint('Logout cleanup error: $e');
-    }
+  // 3. Immediately route to LoginScreen with zero transition delay
+  navigator.pushAndRemoveUntil<void>(
+    PageRouteBuilder<void>(
+      pageBuilder: (_, _, _) => const LoginScreen(clearCredentials: true),
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    ),
+    (route) => false,
+  );
+
+  // 4. Perform session cleanup & Firebase sign out concurrently
+  try {
+    await AdminNavPersistence.clear();
+    await LoginScreen.clearSavedCredentials();
+    await FirebaseAuth.instance.signOut();
+  } catch (e) {
+    debugPrint('Logout cleanup error: $e');
   }
 }
 
