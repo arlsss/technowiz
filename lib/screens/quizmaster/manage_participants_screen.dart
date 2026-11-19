@@ -314,7 +314,7 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      margin: EdgeInsets.zero,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF0F4C81), Color(0xFF1689E8)],
@@ -554,22 +554,28 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'TOTAL JOINED',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'TOTAL JOINED',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          '$totalParticipants',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '$totalParticipants',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -589,22 +595,28 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'READY',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'READY',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          '$readyCount',
-                          style: const TextStyle(
-                            color: Color(0xFF4ADE80),
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '$readyCount',
+                            style: const TextStyle(
+                              color: Color(0xFF4ADE80),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -624,24 +636,30 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'SESSION',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'SESSION',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          status.isEmpty ? 'WAITING' : status.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            status.isEmpty ? 'WAITING' : status.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -929,21 +947,30 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
               }
             } else {
               if (activeSessions.isEmpty) {
-                return Column(
-                  children: [
-                    _buildHeroCard(
-                      context: context,
-                      quizTitle: 'No Active Quiz',
-                      quizCode: '------',
-                      status: 'WAITING',
-                      totalParticipants: 0,
-                      readyCount: 0,
-                      allSessions: const [],
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 860),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeroCard(
+                            context: context,
+                            quizTitle: 'No Active Quiz',
+                            quizCode: '------',
+                            status: 'WAITING',
+                            totalParticipants: 0,
+                            readyCount: 0,
+                            allSessions: const [],
+                          ),
+                          const SizedBox(height: 14),
+                          _buildNoActiveQuizCard(),
+                        ],
+                      ),
                     ),
-                    Expanded(
-                      child: _buildNoActiveQuizCard(),
-                    ),
-                  ],
+                  ),
                 );
               }
 
@@ -963,21 +990,30 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
             }
 
             if (chosenDoc == null) {
-              return Column(
-                children: [
-                  _buildHeroCard(
-                    context: context,
-                    quizTitle: 'No Active Quiz',
-                    quizCode: '------',
-                    status: 'WAITING',
-                    totalParticipants: 0,
-                    readyCount: 0,
-                    allSessions: const [],
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 860),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeroCard(
+                          context: context,
+                          quizTitle: 'No Active Quiz',
+                          quizCode: '------',
+                          status: 'WAITING',
+                          totalParticipants: 0,
+                          readyCount: 0,
+                          allSessions: const [],
+                        ),
+                        const SizedBox(height: 14),
+                        _buildNoActiveQuizCard(),
+                      ],
+                    ),
                   ),
-                  Expanded(
-                    child: _buildNoActiveQuizCard(),
-                  ),
-                ],
+                ),
               );
             }
 
@@ -1065,615 +1101,94 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                       return nameA.compareTo(nameB);
                     });
 
-                    return Column(
-                      children: [
-                        if (isViewingHistoryQuiz) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF7ED),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFFFED7AA),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.history_rounded,
-                                    size: 18,
-                                    color: Color(0xFFEA580C),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Expanded(
-                                    child: Text(
-                                      'Viewing History Participants',
-                                      style: TextStyle(
-                                        color: Color(0xFFC2410C),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        _isViewingFromHistory = false;
-                                        _selectedQuizCode = null;
-                                      });
-                                    },
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 2,
-                                      ),
-                                      child: Text(
-                                        'Back to Live',
-                                        style: TextStyle(
-                                          color: primaryBlue,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                    if (participantsList.isEmpty) {
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 860),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (isViewingHistoryQuiz) ...[
+                                  _buildHistoryBanner(),
+                                  const SizedBox(height: 10),
                                 ],
+                                _buildHeroCard(
+                                  context: context,
+                                  quizTitle: quizTitle,
+                                  quizCode: effectiveCode,
+                                  status: rawStatus,
+                                  totalParticipants: participantsList.length,
+                                  readyCount: readyCount,
+                                  allSessions: isViewingHistoryQuiz
+                                      ? [chosenDoc!]
+                                      : activeSessions,
+                                ),
+                                const SizedBox(height: 14),
+                                _buildAwaitingParticipantsCard(
+                                  effectiveCode: effectiveCode,
+                                  isViewingHistoryQuiz: isViewingHistoryQuiz,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                          sliver: SliverToBoxAdapter(
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 860),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (isViewingHistoryQuiz) ...[
+                                      _buildHistoryBanner(),
+                                      const SizedBox(height: 10),
+                                    ],
+                                    _buildHeroCard(
+                                      context: context,
+                                      quizTitle: quizTitle,
+                                      quizCode: effectiveCode,
+                                      status: rawStatus,
+                                      totalParticipants: participantsList.length,
+                                      readyCount: readyCount,
+                                      allSessions: isViewingHistoryQuiz
+                                          ? [chosenDoc!]
+                                          : activeSessions,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ],
-
-                        // Hero Card with Quiz Details & Stats
-                        _buildHeroCard(
-                          context: context,
-                          quizTitle: quizTitle,
-                          quizCode: effectiveCode,
-                          status: rawStatus,
-                          totalParticipants: participantsList.length,
-                          readyCount: readyCount,
-                          allSessions: isViewingHistoryQuiz
-                              ? [chosenDoc!]
-                              : activeSessions,
                         ),
-
-                        // Participants list
-                        Expanded(
-                          child: participantsList.isEmpty
-                              ? Center(
-                                  child: SingleChildScrollView(
-                                    physics: const BouncingScrollPhysics(),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 24,
-                                      horizontal: 16,
-                                    ),
-                                    child: Container(
-                                      width: double.infinity,
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 520,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 36,
-                                        horizontal: 24,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(22),
-                                        border: Border.all(
-                                          color: const Color(0xFFDCEAF5),
-                                          width: 1.2,
-                                        ),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Color(0x0C168BEB),
-                                            blurRadius: 18,
-                                            offset: Offset(0, 6),
-                                          ),
-                                          BoxShadow(
-                                            color: Color(0x05000000),
-                                            blurRadius: 4,
-                                            offset: Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Container(
-                                            width: 76,
-                                            height: 76,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE0F2FE),
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: const Color(
-                                                    0xFF168BEB,
-                                                  ).withValues(alpha: 0.18),
-                                                  blurRadius: 18,
-                                                  offset: const Offset(0, 6),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Center(
-                                              child: Container(
-                                                width: 56,
-                                                height: 56,
-                                                decoration: const BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      Color(0xFF168BEB),
-                                                      Color(0xFF0F4C81),
-                                                    ],
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                  ),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(
-                                                  Icons.groups_rounded,
-                                                  size: 28,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: isViewingHistoryQuiz
-                                                  ? const Color(0xFFF1F5F9)
-                                                  : const Color(0xFFE5F4FF),
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              border: Border.all(
-                                                color: isViewingHistoryQuiz
-                                                    ? const Color(0xFFCBD5E1)
-                                                    : const Color(0xFFB9E0FF),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Container(
-                                                  width: 6,
-                                                  height: 6,
-                                                  decoration: BoxDecoration(
-                                                    color: isViewingHistoryQuiz
-                                                        ? const Color(
-                                                          0xFF64748B,
-                                                        )
-                                                        : const Color(
-                                                          0xFF168BEB,
-                                                        ),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  isViewingHistoryQuiz
-                                                      ? 'PAST SESSION'
-                                                      : 'AWAITING CONTESTANTS',
-                                                  style: TextStyle(
-                                                    color: isViewingHistoryQuiz
-                                                        ? const Color(
-                                                          0xFF64748B,
-                                                        )
-                                                        : const Color(
-                                                          0xFF168BEB,
-                                                        ),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w800,
-                                                    letterSpacing: 0.6,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            isViewingHistoryQuiz
-                                                ? 'No Participants'
-                                                : 'No Participants Yet',
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w900,
-                                              color: darkBlue,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxWidth: 400,
-                                            ),
-                                            child: Text(
-                                              isViewingHistoryQuiz
-                                                  ? 'No participants found in this past quiz session.'
-                                                  : 'Contestants who enter quiz code "$effectiveCode" will appear here live.',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                color: Color(0xFF64748B),
-                                                fontSize: 12.5,
-                                                height: 1.45,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          sliver: SliverList.builder(
+                            itemCount: participantsList.length,
+                            itemBuilder: (context, index) {
+                              final p = participantsList[index];
+                              return Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 860),
+                                  child: _buildParticipantItem(
+                                    p: p,
+                                    effectiveCode: effectiveCode,
+                                    isViewingHistoryQuiz: isViewingHistoryQuiz,
                                   ),
-                                )
-                              : ListView.builder(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                                  itemCount: participantsList.length,
-                                  itemBuilder: (context, index) {
-                                    final p = participantsList[index];
-                                    final uid = (p['uid'] ?? '').toString();
-                                    final isReady = p['ready'] == true;
-                                    final statusStr = (p['status'] ?? 'joined')
-                                        .toString()
-                                        .trim()
-                                        .toLowerCase();
-                                    final score =
-                                        p['score']?.toString() ?? '0';
-
-                                    return FutureBuilder<Map<String, dynamic>>(
-                                      future: _getParticipantDisplayInfo(uid, p),
-                                      builder: (context, infoSnapshot) {
-                                        final info = infoSnapshot.data;
-                                        final name = (info?['title'] ??
-                                                p['name'] ??
-                                                p['displayName'] ??
-                                                p['realName'] ??
-                                                uid)
-                                            .toString();
-                                        final isTeam =
-                                            (info?['isTeam'] ?? false) as bool;
-                                        final members = List<String>.from(
-                                          (info?['members'] as List?) ??
-                                              const [],
-                                        );
-
-                                         return Container(
-                                           margin: const EdgeInsets.only(
-                                             bottom: 10,
-                                           ),
-                                           decoration: BoxDecoration(
-                                             color: Colors.white,
-                                             borderRadius:
-                                                 BorderRadius.circular(16),
-                                             border: Border.all(
-                                               color: const Color(0xFFDCEAF8),
-                                             ),
-                                             boxShadow: [
-                                               BoxShadow(
-                                                 color: Colors.black.withValues(
-                                                   alpha: 0.03,
-                                                 ),
-                                                 blurRadius: 8,
-                                                 offset: const Offset(0, 2),
-                                               ),
-                                             ],
-                                           ),
-                                           child: Padding(
-                                             padding: const EdgeInsets.symmetric(
-                                               horizontal: 14,
-                                               vertical: 12,
-                                             ),
-                                             child: Row(
-                                               children: [
-                                                 // Number / Avatar index
-                                                 Container(
-                                                   width: 42,
-                                                   height: 42,
-                                                   decoration: BoxDecoration(
-                                                     color: isTeam
-                                                         ? const Color(0xFFE5F4FF)
-                                                         : const Color(0xFFEAF5FF),
-                                                     borderRadius:
-                                                         BorderRadius.circular(12),
-                                                   ),
-                                                   child: Center(
-                                                     child: Icon(
-                                                       isTeam
-                                                           ? Icons.groups_rounded
-                                                           : Icons.person_rounded,
-                                                       color: const Color(0xFF168BEB),
-                                                       size: 22,
-                                                     ),
-                                                   ),
-                                                 ),
-                                                 const SizedBox(width: 12),
-
-                                                 // Name, Team, Members, and Badges
-                                                 Expanded(
-                                                   child: Column(
-                                                     crossAxisAlignment:
-                                                         CrossAxisAlignment.start,
-                                                     children: [
-                                                       Text(
-                                                         name,
-                                                         maxLines: 1,
-                                                         overflow: TextOverflow
-                                                             .ellipsis,
-                                                         style: const TextStyle(
-                                                           color: darkBlue,
-                                                           fontSize: 15,
-                                                           fontWeight:
-                                                               FontWeight.bold,
-                                                         ),
-                                                       ),
-                                                       if (isTeam && members.isNotEmpty) ...[
-                                                         const SizedBox(
-                                                           height: 3,
-                                                         ),
-                                                         Row(
-                                                           children: [
-                                                             const Icon(
-                                                               Icons.group_outlined,
-                                                               size: 13,
-                                                               color: Color(
-                                                                 0xFF168BEB,
-                                                               ),
-                                                             ),
-                                                             const SizedBox(
-                                                               width: 4,
-                                                             ),
-                                                             Expanded(
-                                                               child: Text(
-                                                                 'Members: ${members.join(', ')}',
-                                                                 maxLines: 2,
-                                                                 overflow:
-                                                                     TextOverflow
-                                                                         .ellipsis,
-                                                                 style:
-                                                                     const TextStyle(
-                                                                   color: Color(
-                                                                     0xFF5B7A9C,
-                                                                   ),
-                                                                   fontSize: 11.5,
-                                                                   fontWeight:
-                                                                       FontWeight
-                                                                           .w500,
-                                                                 ),
-                                                               ),
-                                                             ),
-                                                           ],
-                                                         ),
-                                                       ],
-                                                       const SizedBox(height: 5),
-                                                       Wrap(
-                                                         spacing: 6,
-                                                         runSpacing: 4,
-                                                         children: [
-                                                           // Team / Solo Badge
-                                                           Container(
-                                                             padding: const EdgeInsets.symmetric(
-                                                               horizontal: 7,
-                                                               vertical: 3,
-                                                             ),
-                                                             decoration: BoxDecoration(
-                                                               color: isTeam
-                                                                   ? const Color(0xFFE5F4FF)
-                                                                   : const Color(0xFFF1F5F9),
-                                                               borderRadius: BorderRadius.circular(6),
-                                                             ),
-                                                             child: Text(
-                                                               isTeam
-                                                                   ? (members.isNotEmpty
-                                                                       ? 'TEAM (${members.length})'
-                                                                       : 'TEAM')
-                                                                   : 'SOLO',
-                                                               style: TextStyle(
-                                                                 color: isTeam
-                                                                     ? const Color(0xFF168BEB)
-                                                                     : const Color(0xFF475569),
-                                                                 fontSize: 9,
-                                                                 fontWeight: FontWeight.w700,
-                                                                 letterSpacing: 0.3,
-                                                               ),
-                                                             ),
-                                                           ),
-                                                          // Ready Badge
-                                                          if (isReady)
-                                                            Container(
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                horizontal: 7,
-                                                                vertical: 3,
-                                                              ),
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Colors
-                                                                    .green
-                                                                    .withValues(
-                                                                      alpha: 0.12,
-                                                                    ),
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                  10,
-                                                                ),
-                                                              ),
-                                                              child: const Text(
-                                                                'READY',
-                                                                style:
-                                                                    TextStyle(
-                                                                  color: Colors
-                                                                      .green,
-                                                                  fontSize: 9,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ),
-
-                                                          // Status badge
-                                                          Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .symmetric(
-                                                              horizontal: 7,
-                                                              vertical: 3,
-                                                            ),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              color:
-                                                                  const Color(
-                                                                0xFFE5F4FF,
-                                                              ),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                10,
-                                                              ),
-                                                            ),
-                                                            child: Text(
-                                                              statusStr
-                                                                  .replaceAll(
-                                                                    '_',
-                                                                    ' ',
-                                                                  )
-                                                                  .toUpperCase(),
-                                                              style:
-                                                                  const TextStyle(
-                                                                color: Color(
-                                                                  0xFF168BEB,
-                                                                ),
-                                                                fontSize: 9,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                            ),
-                                                          ),
-
-                                                          // Score badge if score > 0
-                                                          if (score != '0')
-                                                            Container(
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                horizontal: 7,
-                                                                vertical: 3,
-                                                              ),
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Colors
-                                                                    .purple
-                                                                    .withValues(
-                                                                      alpha: 0.10,
-                                                                    ),
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                  10,
-                                                                ),
-                                                              ),
-                                                              child: Text(
-                                                                'Score: $score pts',
-                                                                style:
-                                                                    const TextStyle(
-                                                                  color: Colors
-                                                                      .purple,
-                                                                  fontSize: 9,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-
-                                                // REMOVE BUTTON
-                                                Material(
-                                                  color: Colors.transparent,
-                                                  child: InkWell(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                      10,
-                                                    ),
-                                                    onTap: () =>
-                                                        _removeParticipant(
-                                                      context,
-                                                      effectiveCode,
-                                                      uid,
-                                                      name,
-                                                    ),
-                                                    child: Container(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                        horizontal: 10,
-                                                        vertical: 6,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.red
-                                                            .withValues(
-                                                          alpha: 0.08,
-                                                        ),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(10),
-                                                        border: Border.all(
-                                                          color: Colors.red
-                                                              .withValues(
-                                                            alpha: 0.22,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      child: const Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            Icons
-                                                                .delete_outline_rounded,
-                                                            color: Colors.red,
-                                                            size: 16,
-                                                          ),
-                                                          SizedBox(width: 4),
-                                                          Text(
-                                                            'Remove',
-                                                            style: TextStyle(
-                                                              color: Colors.red,
-                                                              fontSize: 11,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
                                 ),
+                              );
+                            },
+                          ),
                         ),
                       ],
                     );
@@ -1689,168 +1204,633 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
 }
 
   // ============================================================
-  // NO ACTIVE QUIZ CARD
+  // HISTORY BANNER
   // ============================================================
-
-  Widget _buildNoActiveQuizCard() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Center(
-        child: Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(maxWidth: 580),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFDCEAF5), width: 1.2),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0C168BEB),
-                blurRadius: 20,
-                offset: Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Color(0x05000000),
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
+  Widget _buildHistoryBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.history_rounded,
+            size: 18,
+            color: Color(0xFFEA580C),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Column(
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Viewing History Participants',
+              style: TextStyle(
+                color: Color(0xFFC2410C),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isViewingFromHistory = false;
+                _selectedQuizCode = null;
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Text(
+                'Back to Live',
+                style: TextStyle(
+                  color: primaryBlue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // AWAITING PARTICIPANTS CARD
+  // ============================================================
+  Widget _buildAwaitingParticipantsCard({
+    required String effectiveCode,
+    required bool isViewingHistoryQuiz,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        vertical: 36,
+        horizontal: 24,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFFDCEAF5),
+          width: 1.2,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C168BEB),
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2FE),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF168BEB).withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF168BEB),
+                      Color(0xFF0F4C81),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.groups_rounded,
+                  size: 28,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: isViewingHistoryQuiz
+                  ? const Color(0xFFF1F5F9)
+                  : const Color(0xFFE5F4FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isViewingHistoryQuiz
+                    ? const Color(0xFFCBD5E1)
+                    : const Color(0xFFB9E0FF),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Top Accent Cyber Gradient Bar
                 Container(
-                  height: 3.5,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
-                    ),
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isViewingHistoryQuiz
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFF168BEB),
+                    shape: BoxShape.circle,
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 38,
-                    horizontal: 24,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Layered Glowing Circle Illustration
-                      Container(
-                        width: 78,
-                        height: 78,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0F2FE),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF168BEB).withValues(
-                                alpha: 0.20,
-                              ),
-                              blurRadius: 20,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 58,
-                            height: 58,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF168BEB), Color(0xFF0F4C81)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.groups_rounded,
-                              size: 28,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Standby Badge Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE5F4FF),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFB9E0FF)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF168BEB),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            const Text(
-                              'PARTICIPANTS STANDBY',
-                              style: TextStyle(
-                                color: Color(0xFF168BEB),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Title
-                      const Text(
-                        'No Active Quiz Right Now',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: darkBlue,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Subtitle
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 440),
-                        child: const Text(
-                          'Contestants and teams who join your quiz session will automatically appear and stream here in real-time once a quiz session begins.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 12.5,
-                            height: 1.45,
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 5),
+                Text(
+                  isViewingHistoryQuiz
+                      ? 'PAST SESSION'
+                      : 'AWAITING CONTESTANTS',
+                  style: TextStyle(
+                    color: isViewingHistoryQuiz
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFF168BEB),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
                   ),
                 ),
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          Text(
+            isViewingHistoryQuiz
+                ? 'No Participants'
+                : 'No Participants Yet',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: darkBlue,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Text(
+              isViewingHistoryQuiz
+                  ? 'No participants found in this past quiz session.'
+                  : 'Contestants who enter quiz code "' + effectiveCode + '" will appear here live.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12.5,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  // ============================================================
+  // PARTICIPANT TILE ITEM
+  // ============================================================
+  Widget _buildParticipantItem({
+    required Map<String, dynamic> p,
+    required String effectiveCode,
+    required bool isViewingHistoryQuiz,
+  }) {
+    final uid = (p['uid'] ?? '').toString();
+    final isReady = p['ready'] == true;
+    final statusStr = (p['status'] ?? 'joined').toString().trim().toLowerCase();
+    final score = p['score']?.toString() ?? '0';
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getParticipantDisplayInfo(uid, p),
+      builder: (context, infoSnapshot) {
+        final info = infoSnapshot.data;
+        final name = (info?['title'] ??
+                p['name'] ??
+                p['displayName'] ??
+                p['realName'] ??
+                uid)
+            .toString();
+        final isTeam = (info?['isTeam'] ?? false) as bool;
+        final members = List<String>.from(
+          (info?['members'] as List?) ?? const [],
+        );
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFDCEAF8),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            child: Row(
+              children: [
+                // Number / Avatar index
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: isTeam
+                        ? const Color(0xFFE5F4FF)
+                        : const Color(0xFFEAF5FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isTeam
+                          ? Icons.groups_rounded
+                          : Icons.person_rounded,
+                      color: const Color(0xFF168BEB),
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Name, Team, Members, and Badges
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: darkBlue,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (isTeam && members.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.group_outlined,
+                              size: 13,
+                              color: Color(0xFF168BEB),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Members: ' + members.join(', '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF5B7A9C),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          // Team / Solo Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isTeam
+                                  ? const Color(0xFFE5F4FF)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isTeam
+                                  ? (members.isNotEmpty
+                                      ? 'TEAM (' + members.length.toString() + ')'
+                                      : 'TEAM')
+                                  : 'SOLO',
+                              style: TextStyle(
+                                color: isTeam
+                                    ? const Color(0xFF168BEB)
+                                    : const Color(0xFF475569),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          // Ready Badge
+                          if (isReady)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'READY',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+
+                          // Status badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE5F4FF),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              statusStr.replaceAll('_', ' ').toUpperCase(),
+                              style: const TextStyle(
+                                color: Color(0xFF168BEB),
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+
+                          // Score badge if score > 0
+                          if (score != '0')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.purple.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'Score: ' + score + ' pts',
+                                style: const TextStyle(
+                                  color: Colors.purple,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // REMOVE BUTTON
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => _removeParticipant(
+                      context,
+                      effectiveCode,
+                      uid,
+                      name,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.red.withValues(alpha: 0.22),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.red,
+                            size: 16,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Remove',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // NO ACTIVE QUIZ CARD
+  // ============================================================
+
+  Widget _buildNoActiveQuizCard() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDCEAF5), width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C168BEB),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            // Top Accent Cyber Gradient Bar
+            Container(
+              height: 3.5,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 38,
+                horizontal: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Layered Glowing Circle Illustration
+                  Container(
+                    width: 78,
+                    height: 78,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF168BEB).withValues(
+                            alpha: 0.20,
+                          ),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF168BEB), Color(0xFF0F4C81)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.groups_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Standby Badge Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5F4FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFB9E0FF)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF168BEB),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'PARTICIPANTS STANDBY',
+                          style: TextStyle(
+                            color: Color(0xFF168BEB),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Title
+                  const Text(
+                    'No Active Quiz Right Now',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: darkBlue,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Subtitle
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: const Text(
+                      'Contestants and teams who join your quiz session will automatically appear and stream here in real-time once a quiz session begins.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12.5,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   // ============================================================
   // BOTTOM NAVIGATION
   // ============================================================

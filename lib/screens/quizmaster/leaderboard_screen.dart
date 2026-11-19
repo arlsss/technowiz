@@ -331,24 +331,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       if (activeSessions.isEmpty) {
                         return SingleChildScrollView(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLiveRankingHeroCard(
-                                context: context,
-                                quizTitle: 'No Active Quiz',
-                                quizCode: '------',
-                                status: 'WAITING',
-                                entries: const [],
-                                allSessions: const [],
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 860),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildLiveRankingHeroCard(
+                                    context: context,
+                                    quizTitle: 'No Active Quiz',
+                                    quizCode: '------',
+                                    status: 'WAITING',
+                                    entries: const [],
+                                    allSessions: const [],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildLevelSelectorTabs(const {
+                                    'levels': ['Level 1', 'Level 2', 'Level 3'],
+                                  }),
+                                  const SizedBox(height: 16),
+                                  _noActiveQuizCard(),
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              _buildLevelSelectorTabs(const {
-                                'levels': ['Level 1', 'Level 2', 'Level 3'],
-                              }),
-                              const SizedBox(height: 16),
-                              _noActiveQuizCard(),
-                            ],
+                            ),
                           ),
                         );
                       }
@@ -373,24 +378,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     if (chosenDoc == null) {
                       return SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLiveRankingHeroCard(
-                              context: context,
-                              quizTitle: 'No Active Quiz',
-                              quizCode: '------',
-                              status: 'WAITING',
-                              entries: const [],
-                              allSessions: const [],
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 860),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildLiveRankingHeroCard(
+                                  context: context,
+                                  quizTitle: 'No Active Quiz',
+                                  quizCode: '------',
+                                  status: 'WAITING',
+                                  entries: const [],
+                                  allSessions: const [],
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLevelSelectorTabs(const {
+                                  'levels': ['Level 1', 'Level 2', 'Level 3'],
+                                }),
+                                const SizedBox(height: 16),
+                                _noActiveQuizCard(),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            _buildLevelSelectorTabs(const {
-                              'levels': ['Level 1', 'Level 2', 'Level 3'],
-                            }),
-                            const SizedBox(height: 16),
-                            _noActiveQuizCard(),
-                          ],
+                          ),
                         ),
                       );
                     }
@@ -468,9 +478,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                 16,
                                 30,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 860),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
                                   if (isViewingHistoryQuiz) ...[
                                     Container(
                                       margin: const EdgeInsets.only(bottom: 12),
@@ -563,7 +576,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                   ],
                                 ],
                               ),
-                            );
+                            ),
+                          ),
+                        );
                           },
                         );
                       },
