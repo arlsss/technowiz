@@ -189,19 +189,37 @@ class CompetitorNavPersistence {
     String? quizCode,
     String? quizTitle,
     int? level,
+    bool clearQuiz = false,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
       await prefs.setString(lastPageKey, pageKey);
-      if (quizCode != null && quizCode.isNotEmpty) {
-        await prefs.setString(quizCodeKey, quizCode);
+      if (clearQuiz) {
+        await prefs.remove(quizCodeKey);
+        await prefs.remove(quizTitleKey);
+        await prefs.remove(quizLevelKey);
+      } else {
+        if (quizCode != null && quizCode.isNotEmpty) {
+          await prefs.setString(quizCodeKey, quizCode);
+        }
+        if (quizTitle != null && quizTitle.isNotEmpty) {
+          await prefs.setString(quizTitleKey, quizTitle);
+        }
+        if (level != null) {
+          await prefs.setInt(quizLevelKey, level);
+        }
       }
-      if (quizTitle != null && quizTitle.isNotEmpty) {
-        await prefs.setString(quizTitleKey, quizTitle);
-      }
-      if (level != null) {
-        await prefs.setInt(quizLevelKey, level);
-      }
+    } catch (_) {}
+  }
+
+  /// Clears quiz-specific parameters while leaving the current page intact.
+  static Future<void> clearQuizParams() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(quizCodeKey);
+      await prefs.remove(quizTitleKey);
+      await prefs.remove(quizLevelKey);
     } catch (_) {}
   }
 

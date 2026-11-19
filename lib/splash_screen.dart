@@ -42,6 +42,7 @@ import 'screens/quizmaster/contestant_readiness_page.dart';
 import 'screens/quizmaster/submitted_answers_screen.dart';
 
 import 'screens/competitor/competitor_dashboard.dart';
+import 'screens/competitor/join_quiz_screen.dart';
 import 'screens/competitor/my_score_screen.dart';
 import 'screens/competitor/quiz_history_score_screen.dart';
 
@@ -243,6 +244,14 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
+    if (page == 'join_quiz' &&
+        quizCode != null &&
+        quizCode.trim().isNotEmpty) {
+      debugPrint('✅ RESTORING CONTESTANT JOIN QUIZ: $quizCode');
+      _replaceWith(JoinQuizScreen(quizCode: quizCode.trim()));
+      return;
+    }
+
     if (page == 'waiting_room' &&
         quizCode != null &&
         quizCode.trim().isNotEmpty) {
@@ -258,7 +267,7 @@ class _SplashScreenState extends State<SplashScreen> {
           final data = quizDoc.data() ?? {};
           final title = quizTitle ?? data['title']?.toString() ?? 'Quiz';
 
-          debugPrint('âœ… RESTORING CONTESTANT WAITING ROOM: ');
+          debugPrint('✅ RESTORING CONTESTANT WAITING ROOM: $quizCode');
 
           _replaceWith(
             WaitingRoomScreen(
@@ -268,9 +277,18 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           );
           return;
+        } else {
+          _replaceWith(
+            WaitingRoomScreen(
+              quizCode: quizCode.trim(),
+              level: level ?? 1,
+              quizTitle: quizTitle ?? 'Quiz',
+            ),
+          );
+          return;
         }
       } catch (e) {
-        debugPrint('Waiting room restore query error: ');
+        debugPrint('Waiting room restore query error: $e');
         if (!mounted) return;
         _replaceWith(
           WaitingRoomScreen(
@@ -297,6 +315,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
         if (quizDoc.exists) {
           debugPrint('✅ RESTORING CONTESTANT QUIZ SCREEN: $quizCode');
+          _replaceWith(QuizScreen(quizCode: quizCode.trim()));
+          return;
+        } else {
           _replaceWith(QuizScreen(quizCode: quizCode.trim()));
           return;
         }

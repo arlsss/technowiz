@@ -116,7 +116,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         };
         for (final doc in snapshot.docs) {
           final data = doc.data();
-          final isPub = data['published'] == true ||
+          final isPub =
+              data['published'] == true ||
               data['isPublished'] == true ||
               data['is_published'] == true ||
               data['published'] == 1 ||
@@ -138,8 +139,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           }
         }
         if (activeDoc != null) {
-          final code =
-              (activeDoc.data()['quizCode'] ?? activeDoc.id).toString().trim();
+          final code = (activeDoc.data()['quizCode'] ?? activeDoc.id)
+              .toString()
+              .trim();
           if (mounted && code.isNotEmpty) {
             setState(() {
               _selectedQuizCode = code;
@@ -157,8 +159,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   String? _selectedQuizCode;
 
   String get _activeQuizCode => (_selectedQuizCode ?? widget.quizCode).trim();
-
-
 
   // ================================================================
 
@@ -213,119 +213,164 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       body: QuizMasterCircuitBackground(
         child: showHistory
             ? LeaderboardHistoryScreen(
-              onBack: () async {
-                await _savePage('leaderboard', quizCode: _activeQuizCode);
-                if (mounted) setState(() => showHistory = false);
-              },
+                onBack: () async {
+                  await _savePage('leaderboard', quizCode: _activeQuizCode);
+                  if (mounted) setState(() => showHistory = false);
+                },
 
-              onOpenNavigation: () async {
-                await _savePage('leaderboard', quizCode: _activeQuizCode);
-                if (mounted) setState(() => showHistory = false);
-              },
+                onOpenNavigation: () async {
+                  await _savePage('leaderboard', quizCode: _activeQuizCode);
+                  if (mounted) setState(() => showHistory = false);
+                },
 
-              onOverview: (quizCode) async {
-                await _savePage('leaderboard', quizCode: quizCode);
-                if (!mounted) return;
-                setState(() {
-                  _selectedQuizCode = quizCode;
-                  _isViewingFromHistory = true;
-                  selectedLevel = 'Overall';
-                  showHistory = false;
-                });
-              },
-            )
-          : SafeArea(
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('quiz_sessions')
-                    .orderBy('createdAt', descending: true)
-                    .limit(30)
-                    .snapshots(),
-                builder: (context, sessionListSnapshot) {
-                  if (sessionListSnapshot.connectionState ==
-                          ConnectionState.waiting &&
-                      !sessionListSnapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: primaryPurple,
-                      ),
-                    );
-                  }
+                onOverview: (quizCode) async {
+                  await _savePage('leaderboard', quizCode: quizCode);
+                  if (!mounted) return;
+                  setState(() {
+                    _selectedQuizCode = quizCode;
+                    _isViewingFromHistory = true;
+                    selectedLevel = 'Overall';
+                    showHistory = false;
+                  });
+                },
+              )
+            : SafeArea(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('quiz_sessions')
+                      .orderBy('createdAt', descending: true)
+                      .limit(30)
+                      .snapshots(),
+                  builder: (context, sessionListSnapshot) {
+                    if (sessionListSnapshot.connectionState ==
+                            ConnectionState.waiting &&
+                        !sessionListSnapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: primaryPurple),
+                      );
+                    }
 
-                  if (sessionListSnapshot.hasError) {
-                    return _errorState(sessionListSnapshot.error);
-                  }
+                    if (sessionListSnapshot.hasError) {
+                      return _errorState(sessionListSnapshot.error);
+                    }
 
-                  final allSessions = sessionListSnapshot.data?.docs ?? [];
+                    final allSessions = sessionListSnapshot.data?.docs ?? [];
 
-                  const activeStatuses = {
-                    'waiting',
-                    'countdown',
-                    'active',
-                    'live',
-                    'started',
-                    'ongoing',
-                    'paused',
-                    'level_pause',
-                    'contest_review',
-                    'in_progress',
-                    'inprogress',
-                  };
+                    const activeStatuses = {
+                      'waiting',
+                      'countdown',
+                      'active',
+                      'live',
+                      'started',
+                      'ongoing',
+                      'paused',
+                      'level_pause',
+                      'contest_review',
+                      'in_progress',
+                      'inprogress',
+                    };
 
-                  const finishedStatuses = {
-                    'finished',
-                    'finish',
-                    'completed',
-                    'complete',
-                    'ended',
-                    'end',
-                    'archived',
-                    'cancelled',
-                    'canceled',
-                  };
+                    const finishedStatuses = {
+                      'finished',
+                      'finish',
+                      'completed',
+                      'complete',
+                      'ended',
+                      'end',
+                      'archived',
+                      'cancelled',
+                      'canceled',
+                    };
 
-                  final activeSessions = allSessions.where((doc) {
-                    final data = doc.data();
-                    final isPub = data['published'] == true ||
-                        data['isPublished'] == true ||
-                        data['is_published'] == true ||
-                        data['published'] == 1 ||
-                        data['isPublished'] == 1 ||
-                        data['published']?.toString().toLowerCase() == 'true' ||
-                        data['isPublished']?.toString().toLowerCase() == 'true' ||
-                        (data['status'] ?? '').toString().toLowerCase() == 'published';
-                    if (!isPub) return false;
+                    final activeSessions = allSessions.where((doc) {
+                      final data = doc.data();
+                      final isPub =
+                          data['published'] == true ||
+                          data['isPublished'] == true ||
+                          data['is_published'] == true ||
+                          data['published'] == 1 ||
+                          data['isPublished'] == 1 ||
+                          data['published']?.toString().toLowerCase() ==
+                              'true' ||
+                          data['isPublished']?.toString().toLowerCase() ==
+                              'true' ||
+                          (data['status'] ?? '').toString().toLowerCase() ==
+                              'published';
+                      if (!isPub) return false;
 
-                    final status = (data['status'] ?? '')
-                        .toString()
-                        .trim()
-                        .toLowerCase()
-                        .replaceAll('-', '_')
-                        .replaceAll(' ', '_');
-                    return activeStatuses.contains(status) &&
-                        !finishedStatuses.contains(status);
-                  }).toList();
+                      final status = (data['status'] ?? '')
+                          .toString()
+                          .trim()
+                          .toLowerCase()
+                          .replaceAll('-', '_')
+                          .replaceAll(' ', '_');
+                      return activeStatuses.contains(status) &&
+                          !finishedStatuses.contains(status);
+                    }).toList();
 
-                  bool isViewingHistoryQuiz = false;
-                  QueryDocumentSnapshot<Map<String, dynamic>>? chosenDoc;
+                    bool isViewingHistoryQuiz = false;
+                    QueryDocumentSnapshot<Map<String, dynamic>>? chosenDoc;
 
-                  if (_isViewingFromHistory &&
-                      _selectedQuizCode != null &&
-                      _selectedQuizCode!.trim().isNotEmpty) {
-                    final target = _selectedQuizCode!.trim();
-                    for (final d in allSessions) {
-                      final code =
-                          (d.data()['quizCode'] ?? d.id).toString().trim();
-                      if (code == target || d.id.trim() == target) {
-                        chosenDoc = d;
-                        isViewingHistoryQuiz = true;
-                        break;
+                    if (_isViewingFromHistory &&
+                        _selectedQuizCode != null &&
+                        _selectedQuizCode!.trim().isNotEmpty) {
+                      final target = _selectedQuizCode!.trim();
+                      for (final d in allSessions) {
+                        final code = (d.data()['quizCode'] ?? d.id)
+                            .toString()
+                            .trim();
+                        if (code == target || d.id.trim() == target) {
+                          chosenDoc = d;
+                          isViewingHistoryQuiz = true;
+                          break;
+                        }
                       }
                     }
-                  }
 
-                  if (!isViewingHistoryQuiz) {
-                    if (activeSessions.isEmpty) {
+                    if (!isViewingHistoryQuiz) {
+                      if (activeSessions.isEmpty) {
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLiveRankingHeroCard(
+                                context: context,
+                                quizTitle: 'No Active Quiz',
+                                quizCode: '------',
+                                status: 'WAITING',
+                                entries: const [],
+                                allSessions: const [],
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLevelSelectorTabs(const {
+                                'levels': ['Level 1', 'Level 2', 'Level 3'],
+                              }),
+                              const SizedBox(height: 16),
+                              _noActiveQuizCard(),
+                            ],
+                          ),
+                        );
+                      }
+
+                      chosenDoc = activeSessions.first;
+
+                      if (_selectedQuizCode != null &&
+                          _selectedQuizCode!.trim().isNotEmpty) {
+                        final target = _selectedQuizCode!.trim();
+                        for (final d in activeSessions) {
+                          final code = (d.data()['quizCode'] ?? d.id)
+                              .toString()
+                              .trim();
+                          if (code == target || d.id.trim() == target) {
+                            chosenDoc = d;
+                            break;
+                          }
+                        }
+                      }
+                    }
+
+                    if (chosenDoc == null) {
                       return SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
                         child: Column(
@@ -341,7 +386,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                             ),
                             const SizedBox(height: 16),
                             _buildLevelSelectorTabs(const {
-                              'levels': ['Level 1', 'Level 2', 'Level 3']
+                              'levels': ['Level 1', 'Level 2', 'Level 3'],
                             }),
                             const SizedBox(height: 16),
                             _noActiveQuizCard(),
@@ -350,214 +395,182 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       );
                     }
 
-                    chosenDoc = activeSessions.first;
+                    final effectiveCode =
+                        (chosenDoc.data()['quizCode'] ?? chosenDoc.id)
+                            .toString()
+                            .trim();
+                    final quizData = chosenDoc.data();
+                    final quizTitle =
+                        (quizData['title'] ??
+                                quizData['quizName'] ??
+                                quizData['name'] ??
+                                'Untitled Quiz')
+                            .toString()
+                            .trim();
+                    final rawStatus = (quizData['status'] ?? 'waiting')
+                        .toString()
+                        .trim()
+                        .toLowerCase()
+                        .replaceAll('_', ' ');
 
-                    if (_selectedQuizCode != null &&
-                        _selectedQuizCode!.trim().isNotEmpty) {
-                      final target = _selectedQuizCode!.trim();
-                      for (final d in activeSessions) {
-                        final code =
-                            (d.data()['quizCode'] ?? d.id).toString().trim();
-                        if (code == target || d.id.trim() == target) {
-                          chosenDoc = d;
-                          break;
-                        }
-                      }
-                    }
-                  }
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('quiz_sessions')
+                          .doc(effectiveCode)
+                          .collection('join_requests')
+                          .snapshots(),
+                      builder: (context, requestSnap) {
+                        return StreamBuilder<
+                          QuerySnapshot<Map<String, dynamic>>
+                        >(
+                          stream: FirebaseFirestore.instance
+                              .collection('quiz_sessions')
+                              .doc(effectiveCode)
+                              .collection('scores')
+                              .snapshots(),
+                          builder: (context, scoreSnap) {
+                            if ((requestSnap.connectionState ==
+                                        ConnectionState.waiting &&
+                                    !requestSnap.hasData) ||
+                                (scoreSnap.connectionState ==
+                                        ConnectionState.waiting &&
+                                    !scoreSnap.hasData)) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  color: primaryPurple,
+                                ),
+                              );
+                            }
 
-                  if (chosenDoc == null) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLiveRankingHeroCard(
-                            context: context,
-                            quizTitle: 'No Active Quiz',
-                            quizCode: '------',
-                            status: 'WAITING',
-                            entries: const [],
-                            allSessions: const [],
-                          ),
-                          const SizedBox(height: 16),
-                          _buildLevelSelectorTabs(const {
-                            'levels': ['Level 1', 'Level 2', 'Level 3']
-                          }),
-                          const SizedBox(height: 16),
-                          _noActiveQuizCard(),
-                        ],
-                      ),
-                    );
-                  }
+                            if (requestSnap.hasError || scoreSnap.hasError) {
+                              return _errorState(
+                                requestSnap.error ?? scoreSnap.error,
+                              );
+                            }
 
-                  final effectiveCode =
-                      (chosenDoc.data()['quizCode'] ?? chosenDoc.id)
-                          .toString()
-                          .trim();
-                  final quizData = chosenDoc.data();
-                  final quizTitle = (quizData['title'] ??
-                          quizData['quizName'] ??
-                          quizData['name'] ??
-                          'Untitled Quiz')
-                      .toString()
-                      .trim();
-                  final rawStatus = (quizData['status'] ?? 'waiting')
-                      .toString()
-                      .trim()
-                      .toLowerCase()
-                      .replaceAll('_', ' ');
+                            final requests = requestSnap.data?.docs ?? [];
+                            final scores = scoreSnap.data?.docs ?? [];
+                            _syncOrFetchLevelScores(effectiveCode, scores);
+                            final configuredLevels = _extractConfiguredLevels(
+                              quizData,
+                            );
+                            final entries = _buildLeaderboard(
+                              requests: requests,
+                              scores: scores,
+                              selectedLevel: selectedLevel,
+                              configuredLevels: configuredLevels,
+                            );
 
-                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection('quiz_sessions')
-                        .doc(effectiveCode)
-                        .collection('join_requests')
-                        .snapshots(),
-                    builder: (context, requestSnap) {
-                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance
-                            .collection('quiz_sessions')
-                            .doc(effectiveCode)
-                            .collection('scores')
-                            .snapshots(),
-                        builder: (context, scoreSnap) {
-                          if ((requestSnap.connectionState ==
-                                      ConnectionState.waiting &&
-                                  !requestSnap.hasData) ||
-                              (scoreSnap.connectionState ==
-                                      ConnectionState.waiting &&
-                                  !scoreSnap.hasData)) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                color: primaryPurple,
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                14,
+                                16,
+                                30,
                               ),
-                            );
-                          }
-
-                          if (requestSnap.hasError || scoreSnap.hasError) {
-                            return _errorState(
-                              requestSnap.error ?? scoreSnap.error,
-                            );
-                          }
-
-                          final requests = requestSnap.data?.docs ?? [];
-                          final scores = scoreSnap.data?.docs ?? [];
-                          _syncOrFetchLevelScores(effectiveCode, scores);
-                          final configuredLevels =
-                              _extractConfiguredLevels(quizData);
-                          final entries = _buildLeaderboard(
-                            requests: requests,
-                            scores: scores,
-                            selectedLevel: selectedLevel,
-                            configuredLevels: configuredLevels,
-                          );
-
-                          return SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (isViewingHistoryQuiz) ...[
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF7ED),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFFED7AA),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (isViewingHistoryQuiz) ...[
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.history_rounded,
-                                          size: 18,
-                                          color: Color(0xFFEA580C),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF7ED),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(0xFFFED7AA),
                                         ),
-                                        const SizedBox(width: 8),
-                                        const Expanded(
-                                          child: Text(
-                                            'Viewing History Results',
-                                            style: TextStyle(
-                                              color: Color(0xFFC2410C),
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.history_rounded,
+                                            size: 18,
+                                            color: Color(0xFFEA580C),
                                           ),
-                                        ),
-                                        InkWell(
-                                          onTap: () {
-                                            setState(() {
-                                              _isViewingFromHistory = false;
-                                              _selectedQuizCode = null;
-                                            });
-                                          },
-                                          child: const Padding(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 2,
-                                            ),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
                                             child: Text(
-                                              'Back to Live',
+                                              'Viewing History Results',
                                               style: TextStyle(
-                                                color: primaryPurple,
+                                                color: Color(0xFFC2410C),
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      ],
+                                          InkWell(
+                                            onTap: () {
+                                              setState(() {
+                                                _isViewingFromHistory = false;
+                                                _selectedQuizCode = null;
+                                              });
+                                            },
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 4,
+                                                vertical: 2,
+                                              ),
+                                              child: Text(
+                                                'Back to Live',
+                                                style: TextStyle(
+                                                  color: primaryPurple,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                  ],
+                                  _buildLiveRankingHeroCard(
+                                    context: context,
+                                    quizTitle: quizTitle,
+                                    quizCode: effectiveCode,
+                                    status: rawStatus,
+                                    entries: entries,
+                                    allSessions: isViewingHistoryQuiz
+                                        ? [chosenDoc!]
+                                        : activeSessions,
                                   ),
+                                  const SizedBox(height: 16),
+                                  _levelSelector(quizData: quizData),
+                                  const SizedBox(height: 16),
+                                  if (entries.isEmpty)
+                                    _waitingLiveStandingsCard()
+                                  else ...[
+                                    _sectionHeader(
+                                      'Top Performers',
+                                      'Leading participants in this competition.',
+                                      Icons.emoji_events_rounded,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _podium(entries),
+                                    const SizedBox(height: 20),
+                                    _sectionHeader(
+                                      'Contestant Standings',
+                                      'Scores and ranking of all contestants.',
+                                      Icons.format_list_numbered_rounded,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _rankingList(entries),
+                                  ],
                                 ],
-                                _buildLiveRankingHeroCard(
-                                  context: context,
-                                  quizTitle: quizTitle,
-                                  quizCode: effectiveCode,
-                                  status: rawStatus,
-                                  entries: entries,
-                                  allSessions: isViewingHistoryQuiz
-                                      ? [chosenDoc!]
-                                      : activeSessions,
-                                ),
-                                const SizedBox(height: 16),
-                                _levelSelector(quizData: quizData),
-                                const SizedBox(height: 16),
-                                if (entries.isEmpty)
-                                  _waitingLiveStandingsCard()
-                                else ...[
-                                  _sectionHeader(
-                                    'Top Performers',
-                                    'Leading participants in this competition.',
-                                    Icons.emoji_events_rounded,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _podium(entries),
-                                  const SizedBox(height: 20),
-                                  _sectionHeader(
-                                    'Contestant Standings',
-                                    'Scores and ranking of all contestants.',
-                                    Icons.format_list_numbered_rounded,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _rankingList(entries),
-                                ],
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
       ),
     );
   }
@@ -714,15 +727,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     required List<_LeaderboardEntry> entries,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> allSessions,
   }) {
-    final isLive = status == 'active' ||
+    final isLive =
+        status == 'active' ||
         status == 'live' ||
         status == 'started' ||
         status == 'waiting';
 
-    final topLeaderName =
-        entries.isNotEmpty ? entries.first.name : 'Waiting for contestants...';
-    final topScore =
-        entries.isNotEmpty ? '${entries.first.score} pts' : '0 pts';
+    final topLeaderName = entries.isNotEmpty
+        ? entries.first.name
+        : 'Waiting for contestants...';
+    final topScore = entries.isNotEmpty
+        ? '${entries.first.score} pts'
+        : '0 pts';
 
     return Container(
       width: double.infinity,
@@ -775,7 +791,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.sensors_rounded, color: Colors.white, size: 13),
+                            Icon(
+                              Icons.sensors_rounded,
+                              color: Colors.white,
+                              size: 13,
+                            ),
                             SizedBox(width: 5),
                             Text(
                               'LIVE RANKING',
@@ -917,22 +937,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       Icons.arrow_drop_down_rounded,
                       color: Colors.white,
                     ),
-                    value: allSessions.any((d) =>
-                            (d.data()['quizCode'] ?? d.id).toString().trim() ==
-                            quizCode)
+                    value:
+                        allSessions.any(
+                          (d) =>
+                              (d.data()['quizCode'] ?? d.id)
+                                  .toString()
+                                  .trim() ==
+                              quizCode,
+                        )
                         ? quizCode
                         : (allSessions.first.data()['quizCode'] ??
-                                allSessions.first.id)
-                            .toString()
-                            .trim(),
+                                  allSessions.first.id)
+                              .toString()
+                              .trim(),
                     items: allSessions.map((doc) {
-                      final code =
-                          (doc.data()['quizCode'] ?? doc.id).toString().trim();
-                      final title = (doc.data()['title'] ??
-                              doc.data()['quizName'] ??
-                              'Quiz')
+                      final code = (doc.data()['quizCode'] ?? doc.id)
                           .toString()
                           .trim();
+                      final title =
+                          (doc.data()['title'] ??
+                                  doc.data()['quizName'] ??
+                                  'Quiz')
+                              .toString()
+                              .trim();
                       return DropdownMenuItem<String>(
                         value: code,
                         child: Text(
@@ -1128,7 +1155,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF1689E8).withValues(alpha: 0.18),
+                          color: const Color(
+                            0xFF1689E8,
+                          ).withValues(alpha: 0.18),
                           blurRadius: 18,
                           offset: const Offset(0, 6),
                         ),
@@ -1269,7 +1298,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF1689E8).withValues(alpha: 0.20),
+                          color: const Color(
+                            0xFF1689E8,
+                          ).withValues(alpha: 0.20),
                           blurRadius: 20,
                           offset: const Offset(0, 6),
                         ),
@@ -1406,8 +1437,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         final numericLevel = int.tryParse(
           rawLabel.replaceFirst(RegExp(r'^level\s*', caseSensitive: false), ''),
         );
-        final normalizedLabel =
-            numericLevel != null ? 'Level $numericLevel' : rawLabel;
+        final normalizedLabel = numericLevel != null
+            ? 'Level $numericLevel'
+            : rawLabel;
         if (!configuredLevels.contains(normalizedLabel)) {
           configuredLevels.add(normalizedLabel);
         }
@@ -1415,10 +1447,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     }
 
     if (configuredLevels.isEmpty) {
-      final int highestAvailableLevel =
-          completedLevel > currentLevel ? completedLevel : currentLevel;
-      final int levelCount =
-          highestAvailableLevel > 1 ? highestAvailableLevel : 1;
+      final int highestAvailableLevel = completedLevel > currentLevel
+          ? completedLevel
+          : currentLevel;
+      final int levelCount = highestAvailableLevel > 1
+          ? highestAvailableLevel
+          : 1;
       for (var number = 1; number <= levelCount; number++) {
         configuredLevels.add('Level $number');
       }
@@ -1469,10 +1503,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         final buttons = [
           for (final level in levels)
             shouldScroll
-                ? SizedBox(
-                    width: 78,
-                    child: _levelButton(level),
-                  )
+                ? SizedBox(width: 78, child: _levelButton(level))
                 : Flexible(fit: FlexFit.tight, child: _levelButton(level)),
         ];
 
@@ -1495,15 +1526,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ? SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: buttons,
-                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: buttons),
                 )
-              : Row(
-                  mainAxisSize: MainAxisSize.max,
-                  children: buttons,
-                ),
+              : Row(mainAxisSize: MainAxisSize.max, children: buttons),
         );
       },
     );
@@ -1923,8 +1948,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   color: rank == 1
                       ? const Color(0xFFFCD34D)
                       : rank == 2
-                          ? const Color(0xFFCBD5E1)
-                          : const Color(0xFFFDBA74),
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFFFDBA74),
                   width: 2,
                 ),
                 boxShadow: const [
@@ -1940,8 +1965,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   rank == 1
                       ? 'assets/trophies/gold_trophy_3d.jpg'
                       : rank == 2
-                          ? 'assets/trophies/silver_trophy_3d.jpg'
-                          : 'assets/trophies/bronze_trophy_3d.jpg',
+                      ? 'assets/trophies/silver_trophy_3d.jpg'
+                      : 'assets/trophies/bronze_trophy_3d.jpg',
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Icon(
                     Icons.emoji_events_rounded,
@@ -1949,8 +1974,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     color: rank == 1
                         ? const Color(0xFFD97706)
                         : rank == 2
-                            ? const Color(0xFF64748B)
-                            : const Color(0xFFB45309),
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFFB45309),
                   ),
                 ),
               ),
@@ -2066,8 +2091,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final trophyAsset = isFirst
           ? 'assets/trophies/gold_trophy_3d.jpg'
           : (isSecond
-              ? 'assets/trophies/silver_trophy_3d.jpg'
-              : 'assets/trophies/bronze_trophy_3d.jpg');
+                ? 'assets/trophies/silver_trophy_3d.jpg'
+                : 'assets/trophies/bronze_trophy_3d.jpg');
       final rankColor = isFirst
           ? const Color(0xFFF59E0B)
           : (isSecond ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
@@ -2214,19 +2239,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         color: entry.eliminated
             ? const Color(0xFFFFF7F7)
             : (isFirst
-                ? const Color(0xFFFFFDF5)
-                : (isTop3
-                    ? const Color(0xFFFAFCFF)
-                    : (isTop10 ? const Color(0xFFF0FDF4) : backgroundColor))),
+                  ? const Color(0xFFFFFDF5)
+                  : (isTop3
+                        ? const Color(0xFFFAFCFF)
+                        : (isTop10
+                              ? const Color(0xFFF0FDF4)
+                              : backgroundColor))),
         borderRadius: BorderRadius.circular(13),
         border: Border.all(
           color: entry.eliminated
               ? const Color(0xFFFECACA)
               : (isFirst
-                  ? const Color(0xFFFDE68A)
-                  : (isTop3
-                      ? const Color(0xFFBAE6FD)
-                      : (isTop10 ? const Color(0xFF86EFAC) : borderColor))),
+                    ? const Color(0xFFFDE68A)
+                    : (isTop3
+                          ? const Color(0xFFBAE6FD)
+                          : (isTop10 ? const Color(0xFF86EFAC) : borderColor))),
           width: (entry.eliminated || isTop3 || isTop10) ? 1.2 : 1,
         ),
       ),
@@ -2280,7 +2307,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           ),
                         ),
                       ),
-                    ] else if (entry.status == 'proceeding' || entry.status == 'approved') ...[
+                    ] else if (entry.status == 'proceeding' ||
+                        entry.status == 'approved') ...[
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -2303,7 +2331,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     ],
                   ],
                 ),
-                if (entry.teamName.isNotEmpty && entry.teamName != entry.name) ...[
+                if (entry.teamName.isNotEmpty &&
+                    entry.teamName != entry.name) ...[
                   const SizedBox(height: 2),
                   Text(
                     'Team: ${entry.teamName}',
@@ -2349,17 +2378,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               color: isFirst
                   ? const Color(0xFFFEF3C7)
                   : (isTop3
-                      ? const Color(0xFFE0F2FE)
-                      : (isTop10 ? const Color(0xFFDCFCE7) : lightPurple)),
+                        ? const Color(0xFFE0F2FE)
+                        : (isTop10 ? const Color(0xFFDCFCE7) : lightPurple)),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isFirst
                     ? const Color(0xFFF59E0B)
                     : (isTop3
-                        ? const Color(0xFF38BDF8)
-                        : (isTop10
-                            ? const Color(0xFF4ADE80)
-                            : const Color(0xFFBAE6FD))),
+                          ? const Color(0xFF38BDF8)
+                          : (isTop10
+                                ? const Color(0xFF4ADE80)
+                                : const Color(0xFFBAE6FD))),
                 width: 1,
               ),
             ),
@@ -2485,10 +2514,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final uid = (data['uid'] ?? doc.id).toString();
 
       // Check if doc already has explicit level breakdown
-      final hasLevel1 = data.containsKey('level1Score') ||
+      final hasLevel1 =
+          data.containsKey('level1Score') ||
           (data['levelScores'] is Map &&
               data['levelScores']['Level 1'] != null);
-      final hasLevel2 = data.containsKey('level2Score') ||
+      final hasLevel2 =
+          data.containsKey('level2Score') ||
           (data['levelScores'] is Map &&
               data['levelScores']['Level 2'] != null);
 
@@ -2508,37 +2539,40 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           .collection('responses')
           .get()
           .then((responsesSnap) {
-        if (!mounted) return;
-        final Map<int, int> userLevelScores = {};
-        for (final r in responsesSnap.docs) {
-          final rData = r.data();
-          final lvl = (rData['level'] as num?)?.toInt() ?? 1;
-          final pts = (rData['points'] as num?)?.toInt() ?? 0;
-          final isCorrect = rData['isCorrect'] == true ||
-              (rData['answerStatus'] ?? '').toString().toLowerCase() ==
-                  'correct';
-          if (pts > 0 && isCorrect) {
-            userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
-          }
-        }
+            if (!mounted) return;
+            final Map<int, int> userLevelScores = {};
+            for (final r in responsesSnap.docs) {
+              final rData = r.data();
+              final lvl = (rData['level'] as num?)?.toInt() ?? 1;
+              final pts = (rData['points'] as num?)?.toInt() ?? 0;
+              final isCorrect =
+                  rData['isCorrect'] == true ||
+                  (rData['answerStatus'] ?? '').toString().toLowerCase() ==
+                      'correct';
+              if (pts > 0 && isCorrect) {
+                userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
+              }
+            }
 
-        if (userLevelScores.isNotEmpty) {
-          setState(() {
-            _levelScoresCache[uid] = userLevelScores;
+            if (userLevelScores.isNotEmpty) {
+              setState(() {
+                _levelScoresCache[uid] = userLevelScores;
+              });
+
+              final updateData = <String, dynamic>{};
+              for (final entry in userLevelScores.entries) {
+                updateData['level${entry.key}Score'] = entry.value;
+                updateData['levelScores.Level ${entry.key}'] = entry.value;
+              }
+              doc.reference
+                  .set(updateData, SetOptions(merge: true))
+                  .catchError((_) {});
+            }
+          })
+          .catchError((_) {})
+          .whenComplete(() {
+            _syncingUids.remove(uid);
           });
-
-          final updateData = <String, dynamic>{};
-          for (final entry in userLevelScores.entries) {
-            updateData['level${entry.key}Score'] = entry.value;
-            updateData['levelScores.Level ${entry.key}'] = entry.value;
-          }
-          doc.reference
-              .set(updateData, SetOptions(merge: true))
-              .catchError((_) {});
-        }
-      }).catchError((_) {}).whenComplete(() {
-        _syncingUids.remove(uid);
-      });
     }
   }
 
@@ -2565,16 +2599,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final name = data['displayName']?.toString().trim().isNotEmpty == true
           ? data['displayName'].toString().trim()
           : (data['name']?.toString().trim().isNotEmpty == true
-              ? data['name'].toString().trim()
-              : 'Contestant');
-      final school = (data['school'] ?? data['schoolName'] ?? '').toString().trim();
+                ? data['name'].toString().trim()
+                : 'Contestant');
+      final school = (data['school'] ?? data['schoolName'] ?? '')
+          .toString()
+          .trim();
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
       final key = teamName.isNotEmpty ? 'team:$teamName' : 'user:$uid';
       final display = teamName.isNotEmpty ? teamName : name;
 
-      final reqIsEliminated = status == 'eliminated' ||
+      final reqIsEliminated =
+          status == 'eliminated' ||
           data['eliminated'] == true ||
           data['isEliminated'] == true;
 
@@ -2612,19 +2649,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final name = data['displayName']?.toString().trim().isNotEmpty == true
           ? data['displayName'].toString().trim()
           : (data['name']?.toString().trim().isNotEmpty == true
-              ? data['name'].toString().trim()
-              : 'Contestant');
-      final school = (data['school'] ?? data['schoolName'] ?? '').toString().trim();
+                ? data['name'].toString().trim()
+                : 'Contestant');
+      final school = (data['school'] ?? data['schoolName'] ?? '')
+          .toString()
+          .trim();
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
-      final isEliminated = data['eliminated'] == true ||
+      final isEliminated =
+          data['eliminated'] == true ||
           data['isEliminated'] == true ||
           (data['status'] ?? '').toString().toLowerCase() == 'eliminated';
       final status = (data['status'] ?? '').toString();
       final lastSubTime = data['lastSubmissionTime'] is Timestamp
           ? data['lastSubmissionTime'] as Timestamp
-          : (data['updatedAt'] is Timestamp ? data['updatedAt'] as Timestamp : null);
+          : (data['updatedAt'] is Timestamp
+                ? data['updatedAt'] as Timestamp
+                : null);
 
       // Score based on selected level
       int contestantScore = 0;
@@ -2657,12 +2699,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           contestantScore = _toInt(data[altKey]);
         } else if (data['levelScores'] is Map &&
             (data['levelScores'] as Map).containsKey('Level $levelNum')) {
-          contestantScore =
-              _toInt((data['levelScores'] as Map)['Level $levelNum']);
+          contestantScore = _toInt(
+            (data['levelScores'] as Map)['Level $levelNum'],
+          );
         } else if (data['levelScores'] is Map &&
             (data['levelScores'] as Map).containsKey(levelNum.toString())) {
-          contestantScore =
-              _toInt((data['levelScores'] as Map)[levelNum.toString()]);
+          contestantScore = _toInt(
+            (data['levelScores'] as Map)[levelNum.toString()],
+          );
         } else if (cached != null && cached.containsKey(levelNum)) {
           contestantScore = cached[levelNum]!;
         } else {
@@ -2701,7 +2745,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           teamName: current.teamName.isNotEmpty ? current.teamName : teamName,
           members: {...current.members, ...members}.toList(),
           school: current.school.isNotEmpty ? current.school : school,
-          score: teamName.isNotEmpty ? current.score + contestantScore : contestantScore,
+          score: teamName.isNotEmpty
+              ? current.score + contestantScore
+              : contestantScore,
           eliminated: current.eliminated || isEliminated,
           status: status.isNotEmpty ? status : current.status,
           lastSubmissionTime: lastSubTime ?? current.lastSubmissionTime,
@@ -2718,7 +2764,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final scoreCompare = b.score.compareTo(a.score);
       if (scoreCompare != 0) return scoreCompare;
       if (a.lastSubmissionTime != null && b.lastSubmissionTime != null) {
-        final timeCompare = a.lastSubmissionTime!.compareTo(b.lastSubmissionTime!);
+        final timeCompare = a.lastSubmissionTime!.compareTo(
+          b.lastSubmissionTime!,
+        );
         if (timeCompare != 0) return timeCompare;
       }
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
@@ -2728,10 +2776,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   List<String> _teamMembers(dynamic raw) {
     if (raw is List) {
-      return raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      return raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
     if (raw is String && raw.trim().isNotEmpty) {
-      return raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      return raw
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
     return <String>[];
   }
@@ -3059,171 +3114,176 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
 
       body: QuizMasterCircuitBackground(
         child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('quiz_sessions')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection('quiz_sessions')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
 
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: primaryPurple),
-            );
-          }
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: primaryPurple),
+              );
+            }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Unable to load leaderboard history.\n${snapshot.error}',
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Unable to load leaderboard history.\n${snapshot.error}',
 
-                textAlign: TextAlign.center,
+                  textAlign: TextAlign.center,
 
-                style: const TextStyle(color: textMuted, fontSize: 12),
-              ),
-            );
-          }
+                  style: const TextStyle(color: textMuted, fontSize: 12),
+                ),
+              );
+            }
 
-          final quizzes = (snapshot.data?.docs ?? []).toList();
+            final quizzes = (snapshot.data?.docs ?? []).toList();
 
-          _currentQuizzes = quizzes;
+            _currentQuizzes = quizzes;
 
-          if (quizzes.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(25),
+            if (quizzes.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(25),
 
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
 
-                  children: [
-                    Icon(Icons.history_rounded, size: 58, color: primaryPurple),
+                    children: [
+                      Icon(
+                        Icons.history_rounded,
+                        size: 58,
+                        color: primaryPurple,
+                      ),
 
-                    SizedBox(height: 14),
+                      SizedBox(height: 14),
 
-                    Text(
-                      'No Leaderboard History',
+                      Text(
+                        'No Leaderboard History',
 
-                      style: TextStyle(
+                        style: TextStyle(
+                          color: textDark,
+
+                          fontSize: 18,
+
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+
+                      SizedBox(height: 6),
+
+                      Text(
+                        'Ongoing, paused, and finished quizzes will appear here.',
+
+                        textAlign: TextAlign.center,
+
+                        style: TextStyle(color: textMuted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
+
+              itemCount: quizzes.length,
+
+              itemBuilder: (context, index) {
+                final quiz = quizzes[index];
+
+                final data = quiz.data() as Map<String, dynamic>;
+
+                final title =
+                    data['title']?.toString().trim().isNotEmpty == true
+                    ? data['title'].toString().trim()
+                    : 'Untitled Quiz';
+
+                final quizCode =
+                    data['quizCode']?.toString().trim().isNotEmpty == true
+                    ? data['quizCode'].toString().trim()
+                    : quiz.id;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+
+                    borderRadius: BorderRadius.circular(16),
+
+                    border: Border.all(color: borderColor),
+                  ),
+
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+
+                      vertical: 6,
+                    ),
+
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFE5F4FF),
+
+                      child: Icon(
+                        Icons.emoji_events_rounded,
+
+                        color: primaryPurple,
+                      ),
+                    ),
+
+                    title: Text(
+                      title,
+
+                      style: const TextStyle(
                         color: textDark,
 
-                        fontSize: 18,
+                        fontSize: 13,
 
                         fontWeight: FontWeight.w800,
                       ),
                     ),
 
-                    SizedBox(height: 6),
+                    subtitle: Text(
+                      'Quiz Code: $quizCode  •  ${_friendlyQuizStatus(data['status'])}',
 
-                    Text(
-                      'Ongoing, paused, and finished quizzes will appear here.',
+                      maxLines: 2,
 
-                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
 
-                      style: TextStyle(color: textMuted, fontSize: 12),
+                      style: const TextStyle(color: textMuted, fontSize: 10),
                     ),
-                  ],
-                ),
-              ),
+
+                    trailing: _selectionMode
+                        ? Checkbox(
+                            value: _selectedQuizIds.contains(quiz.id),
+
+                            activeColor: primaryPurple,
+
+                            onChanged: (_) => _toggleSelected(quiz.id),
+                          )
+                        : const Icon(
+                            Icons.chevron_right_rounded,
+
+                            color: primaryPurple,
+                          ),
+
+                    onTap: () {
+                      if (_selectionMode) {
+                        _toggleSelected(quiz.id);
+                      } else {
+                        widget.onOverview?.call(quizCode);
+                      }
+                    },
+                  ),
+                );
+              },
             );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
-
-            itemCount: quizzes.length,
-
-            itemBuilder: (context, index) {
-              final quiz = quizzes[index];
-
-              final data = quiz.data() as Map<String, dynamic>;
-
-              final title = data['title']?.toString().trim().isNotEmpty == true
-                  ? data['title'].toString().trim()
-                  : 'Untitled Quiz';
-
-              final quizCode =
-                  data['quizCode']?.toString().trim().isNotEmpty == true
-                  ? data['quizCode'].toString().trim()
-                  : quiz.id;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-
-                decoration: BoxDecoration(
-                  color: Colors.white,
-
-                  borderRadius: BorderRadius.circular(16),
-
-                  border: Border.all(color: borderColor),
-                ),
-
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 15,
-
-                    vertical: 6,
-                  ),
-
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE5F4FF),
-
-                    child: Icon(
-                      Icons.emoji_events_rounded,
-
-                      color: primaryPurple,
-                    ),
-                  ),
-
-                  title: Text(
-                    title,
-
-                    style: const TextStyle(
-                      color: textDark,
-
-                      fontSize: 13,
-
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-
-                  subtitle: Text(
-                    'Quiz Code: $quizCode  •  ${_friendlyQuizStatus(data['status'])}',
-
-                    maxLines: 2,
-
-                    overflow: TextOverflow.ellipsis,
-
-                    style: const TextStyle(color: textMuted, fontSize: 10),
-                  ),
-
-                  trailing: _selectionMode
-                      ? Checkbox(
-                          value: _selectedQuizIds.contains(quiz.id),
-
-                          activeColor: primaryPurple,
-
-                          onChanged: (_) => _toggleSelected(quiz.id),
-                        )
-                      : const Icon(
-                          Icons.chevron_right_rounded,
-
-                          color: primaryPurple,
-                        ),
-
-                  onTap: () {
-                    if (_selectionMode) {
-                      _toggleSelected(quiz.id);
-                    } else {
-                      widget.onOverview?.call(quizCode);
-                    }
-                  },
-                ),
-              );
-            },
-          );
-        },
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

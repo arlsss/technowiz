@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../navigation_persistence.dart';
 import 'waiting_room_screen.dart';
 import 'technowiz_theme.dart';
 
@@ -32,6 +33,7 @@ class _JoinQuizScreenState extends State<JoinQuizScreen> {
   @override
   void initState() {
     super.initState();
+    CompetitorNavPersistence.savePage('join_quiz', quizCode: widget.quizCode);
 
     // ==========================================================
     // AUTOMATICALLY JOIN QUIZ
@@ -465,7 +467,10 @@ class _JoinQuizScreenState extends State<JoinQuizScreen> {
             ],
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+                Navigator.of(context).pop();
+              },
               child: const Text('BACK TO DASHBOARD'),
             ),
           ],
@@ -646,6 +651,7 @@ class _JoinQuizScreenState extends State<JoinQuizScreen> {
           height: 54,
           child: OutlinedButton(
             onPressed: () {
+              CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
               Navigator.pop(context);
             },
             style: OutlinedButton.styleFrom(

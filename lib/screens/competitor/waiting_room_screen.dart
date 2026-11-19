@@ -132,6 +132,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
   @override
   void initState() {
     super.initState();
+    _saveWaitingRoomPage();
 
     // Use account information immediately; refine it from cached/Firestore
     // profile data without making the Waiting Room wait for network loading.

@@ -771,10 +771,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _rememberQuizScreen() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString(_contestantLastPageKey, 'quiz_screen');
-    await prefs.setString(_contestantQuizCodeKey, widget.quizCode);
+    await CompetitorNavPersistence.savePage('quiz_screen', quizCode: widget.quizCode);
   }
 
   Future<void> _restoreQuizLocalState() async {
@@ -7437,15 +7434,11 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
             icon: const Icon(Icons.arrow_back_rounded, color: primaryGreen),
             tooltip: 'Back',
             onPressed: () async {
+              await CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+              if (!context.mounted) return;
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
               } else {
-                await CompetitorNavPersistence.savePage('dashboard');
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('contestant_current_quiz_code');
-                await prefs.remove('contestant_current_quiz_title');
-                await prefs.remove('contestant_current_quiz_level');
-                if (!context.mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
                     builder: (_) =>
