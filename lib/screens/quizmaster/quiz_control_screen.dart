@@ -3999,23 +3999,38 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         !hasNextLevel &&
         (_totalQuestions == 0 || _currentQuestion >= _totalQuestions - 1);
 
-    // On the last question of the final level, go directly to Final Ranking.
+    // 1. On the last question of an intermediate level, proceed to Intermediate Level Result / Elimination.
+    if (isLastQuestionOfLevel && hasNextLevel) {
+      _endLevelAndOpenElimination();
+      return;
+    }
+
+    // 2. On the last question of the final level, go directly to Final Ranking.
     if (isFinalQuestionOfQuiz) {
       _finishQuizAndOpenFinalRanking();
       return;
     }
 
+    // 3. If clicked early (questions still remain in the level):
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(
-            'Finish Quiz Early?',
-            style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
+          title: Text(
+            hasNextLevel
+                ? 'End Level $currentLevel Early?'
+                : 'Finish Quiz Early?',
+            style: const TextStyle(
+              color: darkBlue,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          content: const Text(
-            'There are still remaining questions or levels in this quiz.\n\n'
-            'Do you want to end the quiz now and proceed directly to the Final Ranking?',
+          content: Text(
+            hasNextLevel
+                ? 'There are still remaining questions in Level $currentLevel.\n\n'
+                    'Do you want to end Level $currentLevel now and proceed to level results?'
+                : 'There are still remaining questions or levels in this quiz.\n\n'
+                    'Do you want to end the quiz now and proceed directly to the Final Ranking?',
           ),
           actions: [
             TextButton(
@@ -4025,13 +4040,17 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                _finishQuizAndOpenFinalRanking();
+                if (hasNextLevel) {
+                  _endLevelAndOpenElimination();
+                } else {
+                  _finishQuizAndOpenFinalRanking();
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('FINISH NOW'),
+              child: const Text('END LEVEL'),
             ),
           ],
         );
@@ -5270,12 +5289,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             final lastQuestionOfCurrentLevel =
                                 _getLastQuestionIndexForLevel(currentLevel) ==
                                 _currentQuestion;
-                            final hasNextLevelAfterCurrent = _hasLevel(
-                              currentLevel + 1,
-                            );
-                            final shouldShowNextLevel =
-                                lastQuestionOfCurrentLevel &&
-                                hasNextLevelAfterCurrent;
+                            final isLastQuestionOrLevelDone =
+                                lastQuestionOfCurrentLevel ||
+                                (_totalQuestions > 0 &&
+                                    _currentQuestion >= _totalQuestions - 1);
 
                             return Wrap(
                               spacing: gap,
@@ -5289,8 +5306,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                             isWaiting &&
                                             _quizData?['startedAt'] == null)
                                         ? Icons.play_arrow_rounded
-                                        : shouldShowNextLevel
-                                        ? Icons.play_circle_fill_rounded
                                         : Icons.skip_next_rounded,
                                     label: _levelPreparedForStart
                                         ? 'START LEVEL $_currentLevel'
@@ -5298,22 +5313,17 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                               isWaiting &&
                                               _quizData?['startedAt'] == null)
                                         ? 'START'
-                                        : shouldShowNextLevel
-                                        ? 'END LEVEL'
                                         : 'NEXT QUESTION',
                                     color:
                                         _levelPreparedForStart ||
                                             (_currentQuestion == 0 &&
                                                 isWaiting &&
                                                 _quizData?['startedAt'] ==
-                                                    null) ||
-                                            shouldShowNextLevel
+                                                    null)
                                         ? Colors.green
-                                        : ((_totalQuestions > 0 &&
-                                                  _currentQuestion >=
-                                                      _totalQuestions - 1)
-                                              ? Colors.grey
-                                              : primaryBlue),
+                                        : isLastQuestionOrLevelDone
+                                        ? Colors.grey
+                                        : primaryBlue,
                                     enabled:
                                         !_isFinished &&
                                         !_isAdvancingQuestion &&
@@ -5324,15 +5334,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                                     _quizData?['startedAt'] ==
                                                         null)
                                                 ? isWaiting
-                                                : shouldShowNextLevel
-                                                ? true
-                                                : !isWaiting &&
-                                                      !isCountdown &&
-                                                      !_contestReviewActive &&
-                                                      !_isManuallyPaused &&
-                                                      _totalQuestions > 0 &&
-                                                      _currentQuestion <
-                                                          _totalQuestions - 1)),
+                                                : (!isLastQuestionOrLevelDone &&
+                                                    !isWaiting &&
+                                                    !isCountdown &&
+                                                    !_contestReviewActive &&
+                                                    !_isManuallyPaused))),
                                     // One primary control starts the next question or level.
                                     onTap: _levelPreparedForStart
                                         ? () async {
@@ -5354,8 +5360,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                               isWaiting &&
                                               _quizData?['startedAt'] == null)
                                         ? _startInitialCountdownFromButton
-                                        : shouldShowNextLevel
-                                        ? _endLevelAndOpenElimination
                                         : _confirmNextQuestion,
                                   ),
                                 ),
@@ -5397,7 +5401,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   width: buttonWidth,
                                   child: _compactControlButton(
                                     icon: Icons.flag_rounded,
-                                    label: 'FINISH',
+                                    label: 'END LEVEL',
                                     color: Colors.red,
                                     enabled: !_isFinished && !_isFinishingQuiz,
                                     onTap: _confirmFinishQuiz,
