@@ -564,27 +564,47 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   }) {
     final data = doc.data() ?? {};
 
-    DateTime? date = _dateFromFirestore(data['date']);
-    DateTime? start = _dateFromFirestore(data['startTime']);
-    DateTime? end = _dateFromFirestore(data['endTime']);
+    if (editMode) {
+      DateTime? date = _dateFromFirestore(data['date']);
+      DateTime? start = _dateFromFirestore(data['startTime']);
+      DateTime? end = _dateFromFirestore(data['endTime']);
 
-    setState(() {
-      titleController.text = (data['title'] ?? '').toString();
-      descriptionController.text = (data['description'] ?? '').toString();
-      locationController.text = (data['location'] ?? '').toString();
+      setState(() {
+        titleController.text = (data['title'] ?? '').toString();
+        descriptionController.text = (data['description'] ?? '').toString();
+        locationController.text = (data['location'] ?? '').toString();
 
-      selectedDate = date;
-      selectedStartTime = start == null
-          ? null
-          : TimeOfDay(hour: start.hour, minute: start.minute);
-      selectedEndTime = end == null
-          ? null
-          : TimeOfDay(hour: end.hour, minute: end.minute);
+        selectedDate = date;
+        selectedStartTime = start == null
+            ? null
+            : TimeOfDay(hour: start.hour, minute: start.minute);
+        selectedEndTime = end == null
+            ? null
+            : TimeOfDay(hour: end.hour, minute: end.minute);
 
-      editingQuizCode = null;
-      duplicateSourceQuizCode = doc.id;
-      duplicateSourceTitle = (data['title'] ?? doc.id).toString();
-    });
+        editingQuizCode = doc.id;
+        duplicateSourceQuizCode = null;
+        duplicateSourceTitle = null;
+      });
+    } else {
+      // Create from previous event:
+      // Clear title, description, location, date, start time, and end time
+      // so fields are NOT defaulted with previous quiz values and the admin
+      // enters the new event's details fresh.
+      setState(() {
+        titleController.clear();
+        descriptionController.clear();
+        locationController.clear();
+
+        selectedDate = null;
+        selectedStartTime = null;
+        selectedEndTime = null;
+
+        editingQuizCode = null;
+        duplicateSourceQuizCode = doc.id;
+        duplicateSourceTitle = (data['title'] ?? doc.id).toString();
+      });
+    }
   }
 
   // =========================================================
@@ -1524,7 +1544,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
                 Text(
                   duplicateSourceQuizCode != null
-                      ? "A new 6-character quiz code will be generated for this event. All questions from '$duplicateSourceTitle' will be copied over. You can edit the date, times, title, and location above before creating."
+                      ? "A new 6-character quiz code will be generated for this event. All questions from '$duplicateSourceTitle' will be copied over. Please enter the new title, description, date, times, and location above before creating."
                       : "A new 6-character quiz code is generated for every new event. You can load a previous quiz as a template to reuse its settings and questions without changing the original event.",
 
                   style: const TextStyle(
