@@ -1381,26 +1381,184 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       return;
     }
 
+    String? comment;
+
+    if (approve) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.green),
+              SizedBox(width: 8),
+              Text(
+                'Approve Contest Request?',
+                style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you really want to approved this contest request?\n\n'
+            'The contestant\'s answer will be accepted and points will be awarded.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('CONFIRM'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+    } else {
+      final commentController = TextEditingController();
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.cancel_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text(
+                'Reject Contest Request',
+                style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter comments or reason why this contest request was not approved:',
+                style: TextStyle(color: Colors.black87, fontSize: 13.5),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: commentController,
+                maxLines: 3,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Enter reason or comment for rejection...',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, null),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext, {
+                  'confirmed': true,
+                  'comment': commentController.text.trim(),
+                });
+              },
+              child: const Text('CONFIRM'),
+            ),
+          ],
+        ),
+      );
+
+      if (result == null || result['confirmed'] != true) return;
+      comment = (result['comment'] as String?)?.trim();
+    }
+
     setState(() {
       _contestReviewBusy = true;
     });
 
     try {
       final status = approve ? 'approved' : 'rejected';
-
-      await request.reference.update({
+      final updateData = <String, dynamic>{
         'status': status,
         'reviewedAt': FieldValue.serverTimestamp(),
         'reviewedBy': FirebaseAuth.instance.currentUser?.uid,
         'scoreApplied': false,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (!approve && comment != null && comment.isNotEmpty) {
+        updateData['comment'] = comment;
+        updateData['quizmasterComment'] = comment;
+        updateData['rejectionReason'] = comment;
+      }
+
+      await request.reference.update(updateData);
+
+      // Also update the contestant's responses document if it exists so real-time sync is immediate
+      final reqData = request.data();
+      final contestantUid = reqData?['contestantUid']?.toString();
+      final questionNumber = reqData?['questionNumber'];
+      final qIndex = questionNumber is num
+          ? (questionNumber.toInt() - 1)
+          : (int.tryParse(questionNumber?.toString() ?? '') != null
+              ? int.parse(questionNumber.toString()) - 1
+              : null);
+
+      if (contestantUid != null && qIndex != null && qIndex >= 0) {
+        final respRef = FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(widget.quizCode)
+            .collection('answers')
+            .doc(contestantUid)
+            .collection('responses')
+            .doc('question_$qIndex');
+
+        final respUpdate = <String, dynamic>{
+          'contestStatus': status,
+        };
+        if (!approve && comment != null && comment.isNotEmpty) {
+          respUpdate['contestComment'] = comment;
+          respUpdate['quizmasterComment'] = comment;
+          respUpdate['rejectionReason'] = comment;
+        }
+        await respRef.set(respUpdate, SetOptions(merge: true));
+      }
 
       if (mounted) {
         _showMessage(
           approve
-              ? 'Contest checked and approved.'
-              : 'Contest reviewed and rejected.',
+              ? 'Contest approved.'
+              : 'Contest rejected.',
         );
       }
     } catch (e) {
@@ -1544,7 +1702,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   const SizedBox(height: 10),
                   Text(
                     pending > 0
-                        ? '\$pending contestant contest request(s) need review.'
+                        ? '$pending contestant contest request(s) need review.'
                         : 'All contest requests for this question have been reviewed.',
                     style: const TextStyle(color: Colors.black54, height: 1.35),
                   ),
@@ -3165,7 +3323,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'No contest for Question \$questionNumber.',
+                            'No contest for Question $questionNumber.',
                             style: const TextStyle(
                               color: Colors.black54,
                               fontSize: 13,
@@ -3220,7 +3378,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Question \$questionNumber — a contestant is contesting.',
+                    'Question $questionNumber — a contestant is contesting.',
                     style: const TextStyle(color: Colors.black54, fontSize: 13),
                   ),
                   const SizedBox(height: 12),

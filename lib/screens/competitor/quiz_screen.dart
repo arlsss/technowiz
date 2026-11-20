@@ -669,6 +669,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   String contestStatus = "none";
   String? contestRequestId;
+  String contestRejectComment = "";
 
   String? selectedAnswer;
   String currentCorrectAnswer = "";
@@ -2057,6 +2058,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void resetContestState() {
     contestStatus = "none";
     contestRequestId = null;
+    contestRejectComment = "";
     lastAnswerCorrect = false;
     contestSubmitting = false;
     contestProcessingApproval = false;
@@ -3584,9 +3586,21 @@ class _QuizScreenState extends State<QuizScreen> {
           final data = snapshot.data!.data() as Map<String, dynamic>?;
 
           final status = data?['status']?.toString().toLowerCase() ?? "pending";
+          final comment = (data?['comment'] ??
+                  data?['quizmasterComment'] ??
+                  data?['rejectionReason'] ??
+                  '')
+              .toString()
+              .trim();
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
+
+            if (comment != contestRejectComment) {
+              setState(() {
+                contestRejectComment = comment;
+              });
+            }
 
             if (status == "approved") {
               if (contestStatus != "approved") {
@@ -3699,17 +3713,70 @@ class _QuizScreenState extends State<QuizScreen> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.red.shade200),
       ),
-      child: const Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.cancel_rounded, color: Colors.red),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              "Contest rejected. Your original answer "
-              "remains incorrect.",
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
-            ),
+          const Row(
+            children: [
+              Icon(Icons.cancel_rounded, color: Colors.red),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Contest rejected. Your original answer "
+                  "remains incorrect.",
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
+          if (contestRejectComment.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.comment_rounded,
+                    size: 16,
+                    color: Colors.red.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quiz Master Comment:',
+                          style: TextStyle(
+                            color: Colors.red.shade900,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          contestRejectComment,
+                          style: TextStyle(
+                            color: Colors.red.shade800,
+                            fontSize: 12.5,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

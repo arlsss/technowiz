@@ -595,6 +595,13 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
       final String contestExplanation = contest?['explanation']?.toString().trim() ??
           response?['contestExplanation']?.toString().trim() ??
           '';
+      final String contestComment = contest?['comment']?.toString().trim() ??
+          contest?['quizmasterComment']?.toString().trim() ??
+          contest?['rejectionReason']?.toString().trim() ??
+          response?['contestComment']?.toString().trim() ??
+          response?['quizmasterComment']?.toString().trim() ??
+          response?['rejectionReason']?.toString().trim() ??
+          '';
 
       final bool isCorrect = contestStatus == 'approved' ||
           response?['isCorrect'] == true ||
@@ -627,6 +634,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         'isContested': isContested,
         'contestStatus': contestStatus,
         'contestExplanation': contestExplanation,
+        'contestComment': contestComment,
       });
     }
 
@@ -1548,6 +1556,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
     final bool isContested = item['isContested'] == true;
     final String contestStatus = item['contestStatus']?.toString().toLowerCase() ?? 'none';
     final String contestExplanation = item['contestExplanation']?.toString().trim() ?? '';
+    final String contestComment = item['contestComment']?.toString().trim() ?? '';
 
     final Color statusColor;
     final Color statusBg;
@@ -1904,6 +1913,20 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
                           color: Colors.black87,
                           fontSize: 12,
                           fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (contestComment.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24),
+                      child: Text(
+                        'Quiz Master Note: "$contestComment"',
+                        style: TextStyle(
+                          color: Colors.red.shade900,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
