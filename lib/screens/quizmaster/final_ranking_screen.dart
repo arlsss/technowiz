@@ -158,7 +158,6 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
   static const Color primaryBlue = Color(0xFF1565D8);
   static const Color darkBlue = Color(0xFF0B2E6B);
-  static const Color lightBlue = Color(0xFFEAF3FF);
 
   // ============================================================
   // LABELS
@@ -1288,7 +1287,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                                   const NeverScrollableScrollPhysics(),
                                               padding: const EdgeInsets.all(12),
                                               itemCount: qualifiedIndices.length,
-                                              separatorBuilder: (_, __) =>
+                                              separatorBuilder: (_, _) =>
                                                   const SizedBox(height: 8),
                                               itemBuilder: (context, qIndex) {
                                                 final index = qualifiedIndices[qIndex];
@@ -1459,7 +1458,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                                   const NeverScrollableScrollPhysics(),
                                               padding: const EdgeInsets.all(12),
                                               itemCount: eliminatedIndices.length,
-                                              separatorBuilder: (_, __) =>
+                                              separatorBuilder: (_, _) =>
                                                   const SizedBox(height: 8),
                                               itemBuilder: (context, eIndex) {
                                                 final index = eliminatedIndices[eIndex];
