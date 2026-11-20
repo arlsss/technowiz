@@ -501,25 +501,6 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                               'Code: ${(data['quizCode'] ?? doc.id).toString()} • '
                               'Status: ${(data['status'] ?? 'unknown').toString()}',
                             ),
-                            trailing: IconButton(
-                              tooltip: 'Delete quiz event',
-                              icon: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: red,
-                              ),
-                              onPressed: () async {
-                                final deleted = await _confirmAndDeleteQuiz(
-                                  doc,
-                                );
-                                if (deleted && context.mounted) {
-                                  setDialogState(() {
-                                    visibleQuizzes.removeWhere(
-                                      (item) => item.id == doc.id,
-                                    );
-                                  });
-                                }
-                              },
-                            ),
                             onTap: () => Navigator.of(
                               dialogContext,
                               rootNavigator: true,
