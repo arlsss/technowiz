@@ -710,7 +710,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
               Expanded(
                 child: Text(
-                  "Leave Quiz?",
+                  "Are you sure you want to leave?",
 
                   style: TextStyle(
                     color: textDark,
@@ -723,7 +723,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
           ),
 
           content: const Text(
-            "Are you really sure you want to leave the quiz?\n\n"
+            "Are you sure you want to leave the quiz?\n\n"
             "You will be removed from the participant list. If you join again, "
             "you will need to wait for Admin approval again.",
 
@@ -759,7 +759,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
               ),
 
               child: const Text(
-                "LEAVE QUIZ",
+                "CONFIRM",
 
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),

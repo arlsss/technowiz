@@ -1742,7 +1742,12 @@ class _QuizScreenState extends State<QuizScreen> {
       await _clearQuizScreenPersistence();
 
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const CompetitorDashboard(),
+        ),
+        (route) => false,
+      );
     } catch (e) {
       debugPrint('LEAVE QUIZ ERROR: $e');
       if (!mounted) return;
@@ -4421,27 +4426,66 @@ class _QuizScreenState extends State<QuizScreen> {
   Future<void> confirmExit() async {
     final exit = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      barrierDismissible: false,
+      builder: (dialogContext) {
         return AlertDialog(
-          title: const Text("Leave Quiz?"),
-          content: const Text(
-            "Are you sure you want to leave "
-            "the quiz?\n\n"
-            "Your submitted answers and score "
-            "will remain saved.",
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
+          title: const Row(
+            children: [
+              Icon(Icons.exit_to_app_rounded, color: Colors.redAccent, size: 24),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Are you sure you want to leave?",
+                  style: TextStyle(
+                    color: textDark,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            "Are you sure you want to leave the quiz?\n\n"
+            "Your submitted answers and score will remain saved.",
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              height: 1.45,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("CANCEL"),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey.shade700,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              ),
+              child: const Text(
+                "CANCEL",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryGreen,
+                backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text("LEAVE"),
+              child: const Text(
+                "CONFIRM",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         );
