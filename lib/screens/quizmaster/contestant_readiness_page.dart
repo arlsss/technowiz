@@ -339,43 +339,18 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
         .collection('quiz_sessions')
         .doc(quizCode);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: QuizMasterAppBar(
-        title: 'Contestant Readiness',
-        subtitle: 'Code: $quizCode',
-        badgeText: 'TECHNOWIZ • ARENA READINESS',
-        badgeIcon: Icons.how_to_reg_rounded,
-        onBack: () async {
-          final navigator = Navigator.of(context);
-
-          // Normal navigation: return to the previous page.
-          if (navigator.canPop()) {
-            navigator.pop();
-            return;
-          }
-
-          // After a browser refresh, this page may be the first route,
-          // so there may be nothing for maybePop() to pop. Restore Quiz
-          // Sessions explicitly without changing quiz state or readiness.
-          await QuizMasterNavPersistence.savePage('quiz_sessions');
-
-          if (!context.mounted) return;
-          final returnToSessions = onReturnToSessions;
-          if (returnToSessions != null) {
-            await returnToSessions();
-          } else if (navigator.canPop()) {
-            navigator.pop();
-          } else {
-            showQuizMasterTopNotification(
-              context,
-              'Unable to return to Quiz Sessions. Please reopen Quiz Sessions.',
-              isError: true,
-            );
-          }
-        },
-      ),
-      body: QuizMasterCircuitBackground(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: QuizMasterAppBar(
+          title: 'Contestant Readiness',
+          subtitle: 'Code: $quizCode',
+          badgeText: 'TECHNOWIZ • ARENA READINESS',
+          badgeIcon: Icons.how_to_reg_rounded,
+          showBackButton: false,
+        ),
+        body: QuizMasterCircuitBackground(
         child: SafeArea(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: quizRef.collection('join_requests').snapshots(),
@@ -637,6 +612,7 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
         ),
       ),
     ),
-  );
+  ),
+);
 }
 }
