@@ -15,6 +15,7 @@ import 'admin_report_screen.dart';
 import 'admin_sidebar.dart';
 import 'admin_theme.dart';
 import '../../navigation_persistence.dart';
+import '../../services/quiz_cleanup_service.dart';
 
 // ============================================================================
 // RESPONSIVE UI HELPERS
@@ -419,31 +420,11 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
 
     try {
       final firestore = FirebaseFirestore.instance;
-
-      final quizRef = firestore.collection('quiz_sessions').doc(quizCode);
-
-      final subcollections = ['questions', 'join_requests', 'scores'];
-
-      for (final collectionName in subcollections) {
-        final snapshot = await quizRef.collection(collectionName).get();
-
-        // Firestore batch limit safety
-        for (int i = 0; i < snapshot.docs.length; i += 450) {
-          final batch = firestore.batch();
-
-          final end = (i + 450 < snapshot.docs.length)
-              ? i + 450
-              : snapshot.docs.length;
-
-          for (int j = i; j < end; j++) {
-            batch.delete(snapshot.docs[j].reference);
-          }
-
-          await batch.commit();
-        }
-      }
-
-      await quizRef.delete();
+      await QuizCleanupService.purgeQuizSessionFully(
+        firestore: firestore,
+        docId: quizCode,
+        quizCode: quizCode,
+      );
 
       showMessage('Quiz $quizCode deleted successfully.');
       return true;
@@ -791,8 +772,14 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
 
             final allQuizzes = snapshot.data?.docs ?? [];
             final activeQuizzes = allQuizzes.where((quiz) {
+              final data = quiz.data();
+              if (data['deleted'] == true ||
+                  data['isDeleted'] == true ||
+                  data['status'] == 'deleted') {
+                return false;
+              }
               final status = textValue(
-                quiz.data()['status'],
+                data['status'],
                 'waiting',
               ).trim().toLowerCase();
               return status != 'finished';

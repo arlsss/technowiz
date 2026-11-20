@@ -27,6 +27,7 @@ import '../../navigation_persistence.dart';
 import 'admin_sidebar.dart';
 import 'admin_theme.dart';
 import '../../services/user_presence_service.dart';
+import '../../services/quiz_cleanup_service.dart';
 
 import '../login_screen.dart';
 
@@ -4357,40 +4358,11 @@ class AdminQuizHistoryScreen extends StatefulWidget {
 
     try {
       final firestore = FirebaseFirestore.instance;
-      final quizRef = firestore.collection('quiz_sessions').doc(docId);
-
-      final subcollections = [
-        'scores',
-        'questions',
-        'join_requests',
-        'participants',
-        'submissions',
-        'answers',
-      ];
-
-      for (final collectionName in subcollections) {
-        final snapshot = await quizRef.collection(collectionName).get();
-        for (int i = 0; i < snapshot.docs.length; i += 450) {
-          final batch = firestore.batch();
-          final end = (i + 450 < snapshot.docs.length)
-              ? i + 450
-              : snapshot.docs.length;
-          for (int j = i; j < end; j++) {
-            batch.delete(snapshot.docs[j].reference);
-          }
-          await batch.commit();
-        }
-      }
-
-      await quizRef.delete();
-
-      if (quizCode.isNotEmpty && quizCode != docId) {
-        final altRef = firestore.collection('quiz_sessions').doc(quizCode);
-        final altDoc = await altRef.get();
-        if (altDoc.exists) {
-          await altRef.delete();
-        }
-      }
+      await QuizCleanupService.purgeQuizSessionFully(
+        firestore: firestore,
+        docId: docId,
+        quizCode: quizCode,
+      );
 
       if (context.mounted) {
         AdminNotification.success(
@@ -4493,29 +4465,13 @@ class AdminQuizHistoryScreen extends StatefulWidget {
     try {
       final firestore = FirebaseFirestore.instance;
       for (final doc in sessions) {
-        final quizRef = doc.reference;
-        final subcollections = [
-          'scores',
-          'questions',
-          'join_requests',
-          'participants',
-          'submissions',
-          'answers',
-        ];
-        for (final collectionName in subcollections) {
-          final snapshot = await quizRef.collection(collectionName).get();
-          for (int i = 0; i < snapshot.docs.length; i += 450) {
-            final batch = firestore.batch();
-            final end = (i + 450 < snapshot.docs.length)
-                ? i + 450
-                : snapshot.docs.length;
-            for (int j = i; j < end; j++) {
-              batch.delete(snapshot.docs[j].reference);
-            }
-            await batch.commit();
-          }
-        }
-        await quizRef.delete();
+        final data = doc.data();
+        final code = (data['quizCode'] ?? data['code'] ?? doc.id).toString().trim();
+        await QuizCleanupService.purgeQuizSessionFully(
+          firestore: firestore,
+          docId: doc.id,
+          quizCode: code,
+        );
       }
 
       if (context.mounted) {
@@ -4583,6 +4539,11 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
   }
 
   bool _isFinished(Map<String, dynamic> data) {
+    if (data['deleted'] == true ||
+        data['isDeleted'] == true ||
+        data['status']?.toString().toLowerCase() == 'deleted') {
+      return false;
+    }
     final title = (data['title'] ??
             data['quizTitle'] ??
             data['quizName'] ??

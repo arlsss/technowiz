@@ -131,6 +131,13 @@ class _ContestantHistoryScreenState extends State<ContestantHistoryScreen> {
       final checked = await Future.wait(
         quizSnapshot.docs.map((quiz) async {
           final data = quiz.data();
+          final status =
+              (data['status'] ?? '').toString().trim().toLowerCase();
+          if (data['deleted'] == true ||
+              data['isDeleted'] == true ||
+              status == 'deleted') {
+            return null;
+          }
           final code = data['quizCode']?.toString().trim().isNotEmpty == true
               ? data['quizCode'].toString().trim()
               : quiz.id;

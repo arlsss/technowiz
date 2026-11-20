@@ -116,6 +116,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         };
         for (final doc in snapshot.docs) {
           final data = doc.data();
+          if (data['deleted'] == true ||
+              data['isDeleted'] == true ||
+              data['status'] == 'deleted') {
+            continue;
+          }
           final isPub =
               data['published'] == true ||
               data['isPublished'] == true ||
@@ -254,7 +259,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       return _errorState(sessionListSnapshot.error);
                     }
 
-                    final allSessions = sessionListSnapshot.data?.docs ?? [];
+                    final allSessions = (sessionListSnapshot.data?.docs ?? [])
+                        .where((doc) {
+                      final data = doc.data();
+                      return data['deleted'] != true &&
+                          data['isDeleted'] != true &&
+                          data['status'] != 'deleted';
+                    }).toList();
 
                     const activeStatuses = {
                       'waiting',
@@ -3153,7 +3164,19 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
               );
             }
 
-            final quizzes = (snapshot.data?.docs ?? []).toList();
+            final quizzes = (snapshot.data?.docs ?? []).where((quiz) {
+              final data = quiz.data();
+              if (data is Map) {
+                final status =
+                    (data['status'] ?? '').toString().trim().toLowerCase();
+                if (data['deleted'] == true ||
+                    data['isDeleted'] == true ||
+                    status == 'deleted') {
+                  return false;
+                }
+              }
+              return true;
+            }).toList();
 
             _currentQuizzes = quizzes;
 

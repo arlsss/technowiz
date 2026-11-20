@@ -910,6 +910,11 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
 
             final activeSessions = allSessions.where((doc) {
               final data = doc.data();
+              if (data['deleted'] == true ||
+                  data['isDeleted'] == true ||
+                  data['status'] == 'deleted') {
+                return false;
+              }
               final isPub = data['published'] == true ||
                   data['isPublished'] == true ||
                   data['is_published'] == true ||
@@ -2201,8 +2206,13 @@ class _ParticipantsHistoryScreenState extends State<ParticipantsHistoryScreen> {
                   final allQuizzes = snapshot.data?.docs ?? [];
 
                   final quizzes = allQuizzes.where((quiz) {
-                    if (_searchQuery.isEmpty) return true;
                     final data = quiz.data() as Map<String, dynamic>;
+                    if (data['deleted'] == true ||
+                        data['isDeleted'] == true ||
+                        data['status'] == 'deleted') {
+                      return false;
+                    }
+                    if (_searchQuery.isEmpty) return true;
                     final title = (data['title'] ??
                             data['quizName'] ??
                             data['name'] ??

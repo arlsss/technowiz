@@ -543,7 +543,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
                 final quizSnapshot = await quizRef.get();
 
-                if (!quizSnapshot.exists) {
+                if (!quizSnapshot.exists ||
+                    quizSnapshot.data()?['deleted'] == true ||
+                    quizSnapshot.data()?['isDeleted'] == true ||
+                    quizSnapshot.data()?['status'] == 'deleted') {
                   if (pageContext.mounted) {
                     setDialogState(() => checking = false);
                     showTopSnackBar(
@@ -1856,6 +1859,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
         final quizzes = snapshot.data!.docs.where((doc) {
           final data = doc.data();
+
+          if (data['deleted'] == true ||
+              data['isDeleted'] == true ||
+              data['status'] == 'deleted') {
+            return false;
+          }
 
           final published =
               data['published'] == true || data['isPublished'] == true;
@@ -5124,6 +5133,11 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   final allDocs = snapshot.data!.docs;
                   final published = allDocs.where((doc) {
                     final data = doc.data();
+                    if (data['deleted'] == true ||
+                        data['isDeleted'] == true ||
+                        data['status'] == 'deleted') {
+                      return false;
+                    }
                     return data['published'] == true ||
                         data['isPublished'] == true;
                   }).toList();
@@ -6191,7 +6205,15 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                 );
               }
 
-              final quizzes = snapshot.data!.docs;
+              final quizzes = snapshot.data!.docs.where((doc) {
+                final data = doc.data();
+                if (data is Map) {
+                  return data['deleted'] != true &&
+                      data['isDeleted'] != true &&
+                      data['status'] != 'deleted';
+                }
+                return true;
+              }).toList();
 
               if (quizzes.isEmpty) {
                 return const SizedBox(

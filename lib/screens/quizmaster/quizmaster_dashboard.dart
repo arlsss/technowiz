@@ -828,6 +828,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       for (final doc in snapshot.docs) {
         final data = doc.data();
+        if (data['deleted'] == true ||
+            data['isDeleted'] == true ||
+            data['status'] == 'deleted') {
+          continue;
+        }
 
         final status = data['status']?.toString().trim().toLowerCase() ?? '';
 
@@ -966,6 +971,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       for (final doc in sortedDocs) {
         final data = doc.data();
+        if (data['deleted'] == true ||
+            data['isDeleted'] == true ||
+            data['status'] == 'deleted') {
+          continue;
+        }
         final status = data['status']?.toString().trim().toLowerCase() ?? '';
         final isFinished = data['isFinished'] == true ||
             data['isCompleted'] == true ||
@@ -1189,6 +1199,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
           for (final doc in docs) {
             final data = doc.data() as Map<String, dynamic>;
+            if (data['deleted'] == true ||
+                data['isDeleted'] == true ||
+                data['status'] == 'deleted') {
+              continue;
+            }
 
             final isPublished = data['published'] == true ||
                 data['isPublished'] == true ||
@@ -1378,6 +1393,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
                         for (final doc in sortedDocs) {
                           final data = doc.data() as Map<String, dynamic>;
+                          if (data['deleted'] == true ||
+                              data['isDeleted'] == true ||
+                              data['status'] == 'deleted') {
+                            continue;
+                          }
                           final status = (data['status']?.toString() ?? '')
                               .trim()
                               .toLowerCase()

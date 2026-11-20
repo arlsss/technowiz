@@ -4,6 +4,7 @@ import 'admin_theme.dart';
 
 import 'admin_dashboard.dart';
 import '../../navigation_persistence.dart';
+import '../../services/quiz_cleanup_service.dart';
 
 class ManageQuizScreen extends StatefulWidget {
   const ManageQuizScreen({super.key});
@@ -139,24 +140,11 @@ class _ManageQuizScreenState extends State<ManageQuizScreen> {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // Reference sa quiz session
-      final quizRef = firestore.collection('quiz_sessions').doc(quizCode);
-
-      // --------------------------------------------------------
-      // DELETE SCORES SUBCOLLECTION
-      // --------------------------------------------------------
-
-      final scoresSnapshot = await quizRef.collection('scores').get();
-
-      for (final doc in scoresSnapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      // --------------------------------------------------------
-      // DELETE QUIZ SESSION
-      // --------------------------------------------------------
-
-      await quizRef.delete();
+      await QuizCleanupService.purgeQuizSessionFully(
+        firestore: firestore,
+        docId: quizCode,
+        quizCode: quizCode,
+      );
 
       if (!context.mounted) return;
 
@@ -740,7 +728,62 @@ class _ManageQuizScreenState extends State<ManageQuizScreen> {
             );
           }
 
-          final quizzes = snapshot.data!.docs;
+          final quizzes = snapshot.data!.docs.where((doc) {
+            final d = doc.data() as Map<String, dynamic>;
+            return d['deleted'] != true &&
+                d['isDeleted'] != true &&
+                d['status'] != 'deleted';
+          }).toList();
+
+          if (quizzes.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(25),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 110,
+                      height: 110,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [lightBlue, primaryBlue],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.quiz_rounded,
+                        color: Colors.white,
+                        size: 52,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    const Text(
+                      "No Quiz Sessions",
+                      style: TextStyle(
+                        color: textDark,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Create a quiz session first\n"
+                      "to manage it here.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
 
           // ----------------------------------------------------
           // QUIZ LIST

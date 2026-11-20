@@ -16,6 +16,7 @@ import 'manage_participants_screen.dart';
 import 'profile_screen.dart';
 import 'quizmaster_theme.dart';
 import '../../navigation_persistence.dart';
+import '../../services/quiz_cleanup_service.dart';
 
 class QuizSessionsScreen extends StatefulWidget {
   final String? resultMode;
@@ -544,6 +545,11 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                 // Finished/completed quizzes belong in Quiz History, not Quiz Sessions.
                 final docs = allDocs.where((quiz) {
                   final data = quiz.data();
+                  if (data['deleted'] == true ||
+                      data['isDeleted'] == true ||
+                      data['status'] == 'deleted') {
+                    return false;
+                  }
 
                   // Check whether the quiz was published by Admin or Quiz Master.
                   final isPublished =
@@ -805,6 +811,11 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
       QueryDocumentSnapshot<Map<String, dynamic>>? active;
       for (final doc in sortedDocs) {
         final data = doc.data();
+        if (data['deleted'] == true ||
+            data['isDeleted'] == true ||
+            data['status'] == 'deleted') {
+          continue;
+        }
         final status = (data['status'] ?? '')
             .toString()
             .trim()
@@ -1598,6 +1609,11 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                   final data = doc.data();
                   final status =
                       data['status']?.toString().trim().toLowerCase() ?? '';
+                  if (data['deleted'] == true ||
+                      data['isDeleted'] == true ||
+                      status == 'deleted') {
+                    return false;
+                  }
                   final isFinished =
                       data['isFinished'] == true ||
                       data['isCompleted'] == true ||
@@ -1818,24 +1834,30 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
 
                     if (savedQuiz.exists) {
                       final savedData = savedQuiz.data() ?? {};
-                      final savedStatus = (savedData['status'] ?? '')
-                          .toString()
-                          .trim()
-                          .toLowerCase()
-                          .replaceAll('-', '_')
-                          .replaceAll(' ', '_');
-                      final isPub =
-                          savedData['published'] == true ||
-                          savedData['isPublished'] == true ||
-                          savedStatus == 'published';
-                      final isFinished =
-                          savedData['isFinished'] == true ||
-                          savedData['isCompleted'] == true ||
-                          savedStatus == 'finished' ||
-                          savedStatus == 'completed';
-
-                      if (isFinished || !isPub) {
+                      if (savedData['deleted'] == true ||
+                          savedData['isDeleted'] == true ||
+                          savedData['status'] == 'deleted') {
                         quizCode = null;
+                      } else {
+                        final savedStatus = (savedData['status'] ?? '')
+                            .toString()
+                            .trim()
+                            .toLowerCase()
+                            .replaceAll('-', '_')
+                            .replaceAll(' ', '_');
+                        final isPub =
+                            savedData['published'] == true ||
+                            savedData['isPublished'] == true ||
+                            savedStatus == 'published';
+                        final isFinished =
+                            savedData['isFinished'] == true ||
+                            savedData['isCompleted'] == true ||
+                            savedStatus == 'finished' ||
+                            savedStatus == 'completed';
+
+                        if (isFinished || !isPub) {
+                          quizCode = null;
+                        }
                       }
                     } else {
                       quizCode = null;
@@ -2912,7 +2934,12 @@ class QuizHistoryScreen extends StatelessWidget {
     // ====================================
 
     try {
-      await quiz.reference.delete();
+      final quizCode = (quiz.data()['quizCode'] ?? quiz.id).toString();
+      await QuizCleanupService.purgeQuizSessionFully(
+        firestore: FirebaseFirestore.instance,
+        docId: quiz.id,
+        quizCode: quizCode,
+      );
 
       if (!context.mounted) return;
 
@@ -3112,6 +3139,11 @@ class QuizHistoryScreen extends StatelessWidget {
 
             final finishedQuizzes = snapshot.data!.docs.where((quiz) {
               final data = quiz.data();
+              if (data['deleted'] == true ||
+                  data['isDeleted'] == true ||
+                  data['status'] == 'deleted') {
+                return false;
+              }
               final status =
                   (data['status'] ??
                           data['quizStatus'] ??
