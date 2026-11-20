@@ -161,15 +161,21 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
         return;
       }
 
-      final approved = await quizRef
+      final requestsSnapshot = await quizRef
           .collection('join_requests')
-          .where('status', isEqualTo: 'approved')
           .get();
+      final activeParticipants = requestsSnapshot.docs.where((doc) {
+        final status = (doc.data()['status'] ?? '').toString().trim().toLowerCase();
+        return status != 'left' &&
+            status != 'rejected' &&
+            status != 'declined' &&
+            doc.data()['leftQuiz'] != true;
+      }).toList();
 
       final readyCheckId = DateTime.now().millisecondsSinceEpoch.toString();
       final batch = FirebaseFirestore.instance.batch();
 
-      for (final participant in approved.docs) {
+      for (final participant in activeParticipants) {
         batch.update(participant.reference, {
           'ready': false,
           'readyResponded': false,
@@ -335,13 +341,19 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
       // Do not let a delayed callback from an older round affect a new round.
       if (quizData['readyCheckId']?.toString() != readyCheckId) return;
 
-      final participants = await quizRef
+      final participantsSnapshot = await quizRef
           .collection('join_requests')
-          .where('status', isEqualTo: 'approved')
           .get();
+      final participants = participantsSnapshot.docs.where((doc) {
+        final status = (doc.data()['status'] ?? '').toString().trim().toLowerCase();
+        return status != 'left' &&
+            status != 'rejected' &&
+            status != 'declined' &&
+            doc.data()['leftQuiz'] != true;
+      }).toList();
 
       final batch = FirebaseFirestore.instance.batch();
-      for (final participant in participants.docs) {
+      for (final participant in participants) {
         final data = participant.data();
         if (data['readyCheckId']?.toString() != readyCheckId) continue;
 
@@ -4042,9 +4054,6 @@ class ParticipantReadinessPage extends StatelessWidget {
                       ? (rawTeam.isNotEmpty ? rawTeam : personalName)
                       : personalName;
 
-                  final status =
-                      (data['status'] ?? '').toString().trim().toLowerCase();
-                  final bool isPending = status == 'pending';
                   final bool isReady = data['ready'] == true;
 
                   return Container(
@@ -4056,9 +4065,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isPending
-                            ? const Color(0xFFFED7AA)
-                            : const Color(0xFFE2E8F0),
+                        color: const Color(0xFFE2E8F0),
                       ),
                     ),
                     child: Row(
@@ -4156,97 +4163,48 @@ class ParticipantReadinessPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        if (isPending) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF7ED),
-                              borderRadius: BorderRadius.circular(6),
-                              border:
-                                  Border.all(color: const Color(0xFFFED7AA)),
-                            ),
-                            child: const Text(
-                              'PENDING',
-                              style: TextStyle(
-                                color: Color(0xFFC2410C),
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: () async {
-                              await doc.reference
-                                  .update({'status': 'approved'});
-                            },
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'APPROVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
+                          decoration: BoxDecoration(
+                            color: isReady
+                                ? const Color(0xFFEFF6FF)
+                                : const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
                               color: isReady
-                                  ? const Color(0xFFEFF6FF)
-                                  : const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isReady
-                                    ? const Color(0xFFBFDBFE)
-                                    : const Color(0xFFA7F3D0),
-                              ),
+                                  ? const Color(0xFFBFDBFE)
+                                  : const Color(0xFFA7F3D0),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isReady
-                                      ? Icons.check_circle_rounded
-                                      : Icons.verified_rounded,
-                                  size: 11,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isReady
+                                    ? Icons.check_circle_rounded
+                                    : Icons.verified_rounded,
+                                size: 11,
+                                color: isReady
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFF059669),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isReady ? 'READY' : 'JOINED',
+                                style: TextStyle(
                                   color: isReady
                                       ? const Color(0xFF2563EB)
                                       : const Color(0xFF059669),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isReady ? 'READY' : 'JOINED',
-                                  style: TextStyle(
-                                    color: isReady
-                                        ? const Color(0xFF2563EB)
-                                        : const Color(0xFF059669),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   );
@@ -4275,7 +4233,7 @@ class ParticipantReadinessPage extends StatelessWidget {
         'icon': Icons.play_circle_outline_rounded,
         'title': 'START LEVEL',
         'bullets': <String>[
-          'Make sure all approved contestants are READY.',
+          'Make sure all joined contestants are READY.',
           'Select START THE QUIZ to continue.',
         ],
       },
@@ -4880,20 +4838,6 @@ class ParticipantReadinessPage extends StatelessWidget {
                     .snapshots(),
                 builder: (context, snapshot) {
                   final allParticipants = snapshot.data?.docs ?? [];
-                  // Only approved/joined participants count toward ready check
-                  final approvedParticipants = allParticipants.where((doc) {
-                    final status = (doc.data()['status'] ?? '')
-                        .toString()
-                        .trim()
-                        .toLowerCase();
-                    return status == 'approved' || status == 'joined';
-                  }).toList();
-                  final readyCount = approvedParticipants
-                      .where((doc) => doc.data()['ready'] == true)
-                      .length;
-                  final allReady =
-                      approvedParticipants.isNotEmpty &&
-                      readyCount == approvedParticipants.length;
                   // Display participants: exclude left/rejected/declined
                   final displayParticipants = allParticipants.where((doc) {
                     final status = (doc.data()['status'] ?? '')
@@ -4905,6 +4849,12 @@ class ParticipantReadinessPage extends StatelessWidget {
                         status != 'declined' &&
                         doc.data()['leftQuiz'] != true;
                   }).toList();
+                  final readyCount = displayParticipants
+                      .where((doc) => doc.data()['ready'] == true)
+                      .length;
+                  final allReady =
+                      displayParticipants.isNotEmpty &&
+                      readyCount == displayParticipants.length;
                   return Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
@@ -5014,7 +4964,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                               const Padding(
                                 padding: EdgeInsets.only(top: 8),
                                 child: Text(
-                                  'The quiz can start when all approved contestant are ready.',
+                                  'The quiz can start when all joined contestants are ready.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 12,
