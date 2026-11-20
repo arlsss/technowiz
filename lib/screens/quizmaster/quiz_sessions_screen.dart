@@ -4232,14 +4232,6 @@ class ParticipantReadinessPage extends StatelessWidget {
   ) {
     final guidelines = <Map<String, dynamic>>[
       {
-        'icon': Icons.checklist_rounded,
-        'title': 'BEFORE STARTING',
-        'bullets': <String>[
-          'Check the quiz event details.',
-          'Confirm all approved contestants are listed.',
-        ],
-      },
-      {
         'icon': Icons.groups_rounded,
         'title': 'CONTESTANT READINESS',
         'bullets': <String>[
@@ -4285,7 +4277,7 @@ class ParticipantReadinessPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ==========================================
-          // REGISTERED PARTICIPANTS (ABOVE BEFORE STARTING)
+          // REGISTERED PARTICIPANTS
           // ==========================================
           _registeredParticipantsSection(participants),
           const SizedBox(height: 16),
