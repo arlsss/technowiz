@@ -493,12 +493,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
   }
 
   // ============================================================
-  // ELIMINATE ONE CONTESTANT
-  //
-  // Makita dayon sa contestant: "Thank you for participating".
+  // REJOIN ONE CONTESTANT
   // ============================================================
 
-  Future<void> _eliminateContestant({
+  Future<void> _rejoinContestant({
     required BuildContext context,
     required String contestantId,
     required String contestantName,
@@ -509,15 +507,13 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text(
-          'Eliminate Contestant?',
+          'Rejoin Contestant?',
           style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'Are you sure you want to eliminate "$contestantName" '
-          'from $_stageLabel?\n\n'
+          'Allow "$contestantName" to rejoin and proceed to Level ${level + 1}?\n\n'
           'Current Score: $score points\n'
-          'Current Rank: #$rank\n\n'
-          'The contestant will see the result right away.',
+          'Current Rank: #$rank',
         ),
         actions: [
           TextButton(
@@ -526,11 +522,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.green.shade700,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('ELIMINATE'),
+            child: const Text('REJOIN'),
           ),
         ],
       ),
@@ -538,103 +534,6 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
     if (confirmed != true) return;
 
-    try {
-      final db = FirebaseFirestore.instance;
-      final sessionRef = db.collection('quiz_sessions').doc(quizCode);
-
-      final batch = db.batch();
-
-      batch.set(sessionRef.collection('scores').doc(contestantId), {
-        'status': 'eliminated',
-        'eliminated': true,
-        'isEliminated': true,
-        'proceeded': false,
-        'proceededFromLevel': FieldValue.delete(),
-        'proceededAt': FieldValue.delete(),
-        'eliminatedLevel': level,
-        'eliminatedAt': FieldValue.serverTimestamp(),
-        'rankAtElimination': rank,
-        'rank': rank,
-        'levelRank': rank,
-        'currentRank': rank,
-        'rankLevel': level,
-      }, SetOptions(merge: true));
-
-      // Para mo-reset ang confirmation sa contestant ug i-mark isip eliminated
-      batch.set(
-        sessionRef.collection('join_requests').doc(contestantId),
-        {
-          'status': 'eliminated',
-          'eliminationConfirmed': false,
-          'eliminated': true,
-          'isEliminated': true,
-          'ready': false,
-          'readyResponded': false,
-          'contestantDecision': 'eliminated',
-          'decisionLevel': level,
-          'rank': rank,
-          'levelRank': rank,
-          'currentRank': rank,
-          'rankLevel': level,
-          'decisionMessage': 'Thank you for participating!',
-          'decisionAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      batch.set(
-        db
-            .collection('quiz_reports')
-            .doc(quizCode)
-            .collection('levels')
-            .doc('level_$level')
-            .collection('contestants')
-            .doc(contestantId),
-        {
-          'contestantId': contestantId,
-          'name': contestantName,
-          'score': score,
-          'rank': rank,
-          'level': level,
-          'quizCode': quizCode,
-          'status': 'eliminated',
-          'eliminatedLevel': level,
-          'eliminatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      await batch.commit();
-
-      if (!context.mounted) return;
-
-      showQuizMasterTopNotification(
-        context,
-        '$contestantName has been eliminated from $_stageLabel.',
-        isWarning: true,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-
-      showQuizMasterTopNotification(
-        context,
-        'Failed to eliminate contestant: $e',
-        isError: true,
-      );
-    }
-  }
-
-  // ============================================================
-  // MARK ONE CONTESTANT AS PROCEEDING
-  // ============================================================
-
-  Future<void> _proceedContestant({
-    required BuildContext context,
-    required String contestantId,
-    required String contestantName,
-    required int score,
-    required int rank,
-  }) async {
     try {
       final db = FirebaseFirestore.instance;
       final sessionRef = db.collection('quiz_sessions').doc(quizCode);
@@ -661,6 +560,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
         sessionRef.collection('join_requests').doc(contestantId),
         {
           'status': 'approved',
+          'proceeded': true,
+          'proceededFromLevel': level,
           'eliminated': false,
           'isEliminated': false,
           'eliminatedAfterLevel': FieldValue.delete(),
@@ -716,7 +617,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
       showQuizMasterTopNotification(
         context,
-        '$contestantName marked to proceed to Level ${level + 1}.',
+        '$contestantName has rejoined and will proceed to Level ${level + 1}.',
         isSuccess: true,
       );
     } catch (e) {
@@ -724,7 +625,146 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
       showQuizMasterTopNotification(
         context,
-        'Failed to mark contestant to proceed: $e',
+        'Failed to rejoin contestant: $e',
+        isError: true,
+      );
+    }
+  }
+
+  // ============================================================
+  // CONFIRM ELIMINATION FOR ONE CONTESTANT
+  // ============================================================
+
+  Future<void> _confirmElimination({
+    required BuildContext context,
+    required String contestantId,
+    required String contestantName,
+    required int score,
+    required int rank,
+    required bool isAlreadyConfirmed,
+  }) async {
+    if (isAlreadyConfirmed) {
+      showQuizMasterTopNotification(
+        context,
+        'Elimination is already confirmed for $contestantName.',
+        isSuccess: true,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'Confirm Elimination?',
+          style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to confirm the elimination of "$contestantName" '
+          'from $_stageLabel?\n\n'
+          'Current Score: $score points\n'
+          'Current Rank: #$rank\n\n'
+          'The contestant will see the elimination result.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('CONFIRM'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final sessionRef = db.collection('quiz_sessions').doc(quizCode);
+
+      final batch = db.batch();
+
+      batch.set(sessionRef.collection('scores').doc(contestantId), {
+        'status': 'eliminated',
+        'eliminated': true,
+        'isEliminated': true,
+        'proceeded': false,
+        'proceededFromLevel': FieldValue.delete(),
+        'proceededAt': FieldValue.delete(),
+        'eliminatedLevel': level,
+        'eliminatedAt': FieldValue.serverTimestamp(),
+        'rankAtElimination': rank,
+        'rank': rank,
+        'levelRank': rank,
+        'currentRank': rank,
+        'rankLevel': level,
+      }, SetOptions(merge: true));
+
+      batch.set(
+        sessionRef.collection('join_requests').doc(contestantId),
+        {
+          'status': 'eliminated',
+          'eliminationConfirmed': true,
+          'eliminated': true,
+          'isEliminated': true,
+          'ready': false,
+          'readyResponded': false,
+          'contestantDecision': 'eliminated',
+          'decisionLevel': level,
+          'rank': rank,
+          'levelRank': rank,
+          'currentRank': rank,
+          'rankLevel': level,
+          'decisionMessage': 'Thank you for participating!',
+          'decisionAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      batch.set(
+        db
+            .collection('quiz_reports')
+            .doc(quizCode)
+            .collection('levels')
+            .doc('level_$level')
+            .collection('contestants')
+            .doc(contestantId),
+        {
+          'contestantId': contestantId,
+          'name': contestantName,
+          'score': score,
+          'rank': rank,
+          'level': level,
+          'quizCode': quizCode,
+          'status': 'eliminated',
+          'eliminatedLevel': level,
+          'eliminatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      await batch.commit();
+
+      if (!context.mounted) return;
+
+      showQuizMasterTopNotification(
+        context,
+        'Elimination confirmed for $contestantName.',
+        isWarning: true,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+
+      showQuizMasterTopNotification(
+        context,
+        'Failed to confirm elimination: $e',
         isError: true,
       );
     }
@@ -1127,50 +1167,390 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                   ),
                                 ),
                               ],
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: rankings.length,
-                                itemBuilder: (context, index) {
-                                  final player = rankings[index];
-                                  final data = player.data();
-                                  final rawMembers =
-                                      data['teamMembers'] ?? data['members'];
-                                  final List<String> members = [];
-                                  if (rawMembers is List) {
-                                    for (final m in rawMembers) {
-                                      final s = m is Map
-                                          ? (m['name'] ?? '').toString().trim()
-                                          : m.toString().trim();
-                                      if (s.isNotEmpty &&
-                                          !members.contains(s)) {
-                                        members.add(s);
-                                      }
-                                    }
-                                  }
+                              // Split rankings into qualified and eliminated
+                              () {
+                                final List<int> qualifiedIndices = [];
+                                final List<int> eliminatedIndices = [];
+                                for (int i = 0; i < rankings.length; i++) {
+                                  final pData = rankings[i].data();
+                                  final pRank = ranks[i];
+                                  final bool pExplicitElim = _isEliminated(pData);
+                                  final bool pExplicitProceed =
+                                      _isProceededForCurrentLevel(pData);
+                                  final bool pWithinCutoff =
+                                      (configuredProceedCount != null &&
+                                              configuredProceedCount > 0)
+                                          ? pRank <= configuredProceedCount
+                                          : true;
+                                  final bool pIsQualified = pExplicitProceed
+                                      ? true
+                                      : pExplicitElim
+                                          ? false
+                                          : pWithinCutoff;
 
-                                  return _rankingCard(
-                                    context: context,
-                                    rank: ranks[index],
-                                    playerId: player.id,
-                                    playerName: (data['displayName'] ??
-                                            data['name'] ??
-                                            player.id)
-                                        .toString()
-                                        .trim(),
-                                    team:
-                                        data['teamName']?.toString().trim() ?? '',
-                                    members: members,
-                                    score: _scoreOf(data),
-                                    eliminated: _isEliminated(data),
-                                    proceeded:
-                                        _isProceededForCurrentLevel(data),
-                                    isFinalView: false,
-                                    configuredProceedCount:
-                                        configuredProceedCount,
-                                  );
-                                },
-                              ),
+                                  if (pIsQualified) {
+                                    qualifiedIndices.add(i);
+                                  } else {
+                                    eliminatedIndices.add(i);
+                                  }
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // 1. QUALIFIED CONTESTANTS CARD (BABAW)
+                                    Container(
+                                      width: double.infinity,
+                                      margin: const EdgeInsets.only(bottom: 16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: const Color(0xFFBBF7D0),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.04),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Header for Qualified
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 12,
+                                            ),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFF0FDF4),
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: Radius.circular(17),
+                                                topRight: Radius.circular(17),
+                                              ),
+                                              border: Border(
+                                                bottom: BorderSide(
+                                                  color: Color(0xFFBBF7D0),
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFDCFCE7),
+                                                    borderRadius:
+                                                        BorderRadius.circular(8),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.check_circle_rounded,
+                                                    color: Color(0xFF15803D),
+                                                    size: 18,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      const Text(
+                                                        'QUALIFIED CONTESTANTS',
+                                                        style: TextStyle(
+                                                          color: Color(0xFF14532D),
+                                                          fontWeight: FontWeight.w800,
+                                                          fontSize: 13.5,
+                                                          letterSpacing: 0.5,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        configuredProceedCount != null &&
+                                                                configuredProceedCount > 0
+                                                            ? 'Top $configuredProceedCount will advance to Level ${level + 1} (Auto-proceed)'
+                                                            : 'Proceeding to Level ${level + 1} (Auto-proceed)',
+                                                        style: TextStyle(
+                                                          color: Colors.green.shade700,
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF16A34A),
+                                                    borderRadius:
+                                                        BorderRadius.circular(12),
+                                                  ),
+                                                  child: Text(
+                                                    '${qualifiedIndices.length}',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (qualifiedIndices.isEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.all(22),
+                                              child: Center(
+                                                child: Text(
+                                                  'No qualified contestants yet.',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade600,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            ListView.separated(
+                                              shrinkWrap: true,
+                                              physics:
+                                                  const NeverScrollableScrollPhysics(),
+                                              padding: const EdgeInsets.all(12),
+                                              itemCount: qualifiedIndices.length,
+                                              separatorBuilder: (_, __) =>
+                                                  const SizedBox(height: 8),
+                                              itemBuilder: (context, qIndex) {
+                                                final index = qualifiedIndices[qIndex];
+                                                final player = rankings[index];
+                                                final data = player.data();
+                                                final rawMembers =
+                                                    data['teamMembers'] ??
+                                                        data['members'];
+                                                final List<String> members = [];
+                                                if (rawMembers is List) {
+                                                  for (final m in rawMembers) {
+                                                    final s = m is Map
+                                                        ? (m['name'] ?? '')
+                                                            .toString()
+                                                            .trim()
+                                                        : m.toString().trim();
+                                                    if (s.isNotEmpty &&
+                                                        !members.contains(s)) {
+                                                      members.add(s);
+                                                    }
+                                                  }
+                                                }
+
+                                                return _buildQualifiedCard(
+                                                  context: context,
+                                                  rank: ranks[index],
+                                                  playerId: player.id,
+                                                  playerName: (data['displayName'] ??
+                                                          data['name'] ??
+                                                          player.id)
+                                                      .toString()
+                                                      .trim(),
+                                                  team: data['teamName']
+                                                          ?.toString()
+                                                          .trim() ??
+                                                      '',
+                                                  members: members,
+                                                  score: _scoreOf(data),
+                                                  configuredProceedCount:
+                                                      configuredProceedCount,
+                                                );
+                                              },
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // 2. ELIMINATED CONTESTANTS CARD (UBOS)
+                                    Container(
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: const Color(0xFFFECACA),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.04),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Header for Eliminated
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 12,
+                                            ),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFFEF2F2),
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: Radius.circular(17),
+                                                topRight: Radius.circular(17),
+                                              ),
+                                              border: Border(
+                                                bottom: BorderSide(
+                                                  color: Color(0xFFFECACA),
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFEE2E2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(8),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.cancel_rounded,
+                                                    color: Color(0xFFDC2626),
+                                                    size: 18,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                const Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'ELIMINATED CONTESTANTS',
+                                                        style: TextStyle(
+                                                          color: Color(0xFF991B1B),
+                                                          fontWeight: FontWeight.w800,
+                                                          fontSize: 13.5,
+                                                          letterSpacing: 0.5,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        'Below advancement cutoff or confirmed eliminated',
+                                                        style: TextStyle(
+                                                          color: Color(0xFFB91C1C),
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFDC2626),
+                                                    borderRadius:
+                                                        BorderRadius.circular(12),
+                                                  ),
+                                                  child: Text(
+                                                    '${eliminatedIndices.length}',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (eliminatedIndices.isEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.all(22),
+                                              child: Center(
+                                                child: Text(
+                                                  'No eliminated contestants in this level.',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade600,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            ListView.separated(
+                                              shrinkWrap: true,
+                                              physics:
+                                                  const NeverScrollableScrollPhysics(),
+                                              padding: const EdgeInsets.all(12),
+                                              itemCount: eliminatedIndices.length,
+                                              separatorBuilder: (_, __) =>
+                                                  const SizedBox(height: 8),
+                                              itemBuilder: (context, eIndex) {
+                                                final index = eliminatedIndices[eIndex];
+                                                final player = rankings[index];
+                                                final data = player.data();
+                                                final rawMembers =
+                                                    data['teamMembers'] ??
+                                                        data['members'];
+                                                final List<String> members = [];
+                                                if (rawMembers is List) {
+                                                  for (final m in rawMembers) {
+                                                    final s = m is Map
+                                                        ? (m['name'] ?? '')
+                                                            .toString()
+                                                            .trim()
+                                                        : m.toString().trim();
+                                                    if (s.isNotEmpty &&
+                                                        !members.contains(s)) {
+                                                      members.add(s);
+                                                    }
+                                                  }
+                                                }
+
+                                                final bool isConfirmed =
+                                                    data['eliminationConfirmed'] ==
+                                                        true;
+
+                                                return _buildEliminatedCard(
+                                                  context: context,
+                                                  rank: ranks[index],
+                                                  playerId: player.id,
+                                                  playerName: (data['displayName'] ??
+                                                          data['name'] ??
+                                                          player.id)
+                                                      .toString()
+                                                      .trim(),
+                                                  team: data['teamName']
+                                                          ?.toString()
+                                                          .trim() ??
+                                                      '',
+                                                  members: members,
+                                                  score: _scoreOf(data),
+                                                  isConfirmed: isConfirmed,
+                                                  configuredProceedCount:
+                                                      configuredProceedCount,
+                                                );
+                                              },
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }(),
                             ],
                           ],
                         ),
@@ -1713,76 +2093,33 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     );
   }
 
-  Widget _rankingCard({
+  Widget _buildQualifiedCard({
     required BuildContext context,
     required int rank,
     required String playerId,
     required String playerName,
     required String team,
+    required List<String> members,
     required int score,
-    required bool eliminated,
-    required bool proceeded,
-    bool isFinalView = false,
-    List<String> members = const [],
     int? configuredProceedCount,
   }) {
-    final iconColor = rank == 1
-        ? Colors.amber.shade700
-        : rank == 2
-        ? Colors.blueGrey.shade500
-        : rank == 3
-        ? Colors.brown.shade500
-        : primaryBlue;
-
-    final bool showProceededState = !isFinalView && proceeded && !eliminated;
-    final bool isAutoEligible = !isFinalView &&
-        !eliminated &&
-        !proceeded &&
-        configuredProceedCount != null &&
-        configuredProceedCount > 0;
-    final bool isWithinCutoff = isAutoEligible && rank <= configuredProceedCount;
-    final bool isBelowCutoff = isAutoEligible && rank > configuredProceedCount;
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: eliminated
-            ? const Color(0xFFE5E7EB)
-            : isFinalView && rank == 1
-            ? const Color(0xFFFFFBEB)
-            : (showProceededState || isWithinCutoff)
-            ? const Color(0xFFF0FFF4)
-            : isBelowCutoff
-            ? const Color(0xFFFEF2F2)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(17),
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: eliminated
-              ? Colors.grey.shade400
-              : isFinalView && rank == 1
-              ? Colors.amber.shade400
-              : (showProceededState || isWithinCutoff)
-              ? Colors.green.shade300
-              : isBelowCutoff
-              ? Colors.red.shade200
-              : Colors.blue.shade100,
-          width: isFinalView && !eliminated && rank <= 2 ? 1.6 : 1.0,
+          color: const Color(0xFFBBF7D0),
+          width: 1.2,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 45,
-            height: 45,
-            decoration: BoxDecoration(
-              color: eliminated
-                  ? Colors.grey.shade600
-                  : (showProceededState || isWithinCutoff)
-                  ? Colors.green.shade600
-                  : isBelowCutoff
-                  ? Colors.red.shade400
-                  : iconColor,
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xFF16A34A),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -1791,6 +2128,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
                 ),
               ),
             ),
@@ -1804,8 +2142,8 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                   playerName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: eliminated ? Colors.red.shade800 : darkBlue,
+                  style: const TextStyle(
+                    color: darkBlue,
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1823,31 +2161,15 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
-                  eliminated
-                      ? 'ELIMINATED'
-                      : isFinalView
-                      ? (team.isEmpty || team == playerName ? 'RANK $rank' : '$team - RANK $rank')
-                      : showProceededState
-                      ? 'PROCEEDING TO LEVEL ${level + 1}'
-                      : isWithinCutoff
+                  configuredProceedCount != null && configuredProceedCount > 0
                       ? 'TOP $configuredProceedCount • QUALIFIED TO PROCEED'
-                      : isBelowCutoff
-                      ? 'BELOW TOP $configuredProceedCount CUTOFF • WILL BE ELIMINATED'
-                      : (team.isEmpty || team == playerName ? 'Rank #$rank' : '$team - Rank #$rank'),
+                      : 'QUALIFIED TO PROCEED',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: eliminated
-                        ? Colors.grey.shade700
-                        : isFinalView
-                        ? iconColor
-                        : (showProceededState || isWithinCutoff)
-                        ? Colors.green.shade700
-                        : isBelowCutoff
-                        ? Colors.red.shade700
-                        : Colors.black54,
+                  style: const TextStyle(
+                    color: Color(0xFF15803D),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1855,262 +2177,233 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 '$score pts',
                 style: const TextStyle(
                   color: darkBlue,
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
+                  fontSize: 14.5,
                 ),
               ),
-              const SizedBox(height: 7),
-              if (isFinalView)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 2.5,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF86EFAC),
                   ),
-                  decoration: BoxDecoration(
-                    color: eliminated
-                        ? Colors.grey.shade300
-                        : iconColor.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: eliminated
-                          ? Colors.grey.shade400
-                          : iconColor.withValues(alpha: 0.45),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!eliminated && rank <= 3) ...[
-                        Icon(
-                          Icons.emoji_events_rounded,
-                          size: 14,
-                          color: iconColor,
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                      Text(
-                        eliminated ? 'ELIMINATED' : 'RANK $rank',
-                        style: TextStyle(
-                          color: eliminated ? Colors.grey.shade700 : iconColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (proceeded && !eliminated)
-                Row(
+                ),
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.green.shade300,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            size: 13,
-                            color: Colors.green.shade700,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'PROCEEDING',
-                            style: TextStyle(
-                              color: Colors.green.shade700,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
+                    Icon(
+                      Icons.check_rounded,
+                      size: 11,
+                      color: Color(0xFF15803D),
                     ),
-                    const SizedBox(width: 6),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 7,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () => _eliminateContestant(
-                        context: context,
-                        contestantId: playerId,
-                        contestantName: playerName,
-                        score: score,
-                        rank: rank,
-                      ),
-                      child: const Text(
-                        'ELIMINATE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else if (eliminated)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.red.shade300,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.cancel_rounded,
-                            size: 13,
-                            color: Colors.red.shade700,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'ELIMINATED',
-                            style: TextStyle(
-                              color: Colors.red.shade700,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 7,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () => _proceedContestant(
-                        context: context,
-                        contestantId: playerId,
-                        contestantName: playerName,
-                        score: score,
-                        rank: rank,
-                      ),
-                      child: const Text(
-                        'PROCEED',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () => _proceedContestant(
-                        context: context,
-                        contestantId: playerId,
-                        contestantName: playerName,
-                        score: score,
-                        rank: rank,
-                      ),
-                      child: const Text(
-                        'PROCEED',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () => _eliminateContestant(
-                        context: context,
-                        contestantId: playerId,
-                        contestantName: playerName,
-                        score: score,
-                        rank: rank,
-                      ),
-                      child: const Text(
-                        'ELIMINATE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    SizedBox(width: 2),
+                    Text(
+                      'QUALIFIED',
+                      style: TextStyle(
+                        color: Color(0xFF15803D),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEliminatedCard({
+    required BuildContext context,
+    required int rank,
+    required String playerId,
+    required String playerName,
+    required String team,
+    required List<String> members,
+    required int score,
+    required bool isConfirmed,
+    int? configuredProceedCount,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFFECACA),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isConfirmed ? Colors.grey.shade600 : const Color(0xFFEF4444),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  playerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.red.shade900,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (members.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Members: ${members.join(', ')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF5B7A9C),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 3),
+                Text(
+                  isConfirmed
+                      ? 'ELIMINATION CONFIRMED'
+                      : (configuredProceedCount != null &&
+                              configuredProceedCount > 0 &&
+                              rank > configuredProceedCount)
+                          ? 'BELOW TOP $configuredProceedCount CUTOFF'
+                          : 'ELIMINATED',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isConfirmed
+                        ? Colors.grey.shade700
+                        : Colors.red.shade700,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$score pts',
+                style: const TextStyle(
+                  color: darkBlue,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () => _rejoinContestant(
+                      context: context,
+                      contestantId: playerId,
+                      contestantName: playerName,
+                      score: score,
+                      rank: rank,
+                    ),
+                    child: const Text(
+                      'REJOIN',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isConfirmed
+                          ? Colors.grey.shade600
+                          : Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () => _confirmElimination(
+                      context: context,
+                      contestantId: playerId,
+                      contestantName: playerName,
+                      score: score,
+                      rank: rank,
+                      isAlreadyConfirmed: isConfirmed,
+                    ),
+                    child: Text(
+                      isConfirmed ? 'CONFIRMED' : 'CONFIRM',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ],
