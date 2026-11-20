@@ -13,6 +13,7 @@ import 'quiz_preparation_screen.dart';
 import 'quiz_countdown_screen.dart';
 import 'competitor_dashboard.dart';
 import 'technowiz_theme.dart';
+import '../../navigation_persistence.dart';
 
 class WaitingRoomScreen extends StatefulWidget {
   final String quizCode;
@@ -129,10 +130,54 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
   // ============================================================
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _sessionDeletionSubscription;
+  bool _isExitingDueToDeletion = false;
+
+  void _listenForSessionDeletion() {
+    _sessionDeletionSubscription = FirebaseFirestore.instance
+        .collection('quiz_sessions')
+        .doc(widget.quizCode)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists && mounted && !_isExitingDueToDeletion) {
+            _handleQuizDeletedByAdmin();
+          }
+        });
+  }
+
+  Future<void> _handleQuizDeletedByAdmin() async {
+    if (_isExitingDueToDeletion) return;
+    _isExitingDueToDeletion = true;
+    _joinConfirmationTimer?.cancel();
+    _participantRemovalSubscription?.cancel();
+    _joinRequestRemovalSubscription?.cancel();
+    _sessionDeletionSubscription?.cancel();
+
+    await _clearContestantQuizPersistence();
+    await CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This quiz was deleted by the Admin.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const CompetitorDashboard()),
+      (route) => false,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _saveWaitingRoomPage();
+    _listenForSessionDeletion();
 
     // Use account information immediately; refine it from cached/Firestore
     // profile data without making the Waiting Room wait for network loading.
@@ -1199,6 +1244,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     _joinConfirmationTimer?.cancel();
     _participantRemovalSubscription?.cancel();
     _joinRequestRemovalSubscription?.cancel();
+    _sessionDeletionSubscription?.cancel();
     _joinConfirmationVisible.dispose();
     super.dispose();
   }
@@ -1236,7 +1282,10 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
           // completed; during loading, keep the full Waiting Room visible.
           if (quizSnapshot.connectionState != ConnectionState.waiting &&
               (!quizSnapshot.hasData || !quizSnapshot.data!.exists)) {
-            return _errorState("Quiz session not found.");
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _handleQuizDeletedByAdmin();
+            });
+            return _errorState("This quiz was deleted by the Admin.");
           }
 
           final String status = (quizData['status'] ?? 'waiting').toString();

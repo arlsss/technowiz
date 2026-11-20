@@ -101,12 +101,57 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     return s != 'waiting';
   }
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _sessionDeletionSubscription;
+  bool _isExitingDueToDeletion = false;
+
   @override
   void initState() {
     super.initState();
     RefreshBlocker.block();
     _rememberQuizControlPage();
+    _listenForSessionDeletion();
     _loadQuiz();
+  }
+
+  void _listenForSessionDeletion() {
+    _sessionDeletionSubscription = FirebaseFirestore.instance
+        .collection('quiz_sessions')
+        .doc(widget.quizCode)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists && mounted && !_isExitingDueToDeletion) {
+            _handleQuizDeletedByAdmin();
+          }
+        });
+  }
+
+  Future<void> _handleQuizDeletedByAdmin() async {
+    if (_isExitingDueToDeletion) return;
+    _isExitingDueToDeletion = true;
+    _timer?.cancel();
+    _readyCheckTimer?.cancel();
+
+    await QuizMasterNavPersistence.savePage('dashboard');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This quiz was deleted by the Admin.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const QuizMasterDashboard(
+          restoreLastPage: false,
+        ),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _rememberQuizControlPage() async {
@@ -123,6 +168,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   @override
   void dispose() {
     RefreshBlocker.unblock();
+    _sessionDeletionSubscription?.cancel();
     _timer?.cancel();
     _readyCheckTimer?.cancel();
     super.dispose();

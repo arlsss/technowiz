@@ -125,6 +125,10 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     return 0;
   }
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _sessionDeletionSubscription;
+  bool _isExitingDueToDeletion = false;
+
   @override
   void initState() {
     super.initState();
@@ -136,6 +140,44 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     _scoresStream = _sessionRef.collection('scores').snapshots();
     _requestsStream = _sessionRef.collection('join_requests').snapshots();
     _participantsStream = _sessionRef.collection('participants').snapshots();
+
+    _sessionDeletionSubscription = _sessionStream.listen((snapshot) {
+      if (!snapshot.exists && mounted && !_isExitingDueToDeletion) {
+        _handleQuizDeletedByAdmin();
+      }
+    });
+  }
+
+  Future<void> _handleQuizDeletedByAdmin() async {
+    if (_isExitingDueToDeletion) return;
+    _isExitingDueToDeletion = true;
+
+    await QuizMasterNavPersistence.savePage('dashboard');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This quiz was deleted by the Admin.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const QuizMasterDashboard(
+          restoreLastPage: false,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _sessionDeletionSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -801,6 +843,17 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _sessionStream,
       builder: (context, sessionSnap) {
+        if (sessionSnap.hasData && !sessionSnap.data!.exists) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _handleQuizDeletedByAdmin();
+          });
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: primaryBlue),
+            ),
+          );
+        }
+
         final sessionData = sessionSnap.data?.data();
         final rawLevelSettings =
             (sessionData?['levelSettings'] as Map?)?['Level $level'];

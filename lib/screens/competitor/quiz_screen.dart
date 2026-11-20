@@ -86,6 +86,48 @@ class _QuizScreenState extends State<QuizScreen> {
   Map<String, dynamic> _latestQuizData = const {};
   bool _loadingSessionQuestions = false;
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _sessionDeletionSubscription;
+  bool _isExitingDueToDeletion = false;
+
+  void _listenForSessionDeletion() {
+    _sessionDeletionSubscription = FirebaseFirestore.instance
+        .collection('quiz_sessions')
+        .doc(widget.quizCode)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists && mounted && !_isExitingDueToDeletion) {
+            _handleQuizDeletedByAdmin();
+          }
+        });
+  }
+
+  Future<void> _handleQuizDeletedByAdmin() async {
+    if (_isExitingDueToDeletion) return;
+    _isExitingDueToDeletion = true;
+    timer?.cancel();
+    answered = true;
+    submitting = false;
+
+    await _clearQuizScreenPersistence();
+    await CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This quiz was deleted by the Admin.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const CompetitorDashboard()),
+      (route) => false,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +137,7 @@ class _QuizScreenState extends State<QuizScreen> {
     _rememberQuizScreen();
     _restoreQuizLocalState();
     _listenForContestantDecision();
+    _listenForSessionDeletion();
   }
 
   @override
@@ -5576,6 +5619,18 @@ class _QuizScreenState extends State<QuizScreen> {
             );
           }
 
+          if (!quizSnapshot.data!.exists || quizSnapshot.data!.data() == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _handleQuizDeletedByAdmin();
+            });
+            return const Scaffold(
+              backgroundColor: lightGreen,
+              body: Center(
+                child: CircularProgressIndicator(color: primaryGreen),
+              ),
+            );
+          }
+
           final quizData =
               quizSnapshot.data!.data() as Map<String, dynamic>? ?? {};
           _latestQuizData = quizData;
@@ -7251,6 +7306,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void dispose() {
     timer?.cancel();
     _contestantDecisionSubscription?.cancel();
+    _sessionDeletionSubscription?.cancel();
 
     answerInputController.dispose();
 
@@ -7352,6 +7408,29 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
         body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: session.snapshots(),
           builder: (context, sessSnap) {
+            if (sessSnap.hasData && !sessSnap.data!.exists) {
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                await CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('This quiz was deleted by the Admin.'),
+                    backgroundColor: Colors.red,
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const CompetitorDashboard(),
+                  ),
+                  (route) => false,
+                );
+              });
+              return const Center(
+                child: CircularProgressIndicator(color: primaryGreen),
+              );
+            }
+
             final sessionData = sessSnap.data?.data();
             final sessionStatus =
                 sessionData?['status']?.toString().toLowerCase().trim() ?? '';

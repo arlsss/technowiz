@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'quizmaster_theme.dart';
+import 'quizmaster_dashboard.dart';
 import '../../navigation_persistence.dart';
 
 class ContestantReadinessPage extends StatefulWidget {
@@ -31,10 +33,59 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
   Future<void> Function() get onStartQuiz => widget.onStartQuiz;
   Future<void> Function()? get onReturnToSessions => widget.onReturnToSessions;
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _sessionDeletionSubscription;
+  bool _isExitingDueToDeletion = false;
+
   @override
   void initState() {
     super.initState();
     _saveCurrentPage();
+    _listenForSessionDeletion();
+  }
+
+  void _listenForSessionDeletion() {
+    _sessionDeletionSubscription = FirebaseFirestore.instance
+        .collection('quiz_sessions')
+        .doc(widget.quizCode)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists && mounted && !_isExitingDueToDeletion) {
+            _handleQuizDeletedByAdmin();
+          }
+        });
+  }
+
+  Future<void> _handleQuizDeletedByAdmin() async {
+    if (_isExitingDueToDeletion) return;
+    _isExitingDueToDeletion = true;
+
+    await QuizMasterNavPersistence.savePage('dashboard');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This quiz was deleted by the Admin.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const QuizMasterDashboard(
+          restoreLastPage: false,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _sessionDeletionSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _saveCurrentPage() async {
