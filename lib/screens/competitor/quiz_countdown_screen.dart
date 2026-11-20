@@ -162,20 +162,17 @@ class QuizCountdownScreen extends StatelessWidget {
                             ],
                           ),
                           child: Text(
-                            isGo
-                                ? (currentLevel != null
-                                    ? 'Get ready for Level $currentLevel, Question $questionNumber.'
-                                    : 'Get ready for Question $questionNumber.')
-                                : (currentLevel != null
-                                    ? 'Please get ready for Level $currentLevel, Question $questionNumber.'
-                                    : 'Please get ready for Question $questionNumber.'),
+                            currentLevel != null
+                                ? 'Level $currentLevel, Question $questionNumber'
+                                : 'Question $questionNumber',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: darkGreen,
                               fontSize:
-                                  (shortestSide * 0.038).clamp(13.0, 16.0),
-                              fontWeight: FontWeight.w700,
-                              height: 1.4,
+                                  (shortestSide * 0.042).clamp(14.0, 18.0),
+                              fontWeight: FontWeight.w800,
+                              height: 1.3,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),

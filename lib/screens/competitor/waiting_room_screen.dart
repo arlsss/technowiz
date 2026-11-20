@@ -1059,10 +1059,15 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     );
   }
 
-  Widget _countdownScreen(int countdown, {int questionNumber = 1}) {
+  Widget _countdownScreen(
+    int countdown, {
+    int questionNumber = 1,
+    int? currentLevel,
+  }) {
     return QuizCountdownScreen(
       countdown: countdown,
       questionNumber: questionNumber,
+      currentLevel: currentLevel,
     );
   }
 
@@ -1474,7 +1479,16 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
               });
             }
 
-            return _countdownScreen(countdown, questionNumber: questionNumber);
+            final int activeCountdownLevel = _readInstructionInt(
+              quizData['currentLevel'] ?? quizData['level'] ?? widget.level,
+              fallback: widget.level,
+            ).clamp(1, 99).toInt();
+
+            return _countdownScreen(
+              countdown,
+              questionNumber: questionNumber,
+              currentLevel: activeCountdownLevel,
+            );
           }
 
           // After this visit has seen the initial synchronized countdown,
@@ -1483,7 +1497,15 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
           // arrive in separate snapshots; keep GO visible until navigation
           // to QuizScreen can happen.
           if (_hasObservedCountdownForThisVisit && status != 'active') {
-            return _countdownScreen(0, questionNumber: questionNumber);
+            final int activeCountdownLevel = _readInstructionInt(
+              quizData['currentLevel'] ?? quizData['level'] ?? widget.level,
+              fallback: widget.level,
+            ).clamp(1, 99).toInt();
+            return _countdownScreen(
+              0,
+              questionNumber: questionNumber,
+              currentLevel: activeCountdownLevel,
+            );
           }
 
           // ======================================================
@@ -1519,7 +1541,15 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
             // Keep the GO screen in place for this build too, rather than
             // briefly rendering the Waiting Room before the route replacement.
-            return _countdownScreen(0, questionNumber: questionNumber);
+            final int activeCountdownLevel = _readInstructionInt(
+              quizData['currentLevel'] ?? quizData['level'] ?? widget.level,
+              fallback: widget.level,
+            ).clamp(1, 99).toInt();
+            return _countdownScreen(
+              0,
+              questionNumber: questionNumber,
+              currentLevel: activeCountdownLevel,
+            );
           }
 
           // ======================================================
