@@ -132,8 +132,6 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
   static const Color lightGreen = Color(0xFFEAF9F3);
 
-  static const Color red = Color(0xFFEF4444);
-
   // =========================================================
 
   // CONTROLLERS
@@ -362,10 +360,6 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   // ERROR
 
   // =========================================================
-
-  void _showTopNotification(String message) {
-    AdminNotification.success(context, message);
-  }
 
   void showError(String message) {
     AdminNotification.error(context, message);
