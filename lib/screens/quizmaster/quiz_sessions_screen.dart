@@ -4240,16 +4240,8 @@ class ParticipantReadinessPage extends StatelessWidget {
         ],
       },
       {
-        'icon': Icons.tune_rounded,
-        'title': 'LEVEL SETTINGS',
-        'bullets': <String>[
-          'Review each level’s timer and points.',
-          'Check the difficulty and participants to proceed.',
-        ],
-      },
-      {
         'icon': Icons.play_circle_outline_rounded,
-        'title': 'START LEVEL 1',
+        'title': 'START LEVEL',
         'bullets': <String>[
           'Make sure all approved contestants are READY.',
           'Select START THE QUIZ to continue.',
@@ -4261,6 +4253,14 @@ class ParticipantReadinessPage extends StatelessWidget {
         'bullets': <String>[
           'Follow the configured quiz rules.',
           'Avoid changing settings while the quiz is running.',
+        ],
+      },
+      {
+        'icon': Icons.tune_rounded,
+        'title': 'LEVEL SETTINGS',
+        'bullets': <String>[
+          'Review each level’s timer and points.',
+          'Check the difficulty and participants to proceed.',
         ],
       },
     ];
