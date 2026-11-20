@@ -3510,6 +3510,344 @@ class ParticipantReadinessPage extends StatelessWidget {
   static const Color _primaryBlue = Color(0xFF2196F3);
   static const Color _darkBlue = Color(0xFF164E83);
 
+  Future<bool?> _showStartConfirmationDialog(
+    BuildContext context,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> participants,
+  ) async {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final count = participants.length;
+        final countText = count == 1
+            ? 'There is 1 contestant joined the quiz'
+            : 'There are $count contestants joined the quiz';
+
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 10,
+          backgroundColor: Colors.white,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.play_circle_fill_rounded,
+                          color: _primaryBlue,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Start Quiz Event',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _darkBlue,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Please review participants before proceeding',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: count > 0
+                          ? const Color(0xFFEFF6FF)
+                          : const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: count > 0
+                            ? const Color(0xFFBFDBFE)
+                            : const Color(0xFFFECACA),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          count > 0
+                              ? Icons.groups_rounded
+                              : Icons.warning_amber_rounded,
+                          size: 20,
+                          color: count > 0
+                              ? _primaryBlue
+                              : const Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            count > 0
+                                ? countText
+                                : 'No contestants have joined the quiz yet',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: count > 0
+                                  ? _darkBlue
+                                  : const Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (count > 0) ...[
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Scrollbar(
+                          thumbVisibility: count > 3,
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.all(10),
+                            itemCount: count,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, idx) {
+                              final doc = participants[idx];
+                              final data = doc.data();
+                              final rawName = (data['userName'] ??
+                                      data['name'] ??
+                                      data['displayName'] ??
+                                      '')
+                                  .toString()
+                                  .trim();
+                              final rawTeam =
+                                  (data['teamName'] ?? '').toString().trim();
+                              final contestantType =
+                                  (data['contestantType'] ?? '')
+                                      .toString()
+                                      .trim()
+                                      .toLowerCase();
+                              final isTeam = contestantType == 'team' ||
+                                  rawTeam.isNotEmpty;
+                              final teamMembers =
+                                  (data['teamMembers'] as List<dynamic>?)
+                                          ?.map((e) => e.toString().trim())
+                                          .where((e) => e.isNotEmpty)
+                                          .toList() ??
+                                      [];
+                              final displayName = isTeam
+                                  ? (rawTeam.isNotEmpty
+                                      ? rawTeam
+                                      : (rawName.isNotEmpty
+                                          ? rawName
+                                          : 'Team ${idx + 1}'))
+                                  : (rawName.isNotEmpty
+                                      ? rawName
+                                      : 'Contestant ${idx + 1}');
+                              final isReady = data['ready'] == true;
+
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor:
+                                          const Color(0xFFEFF6FF),
+                                      child: Icon(
+                                        isTeam
+                                            ? Icons.group_rounded
+                                            : Icons.person_rounded,
+                                        size: 16,
+                                        color: _primaryBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            displayName,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: _darkBlue,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (isTeam &&
+                                              teamMembers.isNotEmpty)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.only(top: 2),
+                                              child: Text(
+                                                'Members: ${teamMembers.join(', ')}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.black54,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isReady
+                                            ? const Color(0xFFEFF6FF)
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isReady
+                                              ? const Color(0xFFBFDBFE)
+                                              : const Color(0xFFCBD5E1),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isReady ? 'READY' : 'JOINED',
+                                        style: TextStyle(
+                                          color: isReady
+                                              ? const Color(0xFF2563EB)
+                                              : Colors.black54,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  const Text(
+                    'Are you sure you want to start the quiz?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _darkBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop(false);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop(true);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Confirm',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 
 
   Widget _registeredParticipantsSection(
@@ -4450,6 +4788,18 @@ class ParticipantReadinessPage extends StatelessWidget {
                               height: 52,
                               child: ElevatedButton(
                                 onPressed: () async {
+                                  final confirmed =
+                                      await _showStartConfirmationDialog(
+                                    context,
+                                    displayParticipants,
+                                  );
+                                  if (confirmed != true) {
+                                    // Cancel: stay on event guidelines
+                                    return;
+                                  }
+                                  if (!context.mounted) return;
+
+                                  // Confirm: proceed to contestant readiness
                                   // Starting the quiz event from the overview
                                   // always begins at Level 1, resetting any stale
                                   // state from previous test runs.
