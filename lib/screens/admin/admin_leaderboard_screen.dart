@@ -171,7 +171,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AdminThemeColors.background,
-      endDrawer: _adminNavigationDrawer(context),
+      endDrawer: showHistory ? null : _adminNavigationDrawer(context),
 
       // App Bar
       appBar: AppBar(
@@ -304,31 +304,33 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   ),
                 ],
               ),
-        actions: [
-          // 3 Lines Navigation Menu on the RIGHT side
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Builder(
-                builder: (drawerContext) => IconButton(
-                  icon: const Icon(
-                    Icons.menu_rounded,
-                    color: AdminThemeColors.textPrimary,
-                    size: 24,
+        actions: showHistory
+            ? const []
+            : [
+                // 3 Lines Navigation Menu on the RIGHT side
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Builder(
+                      builder: (drawerContext) => IconButton(
+                        icon: const Icon(
+                          Icons.menu_rounded,
+                          color: AdminThemeColors.textPrimary,
+                          size: 24,
+                        ),
+                        tooltip: 'Open navigation menu',
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          FocusScope.of(context).unfocus();
+                          Scaffold.of(drawerContext).openEndDrawer();
+                        },
+                      ),
+                    ),
                   ),
-                  tooltip: 'Open navigation menu',
-                  padding: EdgeInsets.zero,
-                  onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    Scaffold.of(drawerContext).openEndDrawer();
-                  },
                 ),
-              ),
-            ),
-          ),
-        ],
+              ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(
