@@ -72,11 +72,137 @@ class QuizInstructionsScreen extends StatelessWidget {
 
     final target = 'level$instructionLevel';
     for (final entry in rawAllSettings.entries) {
-      if (_normalizeLevelKey(entry.key) == target && entry.value is Map) {
+      final key = _normalizeLevelKey(entry.key);
+      if ((key == target || key == '$instructionLevel') && entry.value is Map) {
         return Map<String, dynamic>.from(entry.value as Map);
       }
     }
     return null;
+  }
+
+  int? _extractProceedCount(
+    Map<String, dynamic> source, [
+    int? instructionLevel,
+  ]) {
+    final directKeys = [
+      'proceedCount',
+      'participantsToProceed',
+      'proceed_count',
+      'participants_to_proceed',
+      'eliminateCount',
+      'eliminationCount',
+      'eliminations',
+      'eliminate_count',
+    ];
+    for (final k in directKeys) {
+      if (source.containsKey(k) && source[k] != null) {
+        final v = _readInt(source[k], fallback: -1);
+        if (v >= 0) return v;
+      }
+    }
+    if (instructionLevel != null) {
+      final levelKeys = [
+        'level${instructionLevel}ProceedCount',
+        'level${instructionLevel}ParticipantsToProceed',
+        'level${instructionLevel}EliminateCount',
+        'proceedCountLevel$instructionLevel',
+      ];
+      for (final k in levelKeys) {
+        if (source.containsKey(k) && source[k] != null) {
+          final v = _readInt(source[k], fallback: -1);
+          if (v >= 0) return v;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<int> _loadProceedCountForLevel(
+    Map<String, dynamic> fallbackSettings,
+    int instructionLevel,
+  ) async {
+    final code =
+        (quizCode ??
+                quizData['quizCode'] ??
+                quizData['code'] ??
+                quizData['sessionCode'] ??
+                quizData['quizEventCode'] ??
+                '')
+            .toString()
+            .trim();
+
+    if (code.isNotEmpty) {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(code)
+            .get();
+
+        final sessionData = snapshot.data() ?? <String, dynamic>{};
+        final rawAllSettings =
+            sessionData['levelSettings'] ?? sessionData['levels'];
+
+        final savedSettings = _findLevelSettings(
+          rawAllSettings,
+          instructionLevel,
+        );
+
+        if (savedSettings != null) {
+          final savedProceed = _extractProceedCount(
+            savedSettings,
+            instructionLevel,
+          );
+          if (savedProceed != null) return savedProceed;
+
+          for (final nestedKey in [
+            'settings',
+            'levelSettings',
+            'configuration',
+            'config',
+          ]) {
+            final nested = savedSettings[nestedKey];
+            if (nested is Map) {
+              final nestedProceed = _extractProceedCount(
+                Map<String, dynamic>.from(nested),
+                instructionLevel,
+              );
+              if (nestedProceed != null) return nestedProceed;
+            }
+          }
+        }
+
+        final topLevelProceed = _extractProceedCount(
+          sessionData,
+          instructionLevel,
+        );
+        if (topLevelProceed != null) return topLevelProceed;
+      } catch (error) {
+        debugPrint(
+          'Unable to load Admin proceedCount for Level $instructionLevel: $error',
+        );
+      }
+    }
+
+    final suppliedProceed = _extractProceedCount(
+      fallbackSettings,
+      instructionLevel,
+    );
+    if (suppliedProceed != null) return suppliedProceed;
+
+    final rawQuizSettings = quizData['levelSettings'] ?? quizData['levels'];
+    final quizLevelSettings = _findLevelSettings(
+      rawQuizSettings,
+      instructionLevel,
+    );
+    if (quizLevelSettings != null) {
+      final proceed = _extractProceedCount(quizLevelSettings, instructionLevel);
+      if (proceed != null) return proceed;
+    }
+
+    final rawQuizProceed = _extractProceedCount(quizData, instructionLevel);
+    if (rawQuizProceed != null) return rawQuizProceed;
+
+    return 0;
   }
 
   Future<int> _loadPointsForLevel(
@@ -431,16 +557,17 @@ class QuizInstructionsScreen extends StatelessWidget {
       fallback: 30,
     );
 
-    final proceedCount = _readInt(
-      settings['proceedCount'] ??
-          settings['participantsToProceed'] ??
-          settings['eliminateCount'] ??
-          settings['eliminationCount'] ??
-          settings['eliminations'] ??
-          quizData['level${instructionLevel}ProceedCount'] ??
-          quizData['level${instructionLevel}EliminateCount'],
-      fallback: 0,
-    );
+    final proceedCount = _extractProceedCount(settings, instructionLevel) ??
+        _readInt(
+          settings['proceedCount'] ??
+              settings['participantsToProceed'] ??
+              settings['eliminateCount'] ??
+              settings['eliminationCount'] ??
+              settings['eliminations'] ??
+              quizData['level${instructionLevel}ProceedCount'] ??
+              quizData['level${instructionLevel}EliminateCount'],
+          fallback: 0,
+        );
 
     final points =
         _configuredPoints(settings) ??
@@ -534,12 +661,31 @@ class QuizInstructionsScreen extends StatelessWidget {
                       const Color(0xFF64748B),
                       "$seconds sec per question.",
                     ),
-                    _instructionItem(
-                      Icons.how_to_reg_rounded,
-                      const Color(0xFF10B981),
-                      proceedCount == 0
-                          ? "Advancement: All eligible participants proceed."
-                          : "Advancement: Top $proceedCount participant(s) will proceed to next level.",
+                    FutureBuilder<int>(
+                      future: _loadProceedCountForLevel(
+                        settings,
+                        instructionLevel,
+                      ),
+                      builder: (context, proceedSnapshot) {
+                        final count = proceedSnapshot.data ?? proceedCount;
+                        final String proceedText;
+                        if (count <= 0) {
+                          proceedText =
+                              "Contestants to proceed: All eligible participants.";
+                        } else if (count == 1) {
+                          proceedText =
+                              "Contestant to proceed: Top 1 participant.";
+                        } else {
+                          proceedText =
+                              "Contestants to proceed: Top $count participant(s).";
+                        }
+
+                        return _instructionItem(
+                          Icons.how_to_reg_rounded,
+                          const Color(0xFF10B981),
+                          proceedText,
+                        );
+                      },
                     ),
                     _instructionItem(
                       Icons.check_box_rounded,
