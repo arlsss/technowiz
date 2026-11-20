@@ -4381,10 +4381,61 @@ class ParticipantReadinessPage extends StatelessWidget {
   }
 
   Widget _levelSettingsSection(Map<String, dynamic> data) {
+    String normalizeLevel(dynamic value) =>
+        value.toString().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    // 1. Authoritative levels explicitly configured by Admin:
+    final rawLevels = data['levels'];
+    final List<String> adminLevels = [];
+    if (rawLevels is List && rawLevels.isNotEmpty) {
+      for (final item in rawLevels) {
+        final s = item.toString().trim();
+        if (s.isNotEmpty && !adminLevels.contains(s)) {
+          adminLevels.add(s);
+        }
+      }
+    }
+
+    // 2. Authoritative level questions map configured by Admin:
+    final rawLevelQuestions = data['levelQuestions'];
+    final List<String> questionLevelKeys = [];
+    if (rawLevelQuestions is Map && rawLevelQuestions.isNotEmpty) {
+      for (final key in rawLevelQuestions.keys) {
+        final s = key.toString().trim();
+        if (s.isNotEmpty && !questionLevelKeys.contains(s)) {
+          questionLevelKeys.add(s);
+        }
+      }
+    }
+
     final rawSettings = data['levelSettings'];
     final Map<String, dynamic> settingsByLevel = rawSettings is Map
         ? Map<String, dynamic>.from(rawSettings)
         : <String, dynamic>{};
+
+    // Determine the active levels set by Admin:
+    final Set<String> activeLevelKeys = {};
+    if (adminLevels.isNotEmpty) {
+      activeLevelKeys.addAll(adminLevels);
+    } else if (questionLevelKeys.isNotEmpty) {
+      activeLevelKeys.addAll(questionLevelKeys);
+    }
+
+    // Filter settingsByLevel to strictly reflect what Admin has configured / kept:
+    if (activeLevelKeys.isNotEmpty) {
+      final activeNormalized = activeLevelKeys.map(normalizeLevel).toSet();
+      settingsByLevel.removeWhere(
+        (key, _) => !activeNormalized.contains(normalizeLevel(key)),
+      );
+
+      for (final lvl in activeLevelKeys) {
+        final exists = settingsByLevel.keys
+            .any((k) => normalizeLevel(k) == normalizeLevel(lvl));
+        if (!exists) {
+          settingsByLevel[lvl] = <String, dynamic>{};
+        }
+      }
+    }
 
     if (settingsByLevel.isEmpty) {
       return Container(
@@ -4522,8 +4573,41 @@ class ParticipantReadinessPage extends StatelessWidget {
           return clean;
         }
 
+        final validEntries = entries.where((entry) {
+          if (activeLevelKeys.isNotEmpty) return true;
+          final settings = entry.value is Map
+              ? Map<String, dynamic>.from(entry.value as Map)
+              : <String, dynamic>{};
+          final count = questionCountForLevel(entry.key, settings);
+          final hasExplicitSettings = settings.values.any((v) =>
+              v != null &&
+              v.toString().trim().isNotEmpty &&
+              v.toString().trim().toLowerCase() != 'not set');
+          return (count != null && count > 0) || hasExplicitSettings;
+        }).toList();
+
+        if (validEntries.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5FAFF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCEAF5)),
+            ),
+            child: const Text(
+              'No saved level settings are available for this quiz event yet.',
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          );
+        }
+
         return Column(
-          children: entries.map((entry) {
+          children: validEntries.map((entry) {
             final levelKey = entry.key;
             final settings = entry.value is Map
                 ? Map<String, dynamic>.from(entry.value as Map)

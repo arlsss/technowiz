@@ -2086,9 +2086,25 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           for (final ids in remainingLevelQuestions.values) ...ids,
         };
 
+        final remainingLevelSettings = <String, dynamic>{};
+        final rawSettings = data['levelSettings'];
+        if (rawSettings is Map) {
+          rawSettings.forEach((key, value) {
+            final keyString = key.toString().trim();
+            if (keyString.isEmpty) return;
+            if (keyString.toLowerCase() == target ||
+                keyString.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') ==
+                    target.replaceAll(RegExp(r'[^a-z0-9]'), '')) {
+              return;
+            }
+            remainingLevelSettings[keyString] = value;
+          });
+        }
+
         transaction.update(quizRef, {
           'levels': remainingLevels,
           'levelQuestions': remainingLevelQuestions,
+          'levelSettings': remainingLevelSettings,
           'questionIds': remainingQuestionIds.toList(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
@@ -2163,9 +2179,25 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           if (value is List) ...value.map((e) => e.toString()),
       };
 
+      final latestLevelSettings = <String, dynamic>{};
+      final latestRawSettings = latestData['levelSettings'];
+      if (latestRawSettings is Map) {
+        latestRawSettings.forEach((key, value) {
+          final keyString = key.toString().trim();
+          if (keyString.isEmpty) return;
+          if (keyString.toLowerCase() == target ||
+              keyString.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') ==
+                  target.replaceAll(RegExp(r'[^a-z0-9]'), '')) {
+            return;
+          }
+          latestLevelSettings[keyString] = value;
+        });
+      }
+
       await quizRef.update({
         'levels': latestLevels,
         'levelQuestions': latestMap,
+        'levelSettings': latestLevelSettings,
         'questionIds': latestQuestionIds.toList(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
