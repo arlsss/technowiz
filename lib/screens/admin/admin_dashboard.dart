@@ -4496,10 +4496,132 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
   static const Color _textDark = AdminThemeColors.textPrimary;
   static const Color _textMuted = AdminThemeColors.textMuted;
 
+  bool _selectionMode = false;
+  final Set<String> _selectedDocIds = {};
+
   @override
   void initState() {
     super.initState();
     AdminNavPersistence.savePage('quiz_history');
+  }
+
+  Future<void> _deleteSelected(
+    BuildContext context,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> sessions,
+  ) async {
+    final selectedSessions =
+        sessions.where((s) => _selectedDocIds.contains(s.id)).toList();
+    if (selectedSessions.isEmpty) return;
+
+    final count = selectedSessions.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.delete_sweep_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  count == 1
+                      ? 'Delete Selected Quiz?'
+                      : 'Delete Selected Quizzes?',
+                  style: const TextStyle(
+                    color: AdminThemeColors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to delete the $count selected quiz session${count == 1 ? '' : 's'} from history?\n\n'
+            'This will permanently remove all scores, question history, and answers from the database. This action cannot be undone.',
+            style: const TextStyle(
+              color: AdminThemeColors.textPrimary,
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              style: TextButton.styleFrom(
+                foregroundColor: AdminThemeColors.textMuted,
+              ),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'DELETE',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      for (final doc in selectedSessions) {
+        final data = doc.data();
+        final code =
+            (data['quizCode'] ?? data['code'] ?? doc.id).toString().trim();
+        await QuizCleanupService.purgeQuizSessionFully(
+          firestore: firestore,
+          docId: doc.id,
+          quizCode: code,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _selectedDocIds.clear();
+          _selectionMode = false;
+        });
+        AdminNotification.success(
+          context,
+          'Successfully deleted $count quiz session${count == 1 ? '' : 's'}.',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AdminNotification.error(
+          context,
+          'Failed to delete selected sessions: $e',
+        );
+      }
+    }
   }
 
   Future<bool> _deleteQuizSession(
@@ -4580,9 +4702,20 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
         elevation: 0,
         automaticallyImplyLeading: false,
         leading: IconButton(
-          tooltip: 'Back to Admin Dashboard',
-          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: _selectionMode
+              ? 'Cancel Selection'
+              : 'Back to Admin Dashboard',
+          icon: Icon(
+            _selectionMode ? Icons.close_rounded : Icons.arrow_back_rounded,
+          ),
           onPressed: () {
+            if (_selectionMode) {
+              setState(() {
+                _selectionMode = false;
+                _selectedDocIds.clear();
+              });
+              return;
+            }
             AdminNavPersistence.savePage('dashboard');
             final navigator = Navigator.of(context);
             if (navigator.canPop()) {
@@ -4597,16 +4730,18 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
             }
           },
         ),
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Quiz History',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              _selectionMode ? 'Select Quizzes' : 'Quiz History',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             Text(
-              'View completed quiz sessions.',
-              style: TextStyle(
+              _selectionMode
+                  ? 'Choose quiz sessions to delete.'
+                  : 'View completed quiz sessions.',
+              style: const TextStyle(
                 fontSize: 11,
                 color: _textMuted,
                 fontWeight: FontWeight.normal,
@@ -4615,258 +4750,408 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
           ],
         ),
       ),
-      body: AdminCircuitBackground(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('quiz_sessions')
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return const Center(child: Text('Unable to load quiz history.'));
-            }
-            if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: _purple),
-              );
-            }
-            final sessions =
-                snapshot.data!.docs
-                    .where((doc) => _isFinished(doc.data()))
-                    .toList()
-                  ..sort(
-                    (a, b) => _dateOf(b.data()).compareTo(_dateOf(a.data())),
-                  );
-            if (sessions.isEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.history_rounded, size: 48, color: _purple),
-                      SizedBox(height: 12),
-                      Text(
-                        'No quiz history yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: _textDark,
-                        ),
-                      ),
-                      SizedBox(height: 5),
-                      Text(
-                        'Finished quiz sessions will appear here.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: _textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            return Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  color: Colors.white.withValues(alpha: 0.7),
-                  child: Row(
-                    children: [
-                      Text(
-                        '${sessions.length} Completed Quiz${sessions.length == 1 ? '' : 'zes'}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _textMuted,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () => _deleteAllHistory(context, sessions),
-                        icon: const Icon(
-                          Icons.delete_sweep_rounded,
-                          size: 16,
-                          color: Color(0xFFEF4444),
-                        ),
-                        label: const Text(
-                          'Delete All',
+      body: PopScope(
+        canPop: !_selectionMode,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (_selectionMode) {
+            setState(() {
+              _selectionMode = false;
+              _selectedDocIds.clear();
+            });
+          }
+        },
+        child: AdminCircuitBackground(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('quiz_sessions')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Center(child: Text('Unable to load quiz history.'));
+              }
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: CircularProgressIndicator(color: _purple),
+                );
+              }
+              final sessions =
+                  snapshot.data!.docs
+                      .where((doc) => _isFinished(doc.data()))
+                      .toList()
+                    ..sort(
+                      (a, b) => _dateOf(b.data()).compareTo(_dateOf(a.data())),
+                    );
+              if (sessions.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.history_rounded, size: 48, color: _purple),
+                        SizedBox(height: 12),
+                        Text(
+                          'No quiz history yet',
                           style: TextStyle(
-                            color: Color(0xFFEF4444),
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: _textDark,
                           ),
                         ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        SizedBox(height: 5),
+                        Text(
+                          'Finished quiz sessions will appear here.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _textMuted),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: sessions.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 9),
-                    itemBuilder: (context, index) {
-                      final doc = sessions[index];
-                      final data = doc.data();
-                      final title =
-                          (data['title'] ??
-                                  data['quizTitle'] ??
-                                  data['quizName'] ??
-                                  data['name'] ??
-                                  'Quiz')
-                              .toString();
-                      final code =
-                          (data['quizCode'] ?? data['code'] ?? doc.id)
-                              .toString();
-                      final date = _dateOf(data);
-                      final dateText = date.millisecondsSinceEpoch == 0
-                          ? 'Date not set'
-                          : '${date.day} ${_monthName(date.month)} ${date.year} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () async {
-                            AdminNavPersistence.savePage(
-                              'quiz_history_results',
-                              historyQuizCode: code,
-                              historyQuizTitle: title,
-                              historyQuizDate: dateText,
-                              historyDocId: doc.id,
-                            );
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AdminFinishedQuizResultsScreen(
-                                  quizCode: code,
-                                  quizTitle: title,
-                                  quizDate: dateText,
-                                  docId: doc.id,
+                );
+              }
+              return Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    color: Colors.white.withValues(alpha: 0.7),
+                    child: Row(
+                      children: [
+                        if (!_selectionMode) ...[
+                          Text(
+                            '${sessions.length} Completed Quiz${sessions.length == 1 ? '' : 'zes'}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _textMuted,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _selectionMode = true;
+                                _selectedDocIds.clear();
+                              });
+                            },
+                            icon: const Icon(
+                              Icons.check_box_outlined,
+                              size: 16,
+                              color: _purple,
+                            ),
+                            label: const Text(
+                              'Select to Delete',
+                              style: TextStyle(
+                                color: _purple,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ] else ...[
+                          Text(
+                            '${_selectedDocIds.length} of ${sessions.length} selected',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _textDark,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                if (_selectedDocIds.length == sessions.length) {
+                                  _selectedDocIds.clear();
+                                } else {
+                                  _selectedDocIds.addAll(sessions.map((s) => s.id));
+                                }
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              _selectedDocIds.length == sessions.length
+                                  ? 'Deselect All'
+                                  : 'Select All',
+                              style: const TextStyle(
+                                color: _purple,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectionMode = false;
+                                _selectedDocIds.clear();
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: _textMuted,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          ElevatedButton.icon(
+                            onPressed: _selectedDocIds.isEmpty
+                                ? null
+                                : () => _deleteSelected(context, sessions),
+                            icon: const Icon(Icons.delete_outline_rounded, size: 15),
+                            label: Text(
+                              'Delete (${_selectedDocIds.length})',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFFCA5A5),
+                              disabledForegroundColor: Colors.white70,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: sessions.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 9),
+                      itemBuilder: (context, index) {
+                        final doc = sessions[index];
+                        final data = doc.data();
+                        final title =
+                            (data['title'] ??
+                                    data['quizTitle'] ??
+                                    data['quizName'] ??
+                                    data['name'] ??
+                                    'Quiz')
+                                .toString();
+                        final code =
+                            (data['quizCode'] ?? data['code'] ?? doc.id)
+                                .toString();
+                        final date = _dateOf(data);
+                        final dateText = date.millisecondsSinceEpoch == 0
+                            ? 'Date not set'
+                            : '${date.day} ${_monthName(date.month)} ${date.year} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+                        final isSelected = _selectedDocIds.contains(doc.id);
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
+                              if (_selectionMode) {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedDocIds.remove(doc.id);
+                                  } else {
+                                    _selectedDocIds.add(doc.id);
+                                  }
+                                });
+                                return;
+                              }
+                              AdminNavPersistence.savePage(
+                                'quiz_history_results',
+                                historyQuizCode: code,
+                                historyQuizTitle: title,
+                                historyQuizDate: dateText,
+                                historyDocId: doc.id,
+                              );
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AdminFinishedQuizResultsScreen(
+                                    quizCode: code,
+                                    quizTitle: title,
+                                    quizDate: dateText,
+                                    docId: doc.id,
+                                  ),
+                                ),
+                              );
+                              if (mounted) {
+                                AdminNavPersistence.savePage('quiz_history');
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? _purple.withValues(alpha: 0.05)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? _purple
+                                      : const Color(0xFFE7E8EF),
+                                  width: isSelected ? 1.5 : 1,
                                 ),
                               ),
-                            );
-                            if (mounted) {
-                              AdminNavPersistence.savePage('quiz_history');
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE7E8EF)),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: AdminThemeColors.pillBg,
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: const Icon(
-                                    Icons.history_rounded,
-                                    color: _purple,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: _textDark,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
+                              child: Row(
+                                children: [
+                                  if (_selectionMode) ...[
+                                    SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: Checkbox(
+                                        value: isSelected,
+                                        activeColor: _purple,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(5),
                                         ),
+                                        onChanged: (val) {
+                                          setState(() {
+                                            if (val == true) {
+                                              _selectedDocIds.add(doc.id);
+                                            } else {
+                                              _selectedDocIds.remove(doc.id);
+                                            }
+                                          });
+                                        },
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Code: $code',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: _textMuted,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        dateText,
-                                        style: const TextStyle(
-                                          color: _textMuted,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AdminThemeColors.pillBg,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: AdminThemeColors.primary.withValues(alpha: 0.25),
-                                      width: 1,
+                                    ),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AdminThemeColors.pillBg,
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: const Icon(
+                                      Icons.history_rounded,
+                                      color: _purple,
                                     ),
                                   ),
-                                  child: const Text(
-                                    'FINISHED',
-                                    style: TextStyle(
-                                      color: AdminThemeColors.primary,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.3,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: _textDark,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Code: $code',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: _textMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          dateText,
+                                          style: const TextStyle(
+                                            color: _textMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                IconButton(
-                                  tooltip: 'Delete Quiz Session',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 36,
-                                    minHeight: 36,
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AdminThemeColors.pillBg,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: AdminThemeColors.primary.withValues(alpha: 0.25),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'FINISHED',
+                                      style: TextStyle(
+                                        color: AdminThemeColors.primary,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
                                   ),
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                    color: Color(0xFFEF4444),
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    _deleteQuizSession(
-                                      context,
-                                      doc.id,
-                                      title,
-                                      code,
-                                    );
-                                  },
-                                ),
-                              ],
+                                  if (!_selectionMode) ...[
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      tooltip: 'Delete Quiz Session',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Color(0xFFEF4444),
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        _deleteQuizSession(
+                                          context,
+                                          doc.id,
+                                          title,
+                                          code,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
