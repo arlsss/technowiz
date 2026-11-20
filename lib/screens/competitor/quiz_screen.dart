@@ -406,18 +406,18 @@ class _QuizScreenState extends State<QuizScreen> {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      eliminated
-                          ? "Thank you for participating! We appreciate your great effort and dedication."
-                          : "You will be proceeding to Level $nextLevel!",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14.5,
-                        height: 1.4,
+                    if (eliminated) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        "Thank you for participating! We appreciate your great effort and dedication.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14.5,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
+                    ],
                     if (eliminated) ...[
                       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                         stream: _sessionRef.snapshots(),
@@ -541,105 +541,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ],
                     if (!eliminated) ...[
-                      const SizedBox(height: 24),
-                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: _sessionRef.snapshots(),
-                        builder: (context, sessSnap) {
-                          final sessData = sessSnap.data?.data();
-                          final officialRanks = sessData?['officialRanks'];
-                          final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-                          int? liveOfficialRank = officialRank;
-                          if (officialRanks is Map && officialRanks.containsKey(myUid)) {
-                            final raw = officialRanks[myUid];
-                            final parsed = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '');
-                            if (parsed != null && parsed > 0) {
-                              liveOfficialRank = parsed;
-                            }
-                          }
-
-                          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: _joinRequestRef(myUid).snapshots(),
-                            builder: (context, reqSnap) {
-                              final reqData = reqSnap.data?.data();
-                              final rawRank = reqData?['rank'] ??
-                                  reqData?['levelRank'] ??
-                                  reqData?['currentRank'] ??
-                                  reqData?['rankAtProceed'] ??
-                                  reqData?['rankAtElimination'] ??
-                                  _contestantDecisionRank;
-                              final int? liveRank = rawRank is num
-                                  ? rawRank.toInt()
-                                  : int.tryParse(rawRank?.toString() ?? '');
-                              final finalRank = liveOfficialRank ??
-                                  liveRank ??
-                                  (_contestantDecisionRank ??
-                                      (currentRank > 0 ? currentRank : null));
-
-                              return Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 22,
-                                  vertical: 20,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(
-                                    color: const Color(0xFFBBF7D0),
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-                                      blurRadius: 18,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.emoji_events_rounded,
-                                          size: 17,
-                                          color: Colors.amber.shade700,
-                                        ),
-                                        const SizedBox(width: 7),
-                                        Text(
-                                          'RANK — LEVEL ${_contestantDecisionLevel ?? 1}',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      finalRank != null
-                                          ? 'RANK: #$finalRank'
-                                          : (currentRank > 0 ? 'RANK: #$currentRank' : 'RANK: --'),
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        color: Color(0xFF14532D),
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
                       SizedBox(
                         width: double.infinity,
                         height: 54,
