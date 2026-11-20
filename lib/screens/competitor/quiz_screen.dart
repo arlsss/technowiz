@@ -4835,47 +4835,6 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: OutlinedButton.icon(
-                                icon: const Icon(
-                                  Icons.leaderboard_rounded,
-                                  color: primaryGreen,
-                                  size: 20,
-                                ),
-                                label: const Text(
-                                  "VIEW CURRENT RANKING",
-                                  style: TextStyle(
-                                    color: primaryGreen,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Color(0xFF86EFAC),
-                                    width: 1.5,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  backgroundColor: Colors.white.withValues(alpha: 0.9),
-                                ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => PartialRankingScreen(
-                                        quizCode: widget.quizCode,
-                                        isFinal: false,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
                           ],
                         );
                       },
