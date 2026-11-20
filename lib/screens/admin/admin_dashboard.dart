@@ -4381,114 +4381,6 @@ class AdminQuizHistoryScreen extends StatefulWidget {
       return false;
     }
   }
-
-  /// Bulk deletes all completed quiz history entries.
-  static Future<void> _deleteAllHistory(
-    BuildContext context,
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> sessions,
-  ) async {
-    if (sessions.isEmpty) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.delete_sweep_rounded,
-                  color: Color(0xFFDC2626),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Delete All History?',
-                  style: TextStyle(
-                    color: AdminThemeColors.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            'Are you sure you want to delete all ${sessions.length} completed quiz session(s) from history?\n\nThis action cannot be undone.',
-            style: const TextStyle(
-              color: AdminThemeColors.textPrimary,
-              fontSize: 13,
-              height: 1.45,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              style: TextButton.styleFrom(
-                foregroundColor: AdminThemeColors.textMuted,
-              ),
-              child: const Text('CANCEL'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'DELETE ALL',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final firestore = FirebaseFirestore.instance;
-      for (final doc in sessions) {
-        final data = doc.data();
-        final code = (data['quizCode'] ?? data['code'] ?? doc.id).toString().trim();
-        await QuizCleanupService.purgeQuizSessionFully(
-          firestore: firestore,
-          docId: doc.id,
-          quizCode: code,
-        );
-      }
-
-      if (context.mounted) {
-        AdminNotification.success(
-          context,
-          'Successfully deleted ${sessions.length} history session(s).',
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        AdminNotification.error(
-          context,
-          'Failed to delete history: $e',
-        );
-      }
-    }
-  }
 }
 
 class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
@@ -4506,7 +4398,6 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
   }
 
   Future<void> _deleteSelected(
-    BuildContext context,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> sessions,
   ) async {
     final selectedSessions =
@@ -4604,23 +4495,21 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
         );
       }
 
-      if (mounted) {
-        setState(() {
-          _selectedDocIds.clear();
-          _selectionMode = false;
-        });
-        AdminNotification.success(
-          context,
-          'Successfully deleted $count quiz session${count == 1 ? '' : 's'}.',
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _selectedDocIds.clear();
+        _selectionMode = false;
+      });
+      AdminNotification.success(
+        context,
+        'Successfully deleted $count quiz session${count == 1 ? '' : 's'}.',
+      );
     } catch (e) {
-      if (context.mounted) {
-        AdminNotification.error(
-          context,
-          'Failed to delete selected sessions: $e',
-        );
-      }
+      if (!mounted) return;
+      AdminNotification.error(
+        context,
+        'Failed to delete selected sessions: $e',
+      );
     }
   }
 
@@ -4636,13 +4525,6 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
       quizTitle,
       quizCode: quizCode,
     );
-  }
-
-  Future<void> _deleteAllHistory(
-    BuildContext context,
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> sessions,
-  ) {
-    return AdminQuizHistoryScreen._deleteAllHistory(context, sessions);
   }
 
   DateTime _dateOf(Map<String, dynamic> data) {
@@ -4915,7 +4797,7 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
                           ElevatedButton.icon(
                             onPressed: _selectedDocIds.isEmpty
                                 ? null
-                                : () => _deleteSelected(context, sessions),
+                                : () => _deleteSelected(sessions),
                             icon: const Icon(Icons.delete_outline_rounded, size: 15),
                             label: Text(
                               'Delete (${_selectedDocIds.length})',
