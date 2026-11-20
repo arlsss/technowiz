@@ -1709,6 +1709,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       levelPointsController.clear();
       levelDifficulty = '';
       levelDifficultyController.clear();
+      levelQuestionType = 'Multiple Choice';
     });
   }
 
@@ -1971,8 +1972,12 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         'participantsToProceed': proceedCount,
         'eliminateCount': proceedCount,
         'pointsPerCorrectAnswer': pointsPerCorrectAnswer,
-        'difficulty': levelDifficulty,
-        'questionType': levelQuestionType,
+        'difficulty': levelDifficulty.trim().isNotEmpty
+            ? levelDifficulty.trim()
+            : 'Easy',
+        'questionType': levelQuestionType.trim().isNotEmpty
+            ? levelQuestionType.trim()
+            : 'Multiple Choice',
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -3287,7 +3292,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
                             // QUESTION TYPE
                             DropdownButtonFormField<String>(
-                              initialValue: const [
+                              value: const [
                                 'Multiple Choice',
                                 'Identification',
                                 'True/False',

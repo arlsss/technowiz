@@ -4504,11 +4504,21 @@ class ParticipantReadinessPage extends StatelessWidget {
 
             final assignedQuestionDocs = questionsForLevel(levelKey);
 
+            final levelNum = int.tryParse(levelKey.replaceAll(RegExp(r'[^0-9]'), ''));
+
             String resolveQuestionType() {
               // 1. Explicit setting on level by admin
               final explicit = (settings['questionType'] ??
+                      settings['questionTypes'] ??
+                      settings['question_type'] ??
+                      settings['question_types'] ??
+                      settings['selectedQuestionType'] ??
+                      settings['levelQuestionType'] ??
                       settings['type'] ??
                       settings['category'] ??
+                      (levelNum != null ? data['level${levelNum}QuestionType'] : null) ??
+                      (levelNum != null ? data['level${levelNum}QuestionTypes'] : null) ??
+                      data['questionType'] ??
                       '')
                   .toString()
                   .trim();
@@ -4578,19 +4588,39 @@ class ParticipantReadinessPage extends StatelessWidget {
                 }
               }
 
+              // 3. Fallback: In Admin "Add Level", Question Type defaults to "Multiple Choice".
+              // If the level has any settings configured or questions assigned, default to 'Multiple Choice'.
+              if (settings.isNotEmpty || (count != null && count > 0)) {
+                return 'Multiple Choice';
+              }
+
               return 'Not set';
             }
 
             final timerSeconds = settings['timerSeconds'] ??
+                settings['timeSeconds'] ??
+                settings['timePerQuestion'] ??
                 settings['timer'] ??
-                settings['timeLimit'];
+                settings['timeLimit'] ??
+                (levelNum != null ? data['level${levelNum}Timer'] : null);
             final points = settings['pointsPerCorrectAnswer'] ??
                 settings['points'] ??
-                settings['pts'];
-            final difficulty = settings['difficulty'];
+                settings['pts'] ??
+                settings['pointsPerQuestion'] ??
+                (levelNum != null ? data['level${levelNum}Points'] : null);
+            final rawDifficulty = (settings['difficulty'] ??
+                    settings['levelDifficulty'] ??
+                    settings['diff'] ??
+                    '')
+                .toString()
+                .trim();
+            final difficulty = rawDifficulty.isNotEmpty
+                ? rawDifficulty
+                : (settings.isNotEmpty ? 'Easy' : null);
             final proceedCount = settings['proceedCount'] ??
                 settings['participantsToProceed'] ??
-                settings['eliminateCount'];
+                settings['eliminateCount'] ??
+                (levelNum != null ? data['level${levelNum}ProceedCount'] : null);
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
