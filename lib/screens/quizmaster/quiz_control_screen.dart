@@ -4207,12 +4207,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         contestants.sort((a, b) {
           final aData = a.data();
           final bData = b.data();
-          final aName =
-              (aData['displayName'] ?? aData['name'] ?? aData['email'] ?? a.id)
-                  .toString();
-          final bName =
-              (bData['displayName'] ?? bData['name'] ?? bData['email'] ?? b.id)
-                  .toString();
+          final aRawTeam = (aData['teamName'] ?? '').toString().trim();
+          final aType = (aData['contestantType'] ?? '').toString().trim().toLowerCase();
+          final bool aIsTeam = aData['isTeam'] == true || aType == 'team' || aRawTeam.isNotEmpty;
+          final aName = aIsTeam && aRawTeam.isNotEmpty
+              ? aRawTeam
+              : (aData['realName'] ?? aData['fullName'] ?? aData['displayName'] ?? aData['name'] ?? aData['email'] ?? a.id).toString();
+
+          final bRawTeam = (bData['teamName'] ?? '').toString().trim();
+          final bType = (bData['contestantType'] ?? '').toString().trim().toLowerCase();
+          final bool bIsTeam = bData['isTeam'] == true || bType == 'team' || bRawTeam.isNotEmpty;
+          final bName = bIsTeam && bRawTeam.isNotEmpty
+              ? bRawTeam
+              : (bData['realName'] ?? bData['fullName'] ?? bData['displayName'] ?? bData['name'] ?? bData['email'] ?? b.id).toString();
+
           return aName.toLowerCase().compareTo(bName.toLowerCase());
         });
 
@@ -4227,12 +4235,38 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: contestants.map((contestantDoc) {
             final contestant = contestantDoc.data();
-            final name =
-                (contestant['displayName'] ??
-                        contestant['name'] ??
-                        contestant['email'] ??
-                        contestantDoc.id)
-                    .toString();
+            final rawTeam = (contestant['teamName'] ?? '').toString().trim();
+            final contestantType = (contestant['contestantType'] ?? '').toString().trim().toLowerCase();
+            final bool isTeam = contestant['isTeam'] == true ||
+                contestantType == 'team' ||
+                rawTeam.isNotEmpty;
+            final personalFullName = (contestant['realName'] ??
+                    contestant['fullName'] ??
+                    contestant['displayName'] ??
+                    contestant['name'] ??
+                    contestant['email'] ??
+                    contestantDoc.id)
+                .toString()
+                .trim();
+            final teamName = rawTeam.isNotEmpty
+                ? rawTeam
+                : (isTeam ? personalFullName : '');
+            final name = isTeam
+                ? (teamName.isNotEmpty ? teamName : personalFullName)
+                : (personalFullName.isNotEmpty ? personalFullName : 'Contestant');
+
+            final rawMembers =
+                contestant['teamMembers'] ?? contestant['members'];
+            final List<String> teamMembers = [];
+            if (rawMembers is List) {
+              for (final m in rawMembers) {
+                final s = m is Map
+                    ? (m['name'] ?? m['displayName'] ?? '').toString().trim()
+                    : m.toString().trim();
+                if (s.isNotEmpty && !teamMembers.contains(s)) teamMembers.add(s);
+              }
+            }
+
             final contestantStatus = (contestant['status'] ?? 'approved')
                 .toString()
                 .toLowerCase();
@@ -4302,22 +4336,87 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(
-                            Icons.person_rounded,
+                          Icon(
+                            isTeam ? Icons.groups_rounded : Icons.person_rounded,
                             color: primaryBlue,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                color: darkBlue,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: darkBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (isTeam && teamMembers.isNotEmpty)
+                                  Text(
+                                    'Members: ${teamMembers.join(', ')}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF5B7A9C),
+                                      fontSize: 10.5,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          if (contestantStatus == 'eliminated')
+                          const SizedBox(width: 6),
+                          if (isTeam)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryBlue.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: primaryBlue.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: const Text(
+                                'TEAM',
+                                style: TextStyle(
+                                  color: primaryBlue,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(
+                                  alpha: 0.10,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFF10B981).withValues(
+                                    alpha: 0.25,
+                                  ),
+                                ),
+                              ),
+                              child: const Text(
+                                'SOLO',
+                                style: TextStyle(
+                                  color: Color(0xFF059669),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          if (contestantStatus == 'eliminated') ...[
+                            const SizedBox(width: 6),
                             const Text(
                               'ELIMINATED',
                               style: TextStyle(
@@ -4326,6 +4425,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -4413,64 +4513,326 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         .doc(widget.quizCode);
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: quizRef.collection('scores').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Text('Unable to load current standings.');
-        }
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+      stream: quizRef.collection('join_requests').snapshots(),
+      builder: (context, requestsSnapshot) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: quizRef.collection('scores').snapshots(),
+          builder: (context, scoresSnapshot) {
+            if (scoresSnapshot.hasError || requestsSnapshot.hasError) {
+              return const Text('Unable to load current standings.');
+            }
+            if ((scoresSnapshot.connectionState == ConnectionState.waiting &&
+                    !scoresSnapshot.hasData) &&
+                (requestsSnapshot.connectionState == ConnectionState.waiting &&
+                    !requestsSnapshot.hasData)) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        final rows =
-            (snapshot.data?.docs ?? []).map((doc) {
-              final data = doc.data();
-              return <String, dynamic>{
-                'name':
-                    (data['name'] ??
-                            data['displayName'] ??
-                            data['contestantName'] ??
-                            doc.id)
-                        .toString(),
-                'score': _asInt(data['score']) ?? 0,
+            final requestDocs = requestsSnapshot.data?.docs ?? [];
+            final scoreDocs = scoresSnapshot.data?.docs ?? [];
+
+            final Map<String, Map<String, dynamic>> joinByUid = {};
+            final Map<String, Map<String, dynamic>> joinByName = {};
+
+            for (final doc in requestDocs) {
+              final d = doc.data();
+              joinByUid[doc.id] = d;
+              final dName = (d['displayName'] ??
+                      d['name'] ??
+                      d['teamName'] ??
+                      d['realName'] ??
+                      d['fullName'] ??
+                      '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+              if (dName.isNotEmpty) {
+                joinByName[dName] = d;
+              }
+            }
+
+            final Map<String, Map<String, dynamic>> participants = {};
+
+            // 1. Process join requests (approved or participating)
+            for (final doc in requestDocs) {
+              final d = doc.data();
+              final status =
+                  (d['status'] ?? '').toString().trim().toLowerCase();
+              if (status == 'rejected' || status == 'pending') continue;
+              participants[doc.id] = {
+                'id': doc.id,
+                'jData': d,
+                'sData': <String, dynamic>{},
               };
-            }).toList()..sort(
-              (a, b) => (b['score'] as int).compareTo(a['score'] as int),
-            );
+            }
 
-        if (rows.isEmpty) {
-          return const Text(
-            'Standings will appear when participant scores are recorded.',
-          );
-        }
+            // 2. Process score docs
+            for (final doc in scoreDocs) {
+              final s = doc.data();
+              if (participants.containsKey(doc.id)) {
+                participants[doc.id]!['sData'] = s;
+              } else {
+                final sName = (s['name'] ??
+                        s['displayName'] ??
+                        s['contestantName'] ??
+                        '')
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+                final matchedJoin =
+                    sName.isNotEmpty ? joinByName[sName] : null;
+                participants[doc.id] = {
+                  'id': doc.id,
+                  'jData': matchedJoin ?? <String, dynamic>{},
+                  'sData': s,
+                };
+              }
+            }
 
-        return Column(
-          children: [
-            for (int i = 0; i < rows.length; i++)
-              ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  radius: 15,
-                  backgroundColor: Colors.blue.shade50,
-                  child: Text(
-                    '${i + 1}',
-                    style: const TextStyle(
-                      color: primaryBlue,
-                      fontWeight: FontWeight.bold,
+            final rows = <Map<String, dynamic>>[];
+
+            for (final entry in participants.values) {
+              final id = entry['id'] as String;
+              final jData = (entry['jData'] as Map<String, dynamic>?) ?? {};
+              final sData = (entry['sData'] as Map<String, dynamic>?) ?? {};
+
+              final rawTeam =
+                  (sData['teamName'] ?? jData['teamName'] ?? '')
+                      .toString()
+                      .trim();
+              final contestantType =
+                  (sData['contestantType'] ?? jData['contestantType'] ?? '')
+                      .toString()
+                      .trim()
+                      .toLowerCase();
+              final bool isTeam =
+                  sData['isTeam'] == true ||
+                  contestantType == 'team' ||
+                  jData['isTeam'] == true ||
+                  rawTeam.isNotEmpty;
+
+              final String personalFullName = (jData['realName'] ??
+                      jData['fullName'] ??
+                      jData['displayName'] ??
+                      jData['name'] ??
+                      sData['realName'] ??
+                      sData['fullName'] ??
+                      sData['displayName'] ??
+                      sData['name'] ??
+                      sData['contestantName'] ??
+                      id)
+                  .toString()
+                  .trim();
+
+              final String finalTeamName =
+                  rawTeam.isNotEmpty
+                      ? rawTeam
+                      : (isTeam ? personalFullName : '');
+
+              final String displayName =
+                  isTeam
+                      ? (finalTeamName.isNotEmpty
+                          ? finalTeamName
+                          : personalFullName)
+                      : (personalFullName.isNotEmpty
+                          ? personalFullName
+                          : 'Contestant');
+
+              final rawMembers =
+                  sData['teamMembers'] ??
+                  sData['members'] ??
+                  jData['teamMembers'] ??
+                  jData['members'];
+              final List<String> teamMembers = [];
+              if (rawMembers is List) {
+                for (final m in rawMembers) {
+                  final s =
+                      m is Map
+                          ? (m['name'] ?? m['displayName'] ?? '')
+                              .toString()
+                              .trim()
+                          : m.toString().trim();
+                  if (s.isNotEmpty && !teamMembers.contains(s)) {
+                    teamMembers.add(s);
+                  }
+                }
+              }
+
+              final int score =
+                  _asInt(sData['score']) ?? _asInt(jData['score']) ?? 0;
+
+              rows.add({
+                'id': id,
+                'name': displayName,
+                'isTeam': isTeam,
+                'teamName': finalTeamName,
+                'personalFullName': personalFullName,
+                'teamMembers': teamMembers,
+                'score': score,
+              });
+            }
+
+            rows.sort((a, b) {
+              final scoreComp = (b['score'] as int).compareTo(
+                a['score'] as int,
+              );
+              if (scoreComp != 0) return scoreComp;
+              return (a['name'] as String).toLowerCase().compareTo(
+                (b['name'] as String).toLowerCase(),
+              );
+            });
+
+            if (rows.isEmpty) {
+              return const Text(
+                'Standings will appear when participant scores are recorded.',
+              );
+            }
+
+            // Assign ranks (equal score = equal rank)
+            for (int i = 0; i < rows.length; i++) {
+              if (i > 0 && rows[i]['score'] == rows[i - 1]['score']) {
+                rows[i]['rank'] = rows[i - 1]['rank'];
+              } else {
+                rows[i]['rank'] = i + 1;
+              }
+            }
+
+            return Column(
+              children: [
+                for (int i = 0; i < rows.length; i++)
+                  ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    leading: CircleAvatar(
+                      radius: 15,
+                      backgroundColor: Colors.blue.shade50,
+                      child: Text(
+                        '${rows[i]['rank']}',
+                        style: const TextStyle(
+                          color: primaryBlue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            rows[i]['name'] as String,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: darkBlue,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        if (rows[i]['isTeam'] == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: primaryBlue.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: primaryBlue.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.groups_rounded,
+                                  size: 11,
+                                  color: primaryBlue,
+                                ),
+                                SizedBox(width: 3),
+                                Text(
+                                  'TEAM',
+                                  style: TextStyle(
+                                    color: primaryBlue,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(
+                                alpha: 0.10,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF10B981).withValues(
+                                  alpha: 0.25,
+                                ),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.person_rounded,
+                                  size: 11,
+                                  color: Color(0xFF059669),
+                                ),
+                                SizedBox(width: 3),
+                                Text(
+                                  'SOLO',
+                                  style: TextStyle(
+                                    color: Color(0xFF059669),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: ((rows[i]['teamMembers'] as List<String>?)?.isNotEmpty ?? false)
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              'Members: ${(rows[i]['teamMembers'] as List<String>).join(', ')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF5B7A9C),
+                              ),
+                            ),
+                          )
+                        : null,
+                    trailing: Text(
+                      '${rows[i]['score']} pts',
+                      style: const TextStyle(
+                        color: darkBlue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
-                title: Text(rows[i]['name'] as String),
-                trailing: Text(
-                  '${rows[i]['score']} pts',
-                  style: const TextStyle(
-                    color: darkBlue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
