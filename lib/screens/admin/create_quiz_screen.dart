@@ -13,10 +13,7 @@ import '../../navigation_persistence.dart';
 class CreateQuizScreen extends StatefulWidget {
   final String? editQuizCode;
 
-  const CreateQuizScreen({
-    super.key,
-    this.editQuizCode,
-  });
+  const CreateQuizScreen({super.key, this.editQuizCode});
 
   @override
   State<CreateQuizScreen> createState() => _CreateQuizScreenState();
@@ -109,9 +106,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
     // Return to Quiz Sessions / Admin Dashboard safely
     AdminNavPersistence.savePage('quiz_sessions');
     navigator.pushReplacement(
-      adminPageRoute<void>(
-        const ManageQuizSessionsScreen(),
-      ),
+      adminPageRoute<void>(const ManageQuizSessionsScreen()),
     );
   }
 
@@ -482,9 +477,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                 width: 480,
                 height: MediaQuery.of(context).size.height * 0.62,
                 child: visibleQuizzes.isEmpty
-                    ? const Center(
-                        child: Text('No quiz events available.'),
-                      )
+                    ? const Center(child: Text('No quiz events available.'))
                     : ListView.separated(
                         shrinkWrap: true,
                         itemCount: visibleQuizzes.length,
@@ -1534,7 +1527,11 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                       ? "A new 6-character quiz code will be generated for this event. All questions from '$duplicateSourceTitle' will be copied over. You can edit the date, times, title, and location above before creating."
                       : "A new 6-character quiz code is generated for every new event. You can load a previous quiz as a template to reuse its settings and questions without changing the original event.",
 
-                  style: const TextStyle(color: textMuted, fontSize: 10, height: 1.4),
+                  style: const TextStyle(
+                    color: textMuted,
+                    fontSize: 10,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -1619,7 +1616,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
             label: Text(
               duplicateSourceQuizCode != null
                   ? 'Switch Previous Quiz'
-                  : 'Edit Previous Event',
+                  : 'Create from previous Event',
             ),
             style: TextButton.styleFrom(
               foregroundColor: primaryPurple,
@@ -1649,533 +1646,541 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
         child: AdminCircuitBackground(
           child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
 
-            final isMobile = width < 700;
+              final isMobile = width < 700;
 
-            final horizontalPadding = isMobile ? 14.0 : 24.0;
+              final horizontalPadding = isMobile ? 14.0 : 24.0;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
 
-                22,
+                  22,
 
-                horizontalPadding,
+                  horizontalPadding,
 
-                35,
-              ),
+                  35,
+                ),
 
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
 
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
 
-                    children: [
-                      // =================================================
+                      children: [
+                        // =================================================
 
-                      // BASIC INFORMATION
+                        // BASIC INFORMATION
 
-                      // =================================================
-                      Container(
-                        width: double.infinity,
+                        // =================================================
+                        Container(
+                          width: double.infinity,
 
-                        padding: EdgeInsets.all(isMobile ? 17 : 22),
+                          padding: EdgeInsets.all(isMobile ? 17 : 22),
 
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFE9E4F8)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF34216B).withAlpha(8),
-                              blurRadius: 16,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-
-                          children: [
-                            sectionTitle(
-                              icon: Icons.description_outlined,
-
-                              title: "Quiz Information",
-
-                              subtitle:
-                                  "Enter the basic details for your quiz.",
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            inputField(
-                              controller: titleController,
-
-                              label: "Quiz Title",
-
-                              hint: "Enter quiz title",
-
-                              icon: Icons.title_rounded,
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            inputField(
-                              controller: descriptionController,
-
-                              label: "Description",
-
-                              hint: "Enter quiz description",
-
-                              icon: Icons.notes_outlined,
-
-                              maxLines: 4,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // =================================================
-
-                      // SCHEDULE & LOCATION
-
-                      // =================================================
-                      Container(
-                        width: double.infinity,
-
-                        padding: EdgeInsets.all(isMobile ? 17 : 22),
-
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFE9E4F8)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF34216B).withAlpha(8),
-                              blurRadius: 16,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-
-                          children: [
-                            sectionTitle(
-                              icon: Icons.calendar_month_outlined,
-
-                              title: "Schedule & Location",
-
-                              subtitle:
-                                  "Set when and where the quiz session will take place.",
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            if (isMobile) ...[
-                              pickerField(
-                                label: "Quiz Date",
-
-                                value: formatDate(selectedDate),
-
-                                icon: Icons.calendar_today_outlined,
-
-                                selected: selectedDate != null,
-
-                                onTap: pickQuizDate,
-                              ),
-
-                              const SizedBox(height: 14),
-
-                              inputField(
-                                controller: locationController,
-
-                                label: "Location",
-
-                                hint: "Enter quiz location",
-
-                                icon: Icons.location_on_outlined,
-                              ),
-
-                              const SizedBox(height: 14),
-
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: pickerField(
-                                      label: "Start Time",
-
-                                      value: formatTime(selectedStartTime),
-
-                                      icon: Icons.schedule_outlined,
-
-                                      selected: selectedStartTime != null,
-
-                                      onTap: pickStartTime,
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 10),
-
-                                  Expanded(
-                                    child: pickerField(
-                                      label: "End Time",
-
-                                      value: formatTime(selectedEndTime),
-
-                                      icon: Icons.schedule_outlined,
-
-                                      selected: selectedEndTime != null,
-
-                                      onTap: pickEndTime,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else ...[
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-
-                                children: [
-                                  Expanded(
-                                    child: pickerField(
-                                      label: "Quiz Date",
-
-                                      value: formatDate(selectedDate),
-
-                                      icon: Icons.calendar_today_outlined,
-
-                                      selected: selectedDate != null,
-
-                                      onTap: pickQuizDate,
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 14),
-
-                                  Expanded(
-                                    child: inputField(
-                                      controller: locationController,
-
-                                      label: "Location",
-
-                                      hint: "Enter quiz location",
-
-                                      icon: Icons.location_on_outlined,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 15),
-
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: pickerField(
-                                      label: "Start Time",
-
-                                      value: formatTime(selectedStartTime),
-
-                                      icon: Icons.schedule_outlined,
-
-                                      selected: selectedStartTime != null,
-
-                                      onTap: pickStartTime,
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 14),
-
-                                  Expanded(
-                                    child: pickerField(
-                                      label: "End Time",
-
-                                      value: formatTime(selectedEndTime),
-
-                                      icon: Icons.schedule_outlined,
-
-                                      selected: selectedEndTime != null,
-
-                                      onTap: pickEndTime,
-                                    ),
-                                  ),
-                                ],
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFE9E4F8)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF34216B).withAlpha(8),
+                                blurRadius: 16,
+                                offset: const Offset(0, 5),
                               ),
                             ],
-                          ],
+                          ),
+
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+
+                            children: [
+                              sectionTitle(
+                                icon: Icons.description_outlined,
+
+                                title: "Quiz Information",
+
+                                subtitle:
+                                    "Enter the basic details for your quiz.",
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              inputField(
+                                controller: titleController,
+
+                                label: "Quiz Title",
+
+                                hint: "Enter quiz title",
+
+                                icon: Icons.title_rounded,
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              inputField(
+                                controller: descriptionController,
+
+                                label: "Description",
+
+                                hint: "Enter quiz description",
+
+                                icon: Icons.notes_outlined,
+
+                                maxLines: 4,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      // =================================================
+                        // =================================================
 
-                      // AUTOMATIC CODE INFO
+                        // SCHEDULE & LOCATION
 
-                      // =================================================
-                      infoRow(),
+                        // =================================================
+                        Container(
+                          width: double.infinity,
 
-                      const SizedBox(height: 16),
+                          padding: EdgeInsets.all(isMobile ? 17 : 22),
 
-                      // =================================================
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFE9E4F8)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF34216B).withAlpha(8),
+                                blurRadius: 16,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
 
-                      // CREATE ACTION
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
-                      // =================================================
-                      Container(
-                        width: double.infinity,
+                            children: [
+                              sectionTitle(
+                                icon: Icons.calendar_month_outlined,
 
-                        padding: EdgeInsets.all(isMobile ? 15 : 17),
+                                title: "Schedule & Location",
 
-                        decoration: BoxDecoration(
-                          color: Colors.white,
+                                subtitle:
+                                    "Set when and where the quiz session will take place.",
+                              ),
 
-                          borderRadius: BorderRadius.circular(15),
+                              const SizedBox(height: 20),
 
-                          border: Border.all(color: borderColor),
+                              if (isMobile) ...[
+                                pickerField(
+                                  label: "Quiz Date",
+
+                                  value: formatDate(selectedDate),
+
+                                  icon: Icons.calendar_today_outlined,
+
+                                  selected: selectedDate != null,
+
+                                  onTap: pickQuizDate,
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                inputField(
+                                  controller: locationController,
+
+                                  label: "Location",
+
+                                  hint: "Enter quiz location",
+
+                                  icon: Icons.location_on_outlined,
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: pickerField(
+                                        label: "Start Time",
+
+                                        value: formatTime(selectedStartTime),
+
+                                        icon: Icons.schedule_outlined,
+
+                                        selected: selectedStartTime != null,
+
+                                        onTap: pickStartTime,
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 10),
+
+                                    Expanded(
+                                      child: pickerField(
+                                        label: "End Time",
+
+                                        value: formatTime(selectedEndTime),
+
+                                        icon: Icons.schedule_outlined,
+
+                                        selected: selectedEndTime != null,
+
+                                        onTap: pickEndTime,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                                  children: [
+                                    Expanded(
+                                      child: pickerField(
+                                        label: "Quiz Date",
+
+                                        value: formatDate(selectedDate),
+
+                                        icon: Icons.calendar_today_outlined,
+
+                                        selected: selectedDate != null,
+
+                                        onTap: pickQuizDate,
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 14),
+
+                                    Expanded(
+                                      child: inputField(
+                                        controller: locationController,
+
+                                        label: "Location",
+
+                                        hint: "Enter quiz location",
+
+                                        icon: Icons.location_on_outlined,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 15),
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: pickerField(
+                                        label: "Start Time",
+
+                                        value: formatTime(selectedStartTime),
+
+                                        icon: Icons.schedule_outlined,
+
+                                        selected: selectedStartTime != null,
+
+                                        onTap: pickStartTime,
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 14),
+
+                                    Expanded(
+                                      child: pickerField(
+                                        label: "End Time",
+
+                                        value: formatTime(selectedEndTime),
+
+                                        icon: Icons.schedule_outlined,
+
+                                        selected: selectedEndTime != null,
+
+                                        onTap: pickEndTime,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
 
-                        child: isMobile
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 16),
 
-                                children: [
-                                  Text(
-                                    editingQuizCode != null
-                                        ? "Ready to update?"
-                                        : "Ready to create?",
+                        // =================================================
 
-                                    style: TextStyle(
-                                      color: textDark,
+                        // AUTOMATIC CODE INFO
 
-                                      fontSize: 12,
+                        // =================================================
+                        infoRow(),
 
-                                      fontWeight: FontWeight.w800,
+                        const SizedBox(height: 16),
+
+                        // =================================================
+
+                        // CREATE ACTION
+
+                        // =================================================
+                        Container(
+                          width: double.infinity,
+
+                          padding: EdgeInsets.all(isMobile ? 15 : 17),
+
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+
+                            borderRadius: BorderRadius.circular(15),
+
+                            border: Border.all(color: borderColor),
+                          ),
+
+                          child: isMobile
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                                  children: [
+                                    Text(
+                                      editingQuizCode != null
+                                          ? "Ready to update?"
+                                          : "Ready to create?",
+
+                                      style: TextStyle(
+                                        color: textDark,
+
+                                        fontSize: 12,
+
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
 
-                                  const SizedBox(height: 3),
+                                    const SizedBox(height: 3),
 
-                                  Text(
-                                    editingQuizCode != null
-                                        ? "Review the changes before saving this quiz event."
-                                        : "Review the information before creating your quiz event.",
+                                    Text(
+                                      editingQuizCode != null
+                                          ? "Review the changes before saving this quiz event."
+                                          : "Review the information before creating your quiz event.",
 
-                                    style: TextStyle(
-                                      color: textMuted,
+                                      style: TextStyle(
+                                        color: textMuted,
 
-                                      fontSize: 10,
+                                        fontSize: 10,
+                                      ),
                                     ),
-                                  ),
 
-                                  const SizedBox(height: 13),
+                                    const SizedBox(height: 13),
 
-                                  SizedBox(
-                                    width: double.infinity,
+                                    SizedBox(
+                                      width: double.infinity,
 
-                                    height: 46,
+                                      height: 46,
 
-                                    child: ElevatedButton.icon(
-                                      onPressed: isLoading ? null : createQuiz,
+                                      child: ElevatedButton.icon(
+                                        onPressed: isLoading
+                                            ? null
+                                            : createQuiz,
 
-                                      icon: isLoading
-                                          ? const SizedBox(
-                                              width: 17,
+                                        icon: isLoading
+                                            ? const SizedBox(
+                                                width: 17,
 
-                                              height: 17,
+                                                height: 17,
 
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: Colors.white,
 
-                                                strokeWidth: 2,
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : const Icon(
+                                                Icons
+                                                    .add_circle_outline_rounded,
+
+                                                size: 18,
                                               ),
-                                            )
-                                          : const Icon(
-                                              Icons.add_circle_outline_rounded,
 
-                                              size: 18,
-                                            ),
+                                        label: Text(
+                                          isLoading
+                                              ? (editingQuizCode != null
+                                                    ? "Saving..."
+                                                    : "Creating...")
+                                              : (editingQuizCode != null
+                                                    ? "Save Changes"
+                                                    : "Create Quiz Event"),
 
-                                      label: Text(
-                                        isLoading
-                                            ? (editingQuizCode != null
-                                                  ? "Saving..."
-                                                  : "Creating...")
-                                            : (editingQuizCode != null
-                                                  ? "Save Changes"
-                                                  : "Create Quiz Event"),
-
-                                        style: const TextStyle(
-                                          fontSize: 12,
-
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryPurple,
-
-                                        foregroundColor: Colors.white,
-
-                                        disabledBackgroundColor: primaryPurple
-                                            .withAlpha(130),
-
-                                        elevation: 0,
-
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            11,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-
-                                      children: [
-                                        Text(
-                                          (editingQuizCode != null
-                                              ? "Ready to update?"
-                                              : "Ready to create?"),
-
-                                          style: TextStyle(
-                                            color: textDark,
-
+                                          style: const TextStyle(
                                             fontSize: 12,
 
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
 
-                                        SizedBox(height: 3),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: primaryPurple,
 
-                                        Text(
-                                          (editingQuizCode != null
-                                              ? "Review the changes before saving this quiz event."
-                                              : "Review the information before creating your quiz event."),
+                                          foregroundColor: Colors.white,
 
-                                          style: TextStyle(
-                                            color: textMuted,
+                                          disabledBackgroundColor: primaryPurple
+                                              .withAlpha(130),
 
-                                            fontSize: 10,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                          elevation: 0,
 
-                                  const SizedBox(width: 15),
-
-                                  SizedBox(
-                                    height: 46,
-
-                                    width: 180,
-
-                                    child: ElevatedButton.icon(
-                                      onPressed: isLoading ? null : createQuiz,
-
-                                      icon: isLoading
-                                          ? const SizedBox(
-                                              width: 17,
-
-                                              height: 17,
-
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
-
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.add_circle_outline_rounded,
-
-                                              size: 18,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              11,
                                             ),
-
-                                      label: Text(
-                                        isLoading
-                                            ? (editingQuizCode != null
-                                                  ? "Saving..."
-                                                  : "Creating...")
-                                            : (editingQuizCode != null
-                                                  ? "Save Changes"
-                                                  : "Create Quiz Event"),
-
-                                        style: const TextStyle(
-                                          fontSize: 12,
-
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryPurple,
-
-                                        foregroundColor: Colors.white,
-
-                                        disabledBackgroundColor: primaryPurple
-                                            .withAlpha(130),
-
-                                        elevation: 0,
-
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            11,
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                      ),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
 
-                      const SizedBox(height: 24),
+                                        children: [
+                                          Text(
+                                            (editingQuizCode != null
+                                                ? "Ready to update?"
+                                                : "Ready to create?"),
 
-                      // =================================================
+                                            style: TextStyle(
+                                              color: textDark,
 
-                      // FOOTER
+                                              fontSize: 12,
 
-                      // =================================================
-                      const Center(
-                        child: Text(
-                          "TechNoWiz Quiz System • Admin Panel",
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
 
-                          style: TextStyle(
-                            color: textMuted,
+                                          SizedBox(height: 3),
 
-                            fontSize: 9,
+                                          Text(
+                                            (editingQuizCode != null
+                                                ? "Review the changes before saving this quiz event."
+                                                : "Review the information before creating your quiz event."),
 
-                            fontWeight: FontWeight.w500,
+                                            style: TextStyle(
+                                              color: textMuted,
+
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 15),
+
+                                    SizedBox(
+                                      height: 46,
+
+                                      width: 180,
+
+                                      child: ElevatedButton.icon(
+                                        onPressed: isLoading
+                                            ? null
+                                            : createQuiz,
+
+                                        icon: isLoading
+                                            ? const SizedBox(
+                                                width: 17,
+
+                                                height: 17,
+
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: Colors.white,
+
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : const Icon(
+                                                Icons
+                                                    .add_circle_outline_rounded,
+
+                                                size: 18,
+                                              ),
+
+                                        label: Text(
+                                          isLoading
+                                              ? (editingQuizCode != null
+                                                    ? "Saving..."
+                                                    : "Creating...")
+                                              : (editingQuizCode != null
+                                                    ? "Save Changes"
+                                                    : "Create Quiz Event"),
+
+                                          style: const TextStyle(
+                                            fontSize: 12,
+
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: primaryPurple,
+
+                                          foregroundColor: Colors.white,
+
+                                          disabledBackgroundColor: primaryPurple
+                                              .withAlpha(130),
+
+                                          elevation: 0,
+
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              11,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // =================================================
+
+                        // FOOTER
+
+                        // =================================================
+                        const Center(
+                          child: Text(
+                            "TechNoWiz Quiz System • Admin Panel",
+
+                            style: TextStyle(
+                              color: textMuted,
+
+                              fontSize: 9,
+
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   // =========================================================

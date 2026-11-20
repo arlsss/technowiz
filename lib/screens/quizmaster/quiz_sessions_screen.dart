@@ -3512,7 +3512,386 @@ class ParticipantReadinessPage extends StatelessWidget {
 
 
 
-  Widget _eventInformation(Map<String, dynamic> data) {
+  Widget _registeredParticipantsSection(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> participants,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.groups_rounded,
+                color: _primaryBlue,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'REGISTERED PARTICIPANTS',
+                    style: TextStyle(
+                      color: _darkBlue,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Contestants and teams who joined this quiz session',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: participants.isEmpty
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFFE0F2FE),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: participants.isEmpty
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFFBAE6FD),
+                ),
+              ),
+              child: Text(
+                '${participants.length} Joined',
+                style: TextStyle(
+                  color: participants.isEmpty
+                      ? Colors.grey.shade600
+                      : const Color(0xFF0369A1),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (participants.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.person_search_rounded,
+                  size: 22,
+                  color: Colors.blue.shade300,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'No Contestants Joined Yet',
+                        style: TextStyle(
+                          color: _darkBlue,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'Contestants will appear here in real-time when they enter Quiz Code: $quizCode',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            constraints: const BoxConstraints(maxHeight: 250),
+            child: Scrollbar(
+              thumbVisibility: participants.length > 3,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: participants.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final doc = participants[index];
+                  final data = doc.data();
+
+                  final rawTeam = (data['teamName'] ?? '').toString().trim();
+                  final contestantType = (data['contestantType'] ?? '')
+                      .toString()
+                      .trim()
+                      .toLowerCase();
+                  final isTeam =
+                      contestantType == 'team' || rawTeam.isNotEmpty;
+
+                  final rawMembers = data['teamMembers'] ?? data['members'];
+                  final List<String> members = [];
+                  if (rawMembers is List) {
+                    for (final m in rawMembers) {
+                      final s =
+                          m is Map ? (m['name'] ?? '').toString() : m.toString();
+                      if (s.trim().isNotEmpty && !members.contains(s.trim())) {
+                        members.add(s.trim());
+                      }
+                    }
+                  }
+
+                  final personalName = (data['displayName'] ??
+                          data['name'] ??
+                          data['email'] ??
+                          doc.id)
+                      .toString()
+                      .trim();
+
+                  final displayName = isTeam
+                      ? (rawTeam.isNotEmpty ? rawTeam : personalName)
+                      : personalName;
+
+                  final status =
+                      (data['status'] ?? '').toString().trim().toLowerCase();
+                  final bool isPending = status == 'pending';
+                  final bool isReady = data['ready'] == true;
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isPending
+                            ? const Color(0xFFFED7AA)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: isTeam
+                                ? const Color(0xFFEFF6FF)
+                                : const Color(0xFFF3E8FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isTeam
+                                ? Icons.groups_rounded
+                                : Icons.person_rounded,
+                            color: isTeam
+                                ? _primaryBlue
+                                : const Color(0xFF7C3AED),
+                            size: 19,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: _darkBlue,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isTeam) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDBEAFE),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'TEAM',
+                                        style: TextStyle(
+                                          color: Color(0xFF1E40AF),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              if (isTeam && members.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Members: ${members.join(', ')}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ] else if (data['email'] != null &&
+                                  data['email']
+                                      .toString()
+                                      .trim()
+                                      .isNotEmpty &&
+                                  data['email'] != displayName) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  data['email'].toString().trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.black45,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (isPending) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(6),
+                              border:
+                                  Border.all(color: const Color(0xFFFED7AA)),
+                            ),
+                            child: const Text(
+                              'PENDING',
+                              style: TextStyle(
+                                color: Color(0xFFC2410C),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () async {
+                              await doc.reference
+                                  .update({'status': 'approved'});
+                            },
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'APPROVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isReady
+                                  ? const Color(0xFFEFF6FF)
+                                  : const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isReady
+                                    ? const Color(0xFFBFDBFE)
+                                    : const Color(0xFFA7F3D0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isReady
+                                      ? Icons.check_circle_rounded
+                                      : Icons.verified_rounded,
+                                  size: 11,
+                                  color: isReady
+                                      ? const Color(0xFF2563EB)
+                                      : const Color(0xFF059669),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isReady ? 'READY' : 'JOINED',
+                                  style: TextStyle(
+                                    color: isReady
+                                        ? const Color(0xFF2563EB)
+                                        : const Color(0xFF059669),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _eventInformation(
+    Map<String, dynamic> data,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> participants,
+  ) {
     final guidelines = <Map<String, dynamic>>[
       {
         'icon': Icons.checklist_rounded,
@@ -3535,7 +3914,7 @@ class ParticipantReadinessPage extends StatelessWidget {
         'title': 'LEVEL SETTINGS',
         'bullets': <String>[
           'Review each level’s timer and points.',
-          'Check the difficulty and elimination count.',
+          'Check the difficulty and participants to proceed.',
         ],
       },
       {
@@ -3567,6 +3946,13 @@ class ParticipantReadinessPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ==========================================
+          // REGISTERED PARTICIPANTS (ABOVE BEFORE STARTING)
+          // ==========================================
+          _registeredParticipantsSection(participants),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0xFFE2E8F0), height: 1),
+          const SizedBox(height: 16),
           ...guidelines.map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 15),
@@ -4015,16 +4401,34 @@ class ParticipantReadinessPage extends StatelessWidget {
                     .collection('quiz_sessions')
                     .doc(quizCode)
                     .collection('join_requests')
-                    .where('status', isEqualTo: 'approved')
                     .snapshots(),
                 builder: (context, snapshot) {
-                  final participants = snapshot.data?.docs ?? [];
-                  final readyCount = participants
+                  final allParticipants = snapshot.data?.docs ?? [];
+                  // Only approved/joined participants count toward ready check
+                  final approvedParticipants = allParticipants.where((doc) {
+                    final status = (doc.data()['status'] ?? '')
+                        .toString()
+                        .trim()
+                        .toLowerCase();
+                    return status == 'approved' || status == 'joined';
+                  }).toList();
+                  final readyCount = approvedParticipants
                       .where((doc) => doc.data()['ready'] == true)
                       .length;
                   final allReady =
-                      participants.isNotEmpty &&
-                      readyCount == participants.length;
+                      approvedParticipants.isNotEmpty &&
+                      readyCount == approvedParticipants.length;
+                  // Display participants: exclude left/rejected/declined
+                  final displayParticipants = allParticipants.where((doc) {
+                    final status = (doc.data()['status'] ?? '')
+                        .toString()
+                        .trim()
+                        .toLowerCase();
+                    return status != 'left' &&
+                        status != 'rejected' &&
+                        status != 'declined' &&
+                        doc.data()['leftQuiz'] != true;
+                  }).toList();
                   return Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
@@ -4036,7 +4440,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                             Expanded(
                               child: ListView(
                                 children: [
-                                  _eventInformation(quizData),
+                                  _eventInformation(quizData, displayParticipants),
                                   const SizedBox(height: 14),
                                 ],
                               ),
