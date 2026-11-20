@@ -574,6 +574,15 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                               configuredLevels: configuredLevels,
                             );
 
+                            final rankingsDeclared = _canDeclareRankings(
+                              quizData: quizData,
+                              scores: scores,
+                              entries: entries,
+                              isViewingHistory: isViewingHistoryQuiz,
+                            );
+
+                            final rankTiers = _buildRankTiers(entries);
+
                             return SingleChildScrollView(
                               padding: const EdgeInsets.fromLTRB(
                                 16,
@@ -645,6 +654,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                                     allSessions: isViewingHistoryQuiz
                                         ? [chosenDoc!]
                                         : activeSessions,
+                                    rankingsDeclared: rankingsDeclared,
+                                    topTier: rankTiers.isNotEmpty
+                                        ? rankTiers.first
+                                        : null,
                                   ),
                                   const SizedBox(height: 16),
                                   _levelSelector(quizData: quizData),
@@ -658,7 +671,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                                       Icons.emoji_events_rounded,
                                     ),
                                     const SizedBox(height: 10),
-                                    _podium(entries),
+                                    _podium(
+                                      tiers: rankTiers,
+                                      rankingsDeclared: rankingsDeclared,
+                                    ),
                                     const SizedBox(height: 20),
                                     _sectionHeader(
                                       'Contestant Standings',
@@ -666,7 +682,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                                       Icons.format_list_numbered_rounded,
                                     ),
                                     const SizedBox(height: 10),
-                                    _rankingList(entries),
+                                    _rankingList(
+                                      entries: entries,
+                                      tiers: rankTiers,
+                                      rankingsDeclared: rankingsDeclared,
+                                    ),
                                   ],
                                 ],
                               ),
@@ -693,6 +713,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     required String status,
     required List<_LeaderboardEntry> entries,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> allSessions,
+    bool rankingsDeclared = true,
+    _RankTier? topTier,
   }) {
     final isLive =
         status == 'live' ||
@@ -701,11 +723,27 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         status == 'in progress' ||
         status == 'inprogress';
 
-    final topLeader = entries.isNotEmpty ? entries.first : null;
-    final topLeaderName = topLeader != null
-        ? topLeader.name
-        : 'Waiting for contestants...';
-    final topScore = topLeader != null ? '${topLeader.score} pts' : '0 pts';
+    final String topLeaderName;
+    final String topScore;
+
+    if (!rankingsDeclared) {
+      topLeaderName = 'Pending Question 2...';
+      topScore = '-- pts';
+    } else if (topTier != null && topTier.entries.isNotEmpty) {
+      if (topTier.entries.length == 1) {
+        topLeaderName = topTier.entries.first.name;
+      } else {
+        topLeaderName =
+            '${topTier.entries.first.name} +${topTier.entries.length - 1} tied';
+      }
+      topScore = '${topTier.score} pts';
+    } else {
+      final topLeader = entries.isNotEmpty ? entries.first : null;
+      topLeaderName = topLeader != null
+          ? topLeader.name
+          : 'Waiting for contestants...';
+      topScore = topLeader != null ? '${topLeader.score} pts' : '0 pts';
+    }
 
     return Container(
       width: double.infinity,
@@ -1584,10 +1622,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   // PODIUM (TOP 3 PERFORMERS)
   // ================================================================
 
-  Widget _podium(List<_LeaderboardEntry> entries) {
-    final first = entries.isNotEmpty ? entries[0] : null;
-    final second = entries.length > 1 ? entries[1] : null;
-    final third = entries.length > 2 ? entries[2] : null;
+  Widget _podium({
+    required List<_RankTier> tiers,
+    required bool rankingsDeclared,
+  }) {
+    final tier1 = tiers.isNotEmpty ? tiers[0] : null;
+    final tier2 = tiers.length > 1 ? tiers[1] : null;
+    final tier3 = tiers.length > 2 ? tiers[2] : null;
 
     return Container(
       width: double.infinity,
@@ -1630,13 +1671,17 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0EBFF),
+                  color: rankingsDeclared
+                      ? const Color(0xFFF0EBFF)
+                      : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Text(
-                  'TOP 3',
+                child: Text(
+                  rankingsDeclared ? 'TOP 3' : 'PENDING Q2',
                   style: TextStyle(
-                    color: AdminThemeColors.primary,
+                    color: rankingsDeclared
+                        ? AdminThemeColors.primary
+                        : const Color(0xFFB45309),
                     fontSize: 8,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.4,
@@ -1645,18 +1690,69 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          if (!rankingsDeclared) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: Color(0xFFD97706),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Rankings will be declared after Question 2 concludes once contestants earn points.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Expanded(
-                child: _podiumPerson(entry: second, rank: 2, height: 105),
+                child: _podiumTier(
+                  entries: tier2?.entries ?? const [],
+                  score: tier2?.score ?? 0,
+                  rank: 2,
+                  height: 105,
+                  rankingsDeclared: rankingsDeclared,
+                ),
               ),
               Expanded(
-                child: _podiumPerson(entry: first, rank: 1, height: 135),
+                child: _podiumTier(
+                  entries: tier1?.entries ?? const [],
+                  score: tier1?.score ?? 0,
+                  rank: 1,
+                  height: 135,
+                  rankingsDeclared: rankingsDeclared,
+                ),
               ),
-              Expanded(child: _podiumPerson(entry: third, rank: 3, height: 90)),
+              Expanded(
+                child: _podiumTier(
+                  entries: tier3?.entries ?? const [],
+                  score: tier3?.score ?? 0,
+                  rank: 3,
+                  height: 90,
+                  rankingsDeclared: rankingsDeclared,
+                ),
+              ),
             ],
           ),
         ],
@@ -1664,14 +1760,19 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     );
   }
 
-  Widget _podiumPerson({
-    required _LeaderboardEntry? entry,
+  Widget _podiumTier({
+    required List<_LeaderboardEntry> entries,
+    required int score,
     required int rank,
     required double height,
+    required bool rankingsDeclared,
   }) {
     final bool isFirst = rank == 1;
+    final bool hasEntries = rankingsDeclared && entries.isNotEmpty;
+    final bool isTied = rankingsDeclared && entries.length > 1;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Rank Circle
         Container(
@@ -1698,6 +1799,18 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   : const Color(0xFFD97706),
               width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: (rank == 1
+                        ? const Color(0xFFF59E0B)
+                        : rank == 2
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFFD97706))
+                    .withValues(alpha: 0.25),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Center(
             child: Text(
@@ -1715,51 +1828,96 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
           ),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
-        // Name
-        Text(
-          entry?.name ?? '---',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: AdminThemeColors.textPrimary,
-          ),
-        ),
-
-        if (entry?.eliminated == true) ...[
-          const SizedBox(height: 2),
+        // Tied indicator badge if multiple contestants share this rank
+        if (isTied) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFFDE68A),
+                width: 0.8,
+              ),
             ),
-            child: const Text(
-              'ELIMINATED',
-              style: TextStyle(
+            child: Text(
+              'TIED (${entries.length})',
+              style: const TextStyle(
                 fontSize: 7.5,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFFDC2626),
+                color: Color(0xFFB45309),
                 letterSpacing: 0.3,
               ),
             ),
           ),
+          const SizedBox(height: 2),
         ],
+
+        // Contestant Name(s) / Placeholder
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: isTied ? 36 : 28,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!rankingsDeclared || !hasEntries)
+                const Text(
+                  '---',
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AdminThemeColors.textMuted,
+                  ),
+                )
+              else ...[
+                for (int i = 0; i < entries.length && i < 2; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 1),
+                    child: Text(
+                      entries[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AdminThemeColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                if (entries.length > 2)
+                  Text(
+                    '+${entries.length - 2} more',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: AdminThemeColors.primary,
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
 
         const SizedBox(height: 3),
 
         // Score
         Text(
-          '${entry?.score ?? 0} pts',
-          style: const TextStyle(
+          rankingsDeclared
+              ? (hasEntries ? '$score pts' : '0 pts')
+              : '-- pts',
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
-            color: AdminThemeColors.primary,
+            color: rankingsDeclared && hasEntries
+                ? AdminThemeColors.primary
+                : AdminThemeColors.textMuted,
           ),
         ),
 
@@ -1843,17 +2001,78 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   // RANKING LIST
   // ================================================================
 
-  Widget _rankingList(List<_LeaderboardEntry> entries) {
+  Widget _rankingList({
+    required List<_LeaderboardEntry> entries,
+    required List<_RankTier> tiers,
+    required bool rankingsDeclared,
+  }) {
     if (entries.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    // Rank 4 to pataas, plus makita pud ang na-eliminate nga contestant
+    if (!rankingsDeclared) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: AdminThemeColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0617245A),
+              blurRadius: 9,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.hourglass_top_rounded,
+                size: 28,
+                color: AdminThemeColors.textMuted,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Rankings will be declared after Question 2 concludes.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AdminThemeColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Map each entry's ID to its rank
+    final Map<String, int> rankMap = {};
+    for (final tier in tiers) {
+      for (final entry in tier.entries) {
+        rankMap[entry.id] = tier.rank;
+      }
+    }
+
+    // Top 3 tier UIDs are already displayed in the podium above
+    final Set<String> top3Uids = {};
+    for (int i = 0; i < tiers.length && i < 3; i++) {
+      for (final e in tiers[i].entries) {
+        top3Uids.add(e.id);
+      }
+    }
+
+    // Contestants to show in standings list:
+    // Rank 4+ or eliminated contestants
     final standingsEntries = <MapEntry<int, _LeaderboardEntry>>[];
-    for (int i = 0; i < entries.length; i++) {
-      final rank = i + 1;
-      final entry = entries[i];
-      if (rank >= 4 || entry.eliminated) {
+    for (final entry in entries) {
+      final rank = rankMap[entry.id] ?? (tiers.length + 1);
+      if (!top3Uids.contains(entry.id) || entry.eliminated) {
         standingsEntries.add(MapEntry(rank, entry));
       }
     }
@@ -2392,6 +2611,88 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   }
 
   // ================================================================
+  // RANKING VALIDATION & TIER GROUPING
+  // ================================================================
+
+  bool _canDeclareRankings({
+    required Map<String, dynamic> quizData,
+    required List<QueryDocumentSnapshot> scores,
+    required List<_LeaderboardEntry> entries,
+    required bool isViewingHistory,
+  }) {
+    if (entries.isEmpty) return false;
+
+    // Must have at least one contestant who has scored points > 0
+    final bool hasScore = entries.any((e) => e.score > 0);
+    if (!hasScore) return false;
+
+    // Past quizzes from history with scores can show rankings
+    if (isViewingHistory) return true;
+
+    final status = (quizData['status'] ?? '').toString().toLowerCase().trim();
+    final eventStatus =
+        (quizData['eventStatus'] ?? '').toString().toLowerCase().trim();
+
+    // If quiz is finished/completed, rankings are declared
+    if (status == 'finished' || status == 'completed' || status == 'ended') {
+      return true;
+    }
+
+    // Rankings are officially declared only after Question 2 concludes
+    final int currentLevel = _toInt(quizData['currentLevel'] ?? 1);
+    final int currentQuestion = _toInt(quizData['currentQuestion'] ?? 0);
+
+    if (currentLevel > 1) return true;
+    if (currentQuestion >= 2) return true;
+
+    // When on Question 2 (index 1), check if Question 2 has concluded
+    if (currentQuestion == 1 &&
+        (status == 'contest_review' ||
+            status == 'level_pause' ||
+            status == 'review' ||
+            eventStatus == 'contest_review' ||
+            eventStatus == 'level_pause')) {
+      return true;
+    }
+
+    // Check if any contestant score document indicates completion of Question 2 or higher
+    for (final doc in scores) {
+      final sData = doc.data() as Map<String, dynamic>;
+      final lq = _toInt(sData['lastQuestion']);
+      if (lq >= 2) return true;
+    }
+
+    return false;
+  }
+
+  List<_RankTier> _buildRankTiers(List<_LeaderboardEntry> entries) {
+    // Only active contestants with score > 0 qualify for rank tiers
+    final activeEntries =
+        entries.where((e) => !e.eliminated && e.score > 0).toList();
+    if (activeEntries.isEmpty) return [];
+
+    final Map<int, List<_LeaderboardEntry>> scoreGroups = {};
+    for (final entry in activeEntries) {
+      scoreGroups.putIfAbsent(entry.score, () => []).add(entry);
+    }
+
+    final sortedScores =
+        scoreGroups.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final List<_RankTier> tiers = [];
+    int rank = 1;
+    for (final score in sortedScores) {
+      tiers.add(_RankTier(
+        rank: rank,
+        score: score,
+        entries: scoreGroups[score]!,
+      ));
+      rank++;
+    }
+    return tiers;
+  }
+
+  // ================================================================
   // LEADERBOARD COMPUTATION ENGINE WITH SPEED TIEBREAKER
   // ================================================================
 
@@ -2613,6 +2914,18 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
 // ================================================================
 // LEADERBOARD MODEL
 // ================================================================
+
+class _RankTier {
+  final int rank;
+  final int score;
+  final List<_LeaderboardEntry> entries;
+
+  const _RankTier({
+    required this.rank,
+    required this.score,
+    required this.entries,
+  });
+}
 
 class _LeaderboardEntry {
   final String id;
