@@ -375,60 +375,6 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   // SELECT A PREVIOUS QUIZ AS A TEMPLATE
   // =========================================================
 
-  Future<bool> _confirmAndDeleteQuiz(
-    QueryDocumentSnapshot<Map<String, dynamic>> quiz,
-  ) async {
-    final title = (quiz.data()['title'] ?? 'Untitled Quiz').toString();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Quiz Event?'),
-        content: Text(
-          'Are you sure you want to delete "$title"? '
-          'Its assigned questions will also be deleted. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext, rootNavigator: true).pop(false),
-            child: const Text('CANCEL'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext, rootNavigator: true).pop(true),
-            style: TextButton.styleFrom(foregroundColor: red),
-            child: const Text('DELETE'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return false;
-
-    try {
-      final questions = await quiz.reference.collection('questions').get();
-      final firestore = FirebaseFirestore.instance;
-      for (var start = 0; start < questions.docs.length; start += 450) {
-        final batch = firestore.batch();
-        final end = (start + 450 < questions.docs.length)
-            ? start + 450
-            : questions.docs.length;
-        for (var i = start; i < end; i++) {
-          batch.delete(questions.docs[i].reference);
-        }
-        await batch.commit();
-      }
-      await quiz.reference.delete();
-      if (mounted) {
-        _showTopNotification('Deleted "$title".');
-      }
-      return true;
-    } catch (e) {
-      if (mounted) showError('Could not delete quiz event: $e');
-      return false;
-    }
-  }
-
   Future<void> chooseExistingQuiz({required bool editMode}) async {
     try {
       // Persist the dialog state before loading Firestore so a browser refresh
