@@ -168,8 +168,6 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
 
   String get _appBarTitle => isFinal ? 'Winners Result' : 'Level $level Result';
 
-  String get _listTitle => isFinal ? 'FINAL RANKING' : 'RANKING';
-
   String get _footerText => isFinal
       ? 'Quiz Master • Final Results'
       : 'Quiz Master • Level $level Result';
@@ -826,7 +824,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
           appBar: QuizMasterAppBar(
             title: effectiveIsFinal ? 'Winners Result' : _appBarTitle,
             subtitle: 'Code: $quizCode',
-            badgeText: 'TECHNOWIZ • RANKING COMMAND',
+            badgeText: 'TECHNOWIZ • RESULT COMMAND',
             badgeIcon: Icons.emoji_events_rounded,
             showBackButton: false,
           ),
@@ -1093,41 +1091,6 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                 ),
                               ],
                             ] else ...[
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: lightBlue,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.leaderboard_rounded,
-                                      color: primaryBlue,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _listTitle,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: darkBlue,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '${rankings.length}',
-                                    style: const TextStyle(
-                                      color: primaryBlue,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
                               if (!effectiveIsFinal &&
                                   configuredProceedCount != null &&
                                   configuredProceedCount > 0) ...[
