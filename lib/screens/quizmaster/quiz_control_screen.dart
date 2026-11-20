@@ -4762,8 +4762,72 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               }
             }
 
+            // Check if Question 2 has submissions/answers or if past Question 1:
+            // Rank numbers only appear after Question 2 submissions and score updates.
+            bool hasQuestion2Submission = false;
+            for (final doc in scoreDocs) {
+              final sData = doc.data();
+              final lq = _asInt(sData['lastQuestion']) ?? 0;
+              if (lq >= 2) {
+                hasQuestion2Submission = true;
+                break;
+              }
+            }
+
+            final bool hasAnyScore = rows.any((r) => (r['score'] as int) > 0);
+            bool showRankNumbers = false;
+
+            if (hasAnyScore) {
+              if (_currentLevel > 1 || _currentQuestion >= 2) {
+                showRankNumbers = true;
+              } else if (hasQuestion2Submission) {
+                showRankNumbers = true;
+              } else if (_currentQuestion >= 1 &&
+                  (_status == 'contest_review' ||
+                      _status == 'level_pause' ||
+                      _status == 'review' ||
+                      _isFinished)) {
+                showRankNumbers = true;
+              }
+            }
+
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!showRankNumbers)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 15,
+                          color: Color(0xFF64748B),
+                        ),
+                        SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            'Rankings will be declared after Question 2 submissions.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 for (int i = 0; i < rows.length; i++)
                   ListTile(
                     dense: true,
@@ -4773,13 +4837,17 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                     ),
                     leading: CircleAvatar(
                       radius: 15,
-                      backgroundColor: Colors.blue.shade50,
+                      backgroundColor: showRankNumbers
+                          ? Colors.blue.shade50
+                          : const Color(0xFFF1F5F9),
                       child: Text(
-                        '${rows[i]['rank']}',
-                        style: const TextStyle(
-                          color: primaryBlue,
+                        showRankNumbers ? '${rows[i]['rank']}' : '-',
+                        style: TextStyle(
+                          color: showRankNumbers
+                              ? primaryBlue
+                              : const Color(0xFF94A3B8),
                           fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                          fontSize: showRankNumbers ? 12 : 14,
                         ),
                       ),
                     ),
