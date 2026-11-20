@@ -4318,8 +4318,8 @@ class AdminQuizHistoryScreen extends StatefulWidget {
             ],
           ),
           content: Text(
-            'Sigurado ka ba nga gusto nimo i-delete ang session para sa "$quizTitle"?\n\n'
-            'Mawala ang tanang scores, question history, ug answers niini gikan sa database. Dili na kini mabalik.',
+            'Are you sure you want to delete the session for "$quizTitle"?\n\n'
+            'This will permanently remove all scores, question history, and answers from the database. This action cannot be undone.',
             style: const TextStyle(
               color: AdminThemeColors.textPrimary,
               fontSize: 13,
@@ -4425,7 +4425,7 @@ class AdminQuizHistoryScreen extends StatefulWidget {
             ],
           ),
           content: Text(
-            'Sigurado ka ba nga gusto nimo i-delete ang tanang ${sessions.length} completed quiz session(s) sa history?\n\nDili na kini mabalik.',
+            'Are you sure you want to delete all ${sessions.length} completed quiz session(s) from history?\n\nThis action cannot be undone.',
             style: const TextStyle(
               color: AdminThemeColors.textPrimary,
               fontSize: 13,
