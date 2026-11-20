@@ -411,7 +411,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
               title: Text(
                 editMode
                     ? 'Select Quiz Event to Edit'
-                    : 'Use Previous Quiz as Template',
+                    : 'Create from Previous Event',
               ),
               content: SizedBox(
                 width: 480,
@@ -429,7 +429,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                             leading: Icon(
                               editMode
                                   ? Icons.edit_outlined
-                                  : Icons.copy_outlined,
+                                  : Icons.copy_rounded,
                               color: primaryPurple,
                             ),
                             title: Text(
@@ -438,8 +438,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              'Code: ${(data['quizCode'] ?? doc.id).toString()} • '
-                              'Status: ${(data['status'] ?? 'unknown').toString()}',
+                              editMode
+                                  ? 'Code: ${(data['quizCode'] ?? doc.id).toString()} • Status: ${(data['status'] ?? 'unknown').toString()}'
+                                  : 'Code: ${(data['quizCode'] ?? doc.id).toString()} • Tap to use questions & settings',
                             ),
                             onTap: () => Navigator.of(
                               dialogContext,
@@ -525,6 +526,13 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         duplicateSourceQuizCode = doc.id;
         duplicateSourceTitle = (data['title'] ?? doc.id).toString();
       });
+
+      if (mounted) {
+        AdminNotification.show(
+          context,
+          'Template loaded from "${data['title'] ?? doc.id}". Quiz details are left blank for your new event.',
+        );
+      }
     }
   }
 
@@ -1544,14 +1552,40 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         ),
 
         actions: [
+          if (duplicateSourceQuizCode != null)
+            TextButton.icon(
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      setState(() {
+                        duplicateSourceQuizCode = null;
+                        duplicateSourceTitle = null;
+                      });
+                      if (mounted) {
+                        AdminNotification.show(
+                          context,
+                          'Template removed. You are now creating a standard blank event.',
+                        );
+                      }
+                    },
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text('Cancel Template'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                textStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           TextButton.icon(
             onPressed: isLoading
                 ? null
-                : () => chooseExistingQuiz(editMode: true),
+                : () => chooseExistingQuiz(editMode: false),
             icon: Icon(
               duplicateSourceQuizCode != null
                   ? Icons.swap_horiz_rounded
-                  : Icons.edit_note_rounded,
+                  : Icons.copy_rounded,
               size: 17,
             ),
             label: Text(
