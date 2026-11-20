@@ -4513,20 +4513,6 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
     }
   }
 
-  Future<bool> _deleteQuizSession(
-    BuildContext context,
-    String docId,
-    String quizTitle, [
-    String quizCode = '',
-  ]) {
-    return AdminQuizHistoryScreen._deleteQuizSession(
-      context,
-      docId,
-      quizTitle,
-      quizCode: quizCode,
-    );
-  }
-
   DateTime _dateOf(Map<String, dynamic> data) {
     final raw =
         data['createdAt'] ??
@@ -4998,30 +4984,6 @@ class _AdminQuizHistoryScreenState extends State<AdminQuizHistoryScreen> {
                                       ),
                                     ),
                                   ),
-                                  if (!_selectionMode) ...[
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      tooltip: 'Delete Quiz Session',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        color: Color(0xFFEF4444),
-                                        size: 20,
-                                      ),
-                                      onPressed: () {
-                                        _deleteQuizSession(
-                                          context,
-                                          doc.id,
-                                          title,
-                                          code,
-                                        );
-                                      },
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),
