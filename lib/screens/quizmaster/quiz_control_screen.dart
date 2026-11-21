@@ -65,7 +65,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   int? _pendingLevel;
 
   bool _contestReviewActive = false;
-  bool _contestReviewBusy = false;
+  final Set<String> _busyContestRequestIds = {};
+  bool get _contestReviewBusy => _busyContestRequestIds.isNotEmpty;
   int? _contestReviewQuestionIndex;
 
   String _status = 'waiting';
@@ -1423,7 +1424,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     required DocumentSnapshot<Map<String, dynamic>> request,
     required bool approve,
   }) async {
-    if (_contestReviewBusy) {
+    final requestId = request.id;
+    if (_busyContestRequestIds.contains(requestId)) {
       return;
     }
 
@@ -1447,7 +1449,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             ],
           ),
           content: const Text(
-            'Are you really want to approved this contest request?\n\n'
+            'Are you sure you want to approve this contest request?\n\n'
             'The contestant\'s answer will be accepted and points will be awarded.',
           ),
           actions: [
@@ -1549,7 +1551,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     }
 
     setState(() {
-      _contestReviewBusy = true;
+      _busyContestRequestIds.add(requestId);
     });
 
     try {
@@ -1616,7 +1618,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _contestReviewBusy = false;
+          _busyContestRequestIds.remove(requestId);
         });
       }
     }
@@ -1838,8 +1840,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
                       final isPending = status == 'pending';
                       final isApproved = status == 'approved';
+                      final requestId = doc.id;
+                      final bool isThisRequestBusy =
+                          _busyContestRequestIds.contains(requestId);
 
                       return Container(
+                        key: ValueKey('review_contest_$requestId'),
                         width: double.infinity,
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(14),
@@ -2019,7 +2025,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 children: [
                                   Expanded(
                                     child: OutlinedButton.icon(
-                                      onPressed: _contestReviewBusy
+                                      onPressed: isThisRequestBusy
                                           ? null
                                           : () => _reviewContestRequest(
                                               request: doc,
@@ -2032,6 +2038,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                         side: const BorderSide(
                                           color: Colors.red,
                                         ),
+                                        disabledForegroundColor:
+                                            Colors.red.withValues(alpha: 0.5),
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 11,
                                         ),
@@ -2041,17 +2049,31 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: ElevatedButton.icon(
-                                      onPressed: _contestReviewBusy
+                                      onPressed: isThisRequestBusy
                                           ? null
                                           : () => _reviewContestRequest(
                                               request: doc,
                                               approve: true,
                                             ),
-                                      icon: const Icon(Icons.check_rounded),
-                                      label: const Text('APPROVE'),
+                                      icon: isThisRequestBusy
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(Icons.check_rounded),
+                                      label: Text(
+                                        isThisRequestBusy ? 'APPROVING...' : 'APPROVE',
+                                      ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green,
                                         foregroundColor: Colors.white,
+                                        disabledBackgroundColor:
+                                            Colors.green.withValues(alpha: 0.7),
+                                        disabledForegroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 11,
                                         ),
@@ -3499,8 +3521,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         data['expectedAnswer']?.toString().trim() ?? '';
                     final explanation =
                         data['explanation']?.toString().trim() ?? '';
+                    final requestId = doc.id;
+                    final bool isThisRequestBusy =
+                        _busyContestRequestIds.contains(requestId);
 
                     return Container(
+                      key: ValueKey('live_contest_$requestId'),
                       width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(14),
@@ -3640,7 +3666,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: _contestReviewBusy
+                                  onPressed: isThisRequestBusy
                                       ? null
                                       : () => _reviewContestRequest(
                                           request: doc,
@@ -3651,6 +3677,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.red,
                                     side: const BorderSide(color: Colors.red),
+                                    disabledForegroundColor:
+                                        Colors.red.withValues(alpha: 0.5),
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 11,
                                     ),
@@ -3660,17 +3688,31 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: _contestReviewBusy
+                                  onPressed: isThisRequestBusy
                                       ? null
                                       : () => _reviewContestRequest(
                                           request: doc,
                                           approve: true,
                                         ),
-                                  icon: const Icon(Icons.check_rounded),
-                                  label: const Text('APPROVE'),
+                                  icon: isThisRequestBusy
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.check_rounded),
+                                  label: Text(
+                                    isThisRequestBusy ? 'APPROVING...' : 'APPROVE',
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.green,
                                     foregroundColor: Colors.white,
+                                    disabledBackgroundColor:
+                                        Colors.green.withValues(alpha: 0.7),
+                                    disabledForegroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 11,
                                     ),
