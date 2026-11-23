@@ -143,7 +143,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     _participantsStream = _sessionRef.collection('participants').snapshots();
 
     _sessionDeletionSubscription = _sessionStream.listen((snapshot) {
-      if (!snapshot.exists && mounted && !_isExitingDueToDeletion) {
+      final isDeleted = !snapshot.exists ||
+          snapshot.data()?['deleted'] == true ||
+          snapshot.data()?['isDeleted'] == true ||
+          snapshot.data()?['status'] == 'deleted';
+      if (isDeleted && mounted && !_isExitingDueToDeletion) {
         _handleQuizDeletedByAdmin();
       }
     });

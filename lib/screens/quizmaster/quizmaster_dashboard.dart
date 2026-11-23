@@ -1901,6 +1901,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
     QueryDocumentSnapshot? targetDoc;
     for (final doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
+      if (data['deleted'] == true ||
+          data['isDeleted'] == true ||
+          data['status'] == 'deleted') {
+        continue;
+      }
       final isPub = data['published'] == true ||
           data['isPublished'] == true ||
           data['is_published'] == true ||
@@ -1916,6 +1921,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           .toLowerCase()
           .replaceAll('-', '_')
           .replaceAll(' ', '_');
+      if (st == 'deleted') continue;
       if (activeStatuses.contains(st)) {
         targetDoc = doc;
         break;
@@ -2231,6 +2237,25 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
     final recentDocs = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
 
+      // Filter out deleted quizzes
+      if (data['deleted'] == true ||
+          data['isDeleted'] == true ||
+          data['status'] == 'deleted') {
+        return false;
+      }
+
+      // Filter out unpublished quizzes (e.g. deleted or draft/unpublished by admin)
+      final isPublished = data['published'] == true ||
+          data['isPublished'] == true ||
+          data['is_published'] == true ||
+          data['published'] == 1 ||
+          data['isPublished'] == 1 ||
+          data['published']?.toString().trim().toLowerCase() == 'true' ||
+          data['isPublished']?.toString().trim().toLowerCase() == 'true' ||
+          (data['status'] ?? '').toString().toLowerCase() == 'published';
+
+      if (!isPublished) return false;
+
       final status =
           data['status']
               ?.toString()
@@ -2240,6 +2265,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
               .replaceAll(' ', '_') ??
           '';
 
+      if (status == 'deleted') return false;
+
       final isFinished = {
         'finished',
         'finish',
@@ -2247,14 +2274,27 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         'complete',
         'ended',
         'end',
-      }.contains(status);
+        'archived',
+        'closed',
+      }.contains(status) ||
+          data['isFinished'] == true ||
+          data['isCompleted'] == true ||
+          data['completed'] == true ||
+          data['finished'] == true;
 
       // Finished quizzes belong in Quiz History, not Recent Quizzes.
       // Keep unfinished quizzes visible regardless of creation date.
       if (isFinished) return false;
 
       return true;
-    }).toList();
+    }).toList()
+      ..sort((a, b) {
+        final aData = a.data() as Map<String, dynamic>;
+        final bData = b.data() as Map<String, dynamic>;
+        final aDate = _dateValue(aData['updatedAt'] ?? aData['createdAt']);
+        final bDate = _dateValue(bData['updatedAt'] ?? bData['createdAt']);
+        return bDate.compareTo(aDate);
+      });
 
     return Container(
       width: double.infinity,

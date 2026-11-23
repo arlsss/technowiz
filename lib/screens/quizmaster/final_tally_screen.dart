@@ -124,6 +124,9 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
 
   bool _isFinishing = false;
   final Set<String> _tieResolvedUids = {};
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _sessionDeletionSubscription;
+  bool _isExitingDueToDeletion = false;
 
   @override
   void initState() {
@@ -137,6 +140,42 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     _requestsStream = _sessionRef.collection('join_requests').snapshots();
     _scoresStream = _sessionRef.collection('scores').snapshots();
     _contestsStream = _sessionRef.collection('contest_requests').snapshots();
+
+    _sessionDeletionSubscription = _sessionStream.listen((snapshot) {
+      final isDeleted = !snapshot.exists ||
+          snapshot.data()?['deleted'] == true ||
+          snapshot.data()?['isDeleted'] == true ||
+          snapshot.data()?['status'] == 'deleted';
+      if (isDeleted && mounted && !_isExitingDueToDeletion) {
+        _handleQuizDeletedByAdmin();
+      }
+    });
+  }
+
+  Future<void> _handleQuizDeletedByAdmin() async {
+    if (_isExitingDueToDeletion) return;
+    _isExitingDueToDeletion = true;
+
+    await QuizMasterNavPersistence.savePage('dashboard');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This quiz was deleted by the Admin.'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const QuizMasterDashboard(
+          restoreLastPage: false,
+        ),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _saveCurrentPage() async {
@@ -150,6 +189,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
 
   @override
   void dispose() {
+    _sessionDeletionSubscription?.cancel();
     for (final sub in _responseSubs.values) {
       sub.cancel();
     }
