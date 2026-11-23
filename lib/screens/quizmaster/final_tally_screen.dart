@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'quizmaster_theme.dart';
+import 'quizmaster_dashboard.dart';
 import 'final_ranking_screen.dart';
 import 'quiz_control_screen.dart';
 import '../../navigation_persistence.dart';
