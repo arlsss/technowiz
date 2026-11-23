@@ -2593,13 +2593,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             isFinal: isFinal,
             onFinishQuiz: () async {
               await _finishQuiz();
-              if (!mounted) return;
-              await _openFinalRanking(isFinal: true);
             },
-            onProceedToNextLevel: () async {
-              if (!mounted) return;
-              await _openFinalRanking(isFinal: false);
-            },
+            onProceedToNextLevel: () async {},
           ),
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,

@@ -344,7 +344,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
               ],
             ),
             content: const Text(
-              'All contestants have distinct scores. No tie-breaker is required!\n\nYou can proceed directly to FINISH QUIZ.',
+              'All contestants have distinct scores. No tie-breaker is required!\n\nYou can proceed directly to PUBLISH WINNERS.',
               style: TextStyle(
                 color: QuizMasterColors.textDark,
                 fontSize: 14,
@@ -826,7 +826,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   }
 
   // ============================================================
-  // FINISH QUIZ ACTION
+  // PUBLISH WINNERS ACTION
   // ============================================================
 
   void _confirmFinishQuiz() {
@@ -847,7 +847,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Finish Quiz Event?',
+                  'Publish Final Winners?',
                   style: TextStyle(
                     color: QuizMasterColors.darkBlue,
                     fontWeight: FontWeight.bold,
@@ -858,7 +858,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
             ],
           ),
           content: const Text(
-            'This will finalize the competition results and open the Winners Podium.\n\nProceed to final results declaration?',
+            'This will finalize the competition results and open the Winners Podium & Final Results screen.\n\nProceed to publish the final winners?',
             style: TextStyle(
               color: QuizMasterColors.textDark,
               fontSize: 14,
@@ -875,8 +875,8 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                 Navigator.pop(ctx);
                 _executeFinishQuiz();
               },
-              icon: const Icon(Icons.flag_rounded),
-              label: const Text('FINISH QUIZ'),
+              icon: const Icon(Icons.emoji_events_rounded),
+              label: const Text('PUBLISH WINNERS'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: QuizMasterColors.primaryBlue,
                 foregroundColor: Colors.white,
@@ -898,38 +898,46 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     try {
       if (widget.onFinishQuiz != null) {
         await widget.onFinishQuiz!();
-        return;
+      } else {
+        // Default finish quiz logic
+        await _sessionRef.set(
+          {
+            'status': 'finished',
+            'isFinished': true,
+            'finishedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
       }
 
-      // Default finish quiz logic
-      await _sessionRef.set(
-        {
-          'status': 'finished',
-          'isFinished': true,
-          'finishedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
+      await QuizMasterNavPersistence.savePage(
+        'ranking',
+        quizCode: widget.quizCode,
+        rankingLevel: widget.level,
+        rankingIsFinal: true,
       );
 
       if (!mounted) return;
 
-      // Navigate to Winners Result
+      // Navigate to Winners Result (Final Winners page)
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => FinalRankingScreen(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) => FinalRankingScreen(
             quizCode: widget.quizCode,
             level: widget.level,
             isFinal: true,
           ),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         ),
       );
     } catch (e) {
-      debugPrint('FINISH QUIZ ERROR: $e');
+      debugPrint('PUBLISH WINNERS ERROR: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to finish quiz: $e'),
+            content: Text('Failed to publish winners: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -2013,27 +2021,29 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
             const SizedBox(width: 12),
           ],
 
-          // FINISH QUIZ BUTTON (or NEXT LEVEL if intermediate)
+          // PUBLISH WINNERS BUTTON (or LEVEL RESULTS if intermediate)
           Expanded(
             child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: widget.isFinal
                     ? _confirmFinishQuiz
-                    : () {
+                    : () async {
                         if (widget.onProceedToNextLevel != null) {
-                          widget.onProceedToNextLevel!();
-                        } else {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute<void>(
-                              builder: (_) => FinalRankingScreen(
-                                quizCode: widget.quizCode,
-                                level: widget.level,
-                                isFinal: false,
-                              ),
-                            ),
-                          );
+                          await widget.onProceedToNextLevel!();
                         }
+                        if (!context.mounted) return;
+                        Navigator.of(context).pushReplacement(
+                          PageRouteBuilder<void>(
+                            pageBuilder: (_, _, _) => FinalRankingScreen(
+                              quizCode: widget.quizCode,
+                              level: widget.level,
+                              isFinal: false,
+                            ),
+                            transitionDuration: Duration.zero,
+                            reverseTransitionDuration: Duration.zero,
+                          ),
+                        );
                       },
                 icon: Icon(
                   widget.isFinal
@@ -2042,7 +2052,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   size: 20,
                 ),
                 label: Text(
-                  widget.isFinal ? 'FINISH QUIZ' : 'LEVEL RESULTS',
+                  widget.isFinal ? 'PUBLISH WINNERS' : 'LEVEL RESULTS',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
