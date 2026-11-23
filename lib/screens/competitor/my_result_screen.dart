@@ -242,10 +242,135 @@ class _MyResultScreenState extends State<MyResultScreen> {
                 }
               }
 
+              final rank = ranks[i];
+              Widget rankLeading;
+              if (rank <= 3) {
+                final trophyAsset = rank == 1
+                    ? 'assets/trophies/gold_trophy_3d.jpg'
+                    : (rank == 2
+                        ? 'assets/trophies/silver_trophy_3d.jpg'
+                        : 'assets/trophies/bronze_trophy_3d.jpg');
+                final rankColor = rank == 1
+                    ? const Color(0xFFF59E0B)
+                    : (rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+
+                rankLeading = Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: rankColor, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: rankColor.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          trophyAsset,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(
+                            rank == 1
+                                ? Icons.emoji_events_rounded
+                                : (rank == 2
+                                    ? Icons.military_tech_rounded
+                                    : Icons.workspace_premium_rounded),
+                            color: rankColor,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -2,
+                      right: -3,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: rankColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$rank',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              } else if (rank <= 10) {
+                const rankColor = Color(0xFF22C55E);
+                rankLeading = Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: rankColor, width: 1.8),
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/trophies/top10_badge_3d.jpg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.workspace_premium_rounded,
+                            color: rankColor,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -2,
+                      right: -3,
+                      child: Container(
+                        width: 15,
+                        height: 15,
+                        decoration: BoxDecoration(
+                          color: rankColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.2),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$rank',
+                          style: const TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                rankLeading = CircleAvatar(child: Text('#$rank'));
+              }
+
               return Card(
                 color: isMe ? Colors.blue.shade50 : null,
                 child: ListTile(
-                  leading: CircleAvatar(child: Text('#${ranks[i]}')),
+                  leading: rankLeading,
                   title: Text(
                     isMe ? '$name (You)' : name,
                     style: TextStyle(
