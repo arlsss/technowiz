@@ -498,7 +498,28 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ],
                     if (!eliminated) ...[
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 10),
+                      Text(
+                        "You proceed to Level $nextLevel",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: darkGreen,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "You have successfully qualified for the next round!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         height: 54,
@@ -589,9 +610,9 @@ class _QuizScreenState extends State<QuizScreen> {
                             });
                           },
                           icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                          label: const Text(
-                            'PROCEED',
-                            style: TextStyle(
+                          label: Text(
+                            'PROCEED TO LEVEL $nextLevel',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.7,
