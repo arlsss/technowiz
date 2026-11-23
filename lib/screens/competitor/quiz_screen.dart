@@ -3043,8 +3043,10 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     final nextQuestionNumber = _getNextQuestionNumberInLevel();
-    final bool isConfirmed =
-        nextReadyConfirmed && (confirmedQuestionIndex == currentQuestion);
+    final bool isContestPending = contestStatus == "pending";
+    final bool isConfirmed = !isContestPending &&
+        nextReadyConfirmed &&
+        (confirmedQuestionIndex == currentQuestion);
 
     return Container(
       width: double.infinity,
@@ -3053,24 +3055,31 @@ class _QuizScreenState extends State<QuizScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderGreen, width: 1.5),
+        border: Border.all(
+          color: isContestPending ? Colors.orange.shade200 : borderGreen,
+          width: 1.5,
+        ),
       ),
       child: Column(
         children: [
           Icon(
-            isConfirmed
-                ? Icons.check_circle_rounded
-                : Icons.play_circle_outline_rounded,
-            color: primaryGreen,
+            isContestPending
+                ? Icons.hourglass_top_rounded
+                : (isConfirmed
+                    ? Icons.check_circle_rounded
+                    : Icons.play_circle_outline_rounded),
+            color: isContestPending ? Colors.orange : primaryGreen,
             size: 44,
           ),
           const SizedBox(height: 10),
           if (!isLastQuestionInLevel) ...[
             Text(
-              isConfirmed ? "YOU ARE READY!" : "YOU ARE READY?",
+              isContestPending
+                  ? "CONTEST UNDER REVIEW"
+                  : (isConfirmed ? "YOU ARE READY!" : "YOU ARE READY?"),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: darkGreen,
+              style: TextStyle(
+                color: isContestPending ? Colors.orange.shade800 : darkGreen,
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
@@ -3078,18 +3087,20 @@ class _QuizScreenState extends State<QuizScreen> {
             const SizedBox(height: 8),
           ],
           Text(
-            isLastQuestionInLevel
-                ? (isConfirmed
-                      ? "Waiting for the Quiz Master to show the Level $currentLevel results."
-                      : "Please see the Level $currentLevel results.")
-                : (isConfirmed
-                      ? "Waiting for the Quiz Master to start Question $nextQuestionNumber."
-                      : "Review the result above, then press CONFIRM when you are ready for the next question."),
+            isContestPending
+                ? "Please wait for the Quiz Master to review your contest (approve or reject) before confirming."
+                : (isLastQuestionInLevel
+                    ? (isConfirmed
+                        ? "Waiting for the Quiz Master to show the Level $currentLevel results."
+                        : "Please see the Level $currentLevel results.")
+                    : (isConfirmed
+                        ? "Waiting for the Quiz Master to start Question $nextQuestionNumber."
+                        : "Review the result above, then press CONFIRM when you are ready for the next question.")),
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.grey,
+              color: isContestPending ? Colors.orange.shade900 : Colors.grey,
               fontSize: isLastQuestionInLevel ? 22 : 15,
-              fontWeight: isLastQuestionInLevel
+              fontWeight: (isLastQuestionInLevel || isContestPending)
                   ? FontWeight.w600
                   : FontWeight.normal,
               height: 1.4,
@@ -3099,7 +3110,7 @@ class _QuizScreenState extends State<QuizScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: isConfirmed
+              onPressed: (isConfirmed || isContestPending)
                   ? null
                   : () {
                       if (isLastQuestionInLevel) {
@@ -3112,11 +3123,18 @@ class _QuizScreenState extends State<QuizScreen> {
                         setNextQuestionReady(true);
                       }
                     },
-              icon: const Icon(Icons.check, size: 20),
+              icon: Icon(
+                isContestPending
+                    ? Icons.hourglass_top_rounded
+                    : (isConfirmed ? Icons.check_circle_rounded : Icons.check),
+                size: 20,
+              ),
               label: Text(
-                isConfirmed
-                    ? (isLastQuestionInLevel ? "NEXT" : "READY")
-                    : (isLastQuestionInLevel ? "NEXT" : "CONFIRM"),
+                isContestPending
+                    ? "WAITING FOR REVIEW..."
+                    : (isConfirmed
+                        ? (isLastQuestionInLevel ? "NEXT" : "READY")
+                        : (isLastQuestionInLevel ? "NEXT" : "CONFIRM")),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -3125,8 +3143,12 @@ class _QuizScreenState extends State<QuizScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryGreen,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFFB7D8C0),
-                disabledForegroundColor: Colors.white,
+                disabledBackgroundColor: isContestPending
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFFB7D8C0),
+                disabledForegroundColor: isContestPending
+                    ? const Color(0xFF94A3B8)
+                    : Colors.white,
                 minimumSize: const Size.fromHeight(54),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -3460,12 +3482,16 @@ class _QuizScreenState extends State<QuizScreen> {
         'contestSubmittedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      await setNextQuestionReady(false);
+
       if (!mounted) return;
 
       setState(() {
         contestSubmitting = false;
         contestRequestId = requestId;
         contestStatus = "pending";
+        nextReadyConfirmed = false;
+        confirmedQuestionIndex = -1;
       });
 
       showTopSnackBar(context, 
