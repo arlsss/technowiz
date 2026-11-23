@@ -4564,35 +4564,6 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
-  Future<int> _getContestantLevelPoints(int level) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return 0;
-
-    final snapshot = await _sessionRef
-        .collection('answers')
-        .doc(user.uid)
-        .collection('responses')
-        .get();
-
-    var total = 0;
-    for (final response in snapshot.docs) {
-      final data = response.data();
-      final rawLvl = data['level'];
-      int? itemLevel;
-      if (rawLvl is num) {
-        itemLevel = rawLvl.toInt();
-      } else if (rawLvl != null) {
-        final match = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
-        if (match != null) itemLevel = int.tryParse(match.group(1)!);
-      }
-      if (itemLevel == level) {
-        final value = data['points'];
-        if (value is num) total += value.toInt();
-      }
-    }
-    return total;
-  }
-
   // ==========================================================
   // LEVEL PAUSE SCREEN
   // ==========================================================
