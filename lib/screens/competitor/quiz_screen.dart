@@ -758,6 +758,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _currentLevelQuestionNumber = 0;
   int _currentLevelQuestionTotal = 0;
   int _currentQuestionLevel = 1;
+  final Map<int, int> _localLevelPoints = {};
   bool _showLocalLevelResults = false;
 
   // ==========================================================
@@ -2498,6 +2499,8 @@ class _QuizScreenState extends State<QuizScreen> {
       });
 
       if (correct) {
+        _localLevelPoints[sessionLevel] =
+            (_localLevelPoints[sessionLevel] ?? 0) + earnedPoints;
         await updateScore(uid, earnedPoints, questionNumber, level: sessionLevel);
       }
 
@@ -3988,6 +3991,8 @@ class _QuizScreenState extends State<QuizScreen> {
         .doc(uid);
 
     final int targetLevel = level ?? getLevelFromQuestionNumber(questionNumber);
+    _localLevelPoints[targetLevel] =
+        ((_localLevelPoints[targetLevel] ?? 0) + points).clamp(0, 999999);
     final String levelKey = 'level${targetLevel}Score';
 
     await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -4678,78 +4683,141 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    FutureBuilder<int>(
-                      future: _getContestantLevelPoints(currentLevel),
-                      builder: (context, snapshot) {
-                        final points = snapshot.data;
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 22,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color: const Color(0xFFBBF7D0),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-                                blurRadius: 20,
-                                offset: const Offset(0, 6),
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseAuth.instance.currentUser != null
+                          ? _sessionRef
+                              .collection('answers')
+                              .doc(FirebaseAuth.instance.currentUser!.uid)
+                              .collection('responses')
+                              .snapshots()
+                          : null,
+                      builder: (context, responsesSnapshot) {
+                        int points = _localLevelPoints[currentLevel] ?? 0;
+
+                        if (responsesSnapshot.hasData &&
+                            responsesSnapshot.data != null) {
+                          int respPoints = 0;
+                          for (final doc in responsesSnapshot.data!.docs) {
+                            final data = doc.data();
+                            final rawLvl = data['level'];
+                            int? itemLevel;
+                            if (rawLvl is num) {
+                              itemLevel = rawLvl.toInt();
+                            } else if (rawLvl != null) {
+                              final match = RegExp(r'(\d+)').firstMatch(
+                                rawLvl.toString(),
+                              );
+                              if (match != null) {
+                                itemLevel = int.tryParse(match.group(1)!);
+                              }
+                            }
+                            if (itemLevel == currentLevel) {
+                              final val = data['points'];
+                              if (val is num) respPoints += val.toInt();
+                            }
+                          }
+                          if (respPoints > points) {
+                            points = respPoints;
+                            _localLevelPoints[currentLevel] = points;
+                          }
+                        }
+
+                        return StreamBuilder<
+                            DocumentSnapshot<Map<String, dynamic>>>(
+                          stream: FirebaseAuth.instance.currentUser != null
+                              ? _sessionRef
+                                  .collection('scores')
+                                  .doc(FirebaseAuth.instance.currentUser!.uid)
+                                  .snapshots()
+                              : null,
+                          builder: (context, scoreSnapshot) {
+                            int finalPoints = points;
+                            final sData = scoreSnapshot.data?.data();
+                            if (sData != null) {
+                              final String levelKey = 'level${currentLevel}Score';
+                              final dynamic rawLvl = sData[levelKey] ??
+                                  (sData['levelScores'] is Map
+                                      ? sData['levelScores']['Level $currentLevel']
+                                      : null);
+                              if (rawLvl != null) {
+                                final parsed = int.tryParse(rawLvl.toString());
+                                if (parsed != null && parsed > finalPoints) {
+                                  finalPoints = parsed;
+                                  _localLevelPoints[currentLevel] = finalPoints;
+                                }
+                              } else if (currentLevel == 1 &&
+                                  sData['score'] != null) {
+                                final parsed = int.tryParse(
+                                  sData['score'].toString(),
+                                );
+                                if (parsed != null && parsed > finalPoints) {
+                                  finalPoints = parsed;
+                                  _localLevelPoints[currentLevel] = finalPoints;
+                                }
+                              }
+                            }
+
+                            return Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 22,
                               ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.stars_rounded,
-                                    size: 16,
-                                    color: Colors.amber.shade600,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color: const Color(0xFFBBF7D0),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF16A34A,
+                                    ).withValues(alpha: 0.08),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 6),
                                   ),
-                                  const SizedBox(width: 6),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.stars_rounded,
+                                        size: 16,
+                                        color: Colors.amber.shade600,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        "YOUR LEVEL SCORE",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
                                   Text(
-                                    "YOUR LEVEL SCORE",
+                                    "$finalPoints ${finalPoints == 1 ? 'POINT' : 'POINTS'}",
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.2,
+                                    style: const TextStyle(
+                                      color: primaryGreen,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 10),
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting)
-                                const SizedBox(
-                                  width: 26,
-                                  height: 26,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: primaryGreen,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "${points ?? 0} ${points == 1 ? 'POINT' : 'POINTS'}",
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: primaryGreen,
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                            ],
-                          ),
+                            );
+                          },
                         );
                       },
                     ),
