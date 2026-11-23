@@ -671,13 +671,13 @@ class QuizInstructionsScreen extends StatelessWidget {
                         final String proceedText;
                         if (count <= 0) {
                           proceedText =
-                              "Contestants to proceed: All eligible participants.";
+                              "Contestants to proceed: All eligible contestants.";
                         } else if (count == 1) {
                           proceedText =
-                              "Contestant to proceed: Top 1 participant.";
+                              "Contestant to proceed: Top 1 contestant.";
                         } else {
                           proceedText =
-                              "Contestants to proceed: Top $count participant(s).";
+                              "Contestants to proceed: Top $count contestant(s).";
                         }
 
                         return _instructionItem(

@@ -1187,7 +1187,7 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
-                                          'Advancement Rule: Top $configuredProceedCount participant(s) will proceed to Level ${level + 1}.',
+                                          'Advancement Rule: Top $configuredProceedCount contestant(s) will proceed to Level ${level + 1}.',
                                           style: TextStyle(
                                             color: Colors.green.shade800,
                                             fontSize: 12.5,

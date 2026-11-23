@@ -7931,7 +7931,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                     ),
                                     child: Text(
                                       isMyEliminated
-                                          ? "PARTICIPANT"
+                                          ? "CONTESTANT"
                                           : (myRank == 1
                                               ? "YOU ARE RANK 1 • CHAMPION 🏆"
                                               : (myRank == 2

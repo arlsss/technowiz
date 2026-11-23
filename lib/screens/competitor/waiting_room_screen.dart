@@ -724,7 +724,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
           content: const Text(
             "Are you sure you want to leave the quiz?\n\n"
-            "You will be removed from the participant list. If you join again, "
+            "You will be removed from the contestant list. If you join again, "
             "you will need to wait for Admin approval again.",
 
             style: TextStyle(color: Colors.black54, height: 1.5),
@@ -1985,7 +1985,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
                                         ? "This Quiz Event has already ended."
                                         : status == 'finished'
                                         ? "This Quiz Event has been completed."
-                                        : "The Quiz Master is checking if participants are ready. Please wait.",
+                                        : "The Quiz Master is checking if contestants are ready. Please wait.",
 
                                     style: const TextStyle(
                                       color: Colors.grey,

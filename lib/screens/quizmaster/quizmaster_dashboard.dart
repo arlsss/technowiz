@@ -84,25 +84,29 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.reload();
-      final String? rawQuizCode =
-          prefs.getString(QuizMasterNavPersistence.quizCodeKey);
+      final String? rawQuizCode = prefs.getString(
+        QuizMasterNavPersistence.quizCodeKey,
+      );
       final String quizCode = rawQuizCode?.trim() ?? '';
 
       late final Widget page;
       switch (savedPage) {
         case 'quiz_sessions':
-          final savedResultMode =
-              prefs.getString(QuizMasterNavPersistence.resultModeKey);
+          final savedResultMode = prefs.getString(
+            QuizMasterNavPersistence.resultModeKey,
+          );
           page = QuizSessionsScreen(resultMode: savedResultMode);
           break;
         case 'leaderboard':
         case 'leaderboard_history':
           final savedLevel =
               prefs.getString(QuizMasterNavPersistence.leaderboardLevelKey) ??
-                  'Overall';
-          final showHist = (savedPage == 'leaderboard_history') ||
+              'Overall';
+          final showHist =
+              (savedPage == 'leaderboard_history') ||
               (prefs.getBool(
-                      QuizMasterNavPersistence.leaderboardShowHistoryKey) ??
+                    QuizMasterNavPersistence.leaderboardShowHistoryKey,
+                  ) ??
                   false);
           page = LeaderboardScreen(
             quizCode: quizCode,
@@ -113,9 +117,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         case 'participants':
         case 'contestant':
         case 'participants_history':
-          final showHist = (savedPage == 'participants_history') ||
+          final showHist =
+              (savedPage == 'participants_history') ||
               (prefs.getBool(
-                      QuizMasterNavPersistence.participantsShowHistoryKey) ??
+                    QuizMasterNavPersistence.participantsShowHistoryKey,
+                  ) ??
                   false);
           page = ManageParticipantsScreen(
             quizCode: quizCode,
@@ -133,9 +139,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         case 'contestant_readiness':
         case 'quizmaster_overview':
           if (quizCode.isNotEmpty) {
-            final savedLevel = prefs.getInt(
-                    QuizMasterNavPersistence.readinessLevelKey) ??
-                1;
+            final savedLevel =
+                prefs.getInt(QuizMasterNavPersistence.readinessLevelKey) ?? 1;
             page = ContestantReadinessPage(
               quizCode: quizCode,
               startLevel: savedLevel,
@@ -164,7 +169,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                 prefs.getInt(QuizMasterNavPersistence.rankingLevelKey) ?? 1;
             final isFinal =
                 prefs.getBool(QuizMasterNavPersistence.rankingIsFinalKey) ??
-                    true;
+                true;
             page = FinalTallyScreen(
               quizCode: quizCode,
               level: savedLevel,
@@ -181,7 +186,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                 prefs.getInt(QuizMasterNavPersistence.rankingLevelKey) ?? 1;
             final isFinal =
                 prefs.getBool(QuizMasterNavPersistence.rankingIsFinalKey) ??
-                    true;
+                true;
             page = FinalRankingScreen(
               quizCode: quizCode,
               level: savedLevel,
@@ -194,7 +199,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         case 'submitted_answers':
           if (quizCode.isNotEmpty) {
             final qIndex = prefs.getInt(
-                QuizMasterNavPersistence.submittedQuestionIndexKey);
+              QuizMasterNavPersistence.submittedQuestionIndexKey,
+            );
             page = SubmittedAnswersScreen(
               quizCode: quizCode,
               questionIndex: qIndex,
@@ -853,7 +859,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
         final status = data['status']?.toString().trim().toLowerCase() ?? '';
 
-        final isFinished = data['isFinished'] == true ||
+        final isFinished =
+            data['isFinished'] == true ||
             data['isCompleted'] == true ||
             data['completed'] == true ||
             data['finished'] == true ||
@@ -864,7 +871,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
         if (isFinished) continue;
 
-        final isPub = data['published'] == true ||
+        final isPub =
+            data['published'] == true ||
             data['isPublished'] == true ||
             data['is_published'] == true ||
             data['published'] == 1 ||
@@ -981,8 +989,12 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
       final sortedDocs = snapshot.docs.toList()
         ..sort((a, b) {
-          final aDate = _dateValue(a.data()['updatedAt'] ?? a.data()['createdAt']);
-          final bDate = _dateValue(b.data()['updatedAt'] ?? b.data()['createdAt']);
+          final aDate = _dateValue(
+            a.data()['updatedAt'] ?? a.data()['createdAt'],
+          );
+          final bDate = _dateValue(
+            b.data()['updatedAt'] ?? b.data()['createdAt'],
+          );
           return bDate.compareTo(aDate);
         });
 
@@ -994,7 +1006,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           continue;
         }
         final status = data['status']?.toString().trim().toLowerCase() ?? '';
-        final isFinished = data['isFinished'] == true ||
+        final isFinished =
+            data['isFinished'] == true ||
             data['isCompleted'] == true ||
             data['completed'] == true ||
             data['finished'] == true ||
@@ -1005,7 +1018,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
         if (isFinished) continue;
 
-        final isPub = data['published'] == true ||
+        final isPub =
+            data['published'] == true ||
             data['isPublished'] == true ||
             data['is_published'] == true ||
             data['published'] == 1 ||
@@ -1078,9 +1092,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: QuizMasterCircuitBackground(
-        child: _buildMainContent(),
-      ),
+      body: QuizMasterCircuitBackground(child: _buildMainContent()),
       bottomNavigationBar: _buildBottomNavigation(),
     );
   }
@@ -1096,7 +1108,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
       (icon: Icons.dashboard_outlined, title: 'Dashboard', index: 0),
       (icon: Icons.assignment_outlined, title: 'Quizzes', index: 1),
       (icon: Icons.bar_chart_outlined, title: 'Leaderboard', index: 2),
-      (icon: Icons.people_outline, title: 'Participants', index: 3),
+      (icon: Icons.people_outline, title: 'Contestants', index: 3),
       (icon: Icons.person_outline, title: 'Profile', index: 4),
     ];
 
@@ -1222,13 +1234,15 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
               continue;
             }
 
-            final isPublished = data['published'] == true ||
+            final isPublished =
+                data['published'] == true ||
                 data['isPublished'] == true ||
                 data['is_published'] == true ||
                 data['published'] == 1 ||
                 data['isPublished'] == 1 ||
                 data['published']?.toString().trim().toLowerCase() == 'true' ||
-                data['isPublished']?.toString().trim().toLowerCase() == 'true' ||
+                data['isPublished']?.toString().trim().toLowerCase() ==
+                    'true' ||
                 (data['status'] ?? '').toString().toLowerCase() == 'published';
 
             if (!isPublished) continue;
@@ -1239,7 +1253,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                 .replaceAll('-', '_')
                 .replaceAll(' ', '_');
 
-            final isFinished = finishedStatuses.contains(status) ||
+            final isFinished =
+                finishedStatuses.contains(status) ||
                 data['isFinished'] == true ||
                 data['isCompleted'] == true ||
                 data['completed'] == true ||
@@ -1403,8 +1418,12 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                           ..sort((a, b) {
                             final aData = a.data() as Map<String, dynamic>;
                             final bData = b.data() as Map<String, dynamic>;
-                            final aDate = _dateValue(aData['updatedAt'] ?? aData['createdAt']);
-                            final bDate = _dateValue(bData['updatedAt'] ?? bData['createdAt']);
+                            final aDate = _dateValue(
+                              aData['updatedAt'] ?? aData['createdAt'],
+                            );
+                            final bDate = _dateValue(
+                              bData['updatedAt'] ?? bData['createdAt'],
+                            );
                             return bDate.compareTo(aDate);
                           });
 
@@ -1420,13 +1439,17 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                               .toLowerCase()
                               .replaceAll('-', '_')
                               .replaceAll(' ', '_');
-                          final isPublished = data['published'] == true ||
+                          final isPublished =
+                              data['published'] == true ||
                               data['isPublished'] == true ||
                               data['is_published'] == true ||
-                              data['published']?.toString().toLowerCase() == 'true' ||
-                              data['isPublished']?.toString().toLowerCase() == 'true' ||
+                              data['published']?.toString().toLowerCase() ==
+                                  'true' ||
+                              data['isPublished']?.toString().toLowerCase() ==
+                                  'true' ||
                               status == 'published';
-                          final isFinished = data['isFinished'] == true ||
+                          final isFinished =
+                              data['isFinished'] == true ||
                               data['isCompleted'] == true ||
                               data['completed'] == true ||
                               data['finished'] == true ||
@@ -1622,7 +1645,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
       ),
 
       _StatData(
-        title: "Total Participants",
+        title: "Total Contestants",
         value: _formatNumber(totalParticipants),
         icon: Icons.groups_rounded,
         badgeText: "ATTENDANCE",
@@ -1906,7 +1929,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           data['status'] == 'deleted') {
         continue;
       }
-      final isPub = data['published'] == true ||
+      final isPub =
+          data['published'] == true ||
           data['isPublished'] == true ||
           data['is_published'] == true ||
           data['published'] == 1 ||
@@ -1932,10 +1956,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
 
     final data = targetDoc.data() as Map<String, dynamic>;
     final quizCode = (data['quizCode'] ?? targetDoc.id).toString().trim();
-    final quizTitle =
-        (data['title'] ?? data['quizTitle'] ?? quizCode).toString();
+    final quizTitle = (data['title'] ?? data['quizTitle'] ?? quizCode)
+        .toString();
     final status = (data['status'] ?? 'waiting').toString().toLowerCase();
-    final isLive = status == 'active' ||
+    final isLive =
+        status == 'active' ||
         status == 'ongoing' ||
         status == 'running' ||
         status == 'in_progress';
@@ -1962,7 +1987,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
               final d = j.data();
               contestantMap[j.id] = {
                 'id': j.id,
-                'name': d['name'] ??
+                'name':
+                    d['name'] ??
                     d['displayName'] ??
                     d['contestantName'] ??
                     'Contestant',
@@ -2129,9 +2155,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                       ),
                       child: Column(
                         children: [
-                          for (int i = 0;
-                              i < (list.length > 3 ? 3 : list.length);
-                              i++) ...[
+                          for (
+                            int i = 0;
+                            i < (list.length > 3 ? 3 : list.length);
+                            i++
+                          ) ...[
                             if (i > 0)
                               const Divider(color: Colors.white12, height: 12),
                             Row(
@@ -2143,8 +2171,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                                     color: i == 0
                                         ? const Color(0xFFFFD700)
                                         : i == 1
-                                            ? const Color(0xFFC0C0C0)
-                                            : const Color(0xFFCD7F32),
+                                        ? const Color(0xFFC0C0C0)
+                                        : const Color(0xFFCD7F32),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
@@ -2234,67 +2262,69 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
   // ============================================================
 
   Widget _buildRecentQuizzes(List<QueryDocumentSnapshot> docs) {
-    final recentDocs = docs.where((doc) {
-      final data = doc.data() as Map<String, dynamic>;
+    final recentDocs =
+        docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
 
-      // Filter out deleted quizzes
-      if (data['deleted'] == true ||
-          data['isDeleted'] == true ||
-          data['status'] == 'deleted') {
-        return false;
-      }
+          // Filter out deleted quizzes
+          if (data['deleted'] == true ||
+              data['isDeleted'] == true ||
+              data['status'] == 'deleted') {
+            return false;
+          }
 
-      // Filter out unpublished quizzes (e.g. deleted or draft/unpublished by admin)
-      final isPublished = data['published'] == true ||
-          data['isPublished'] == true ||
-          data['is_published'] == true ||
-          data['published'] == 1 ||
-          data['isPublished'] == 1 ||
-          data['published']?.toString().trim().toLowerCase() == 'true' ||
-          data['isPublished']?.toString().trim().toLowerCase() == 'true' ||
-          (data['status'] ?? '').toString().toLowerCase() == 'published';
+          // Filter out unpublished quizzes (e.g. deleted or draft/unpublished by admin)
+          final isPublished =
+              data['published'] == true ||
+              data['isPublished'] == true ||
+              data['is_published'] == true ||
+              data['published'] == 1 ||
+              data['isPublished'] == 1 ||
+              data['published']?.toString().trim().toLowerCase() == 'true' ||
+              data['isPublished']?.toString().trim().toLowerCase() == 'true' ||
+              (data['status'] ?? '').toString().toLowerCase() == 'published';
 
-      if (!isPublished) return false;
+          if (!isPublished) return false;
 
-      final status =
-          data['status']
-              ?.toString()
-              .trim()
-              .toLowerCase()
-              .replaceAll('-', '_')
-              .replaceAll(' ', '_') ??
-          '';
+          final status =
+              data['status']
+                  ?.toString()
+                  .trim()
+                  .toLowerCase()
+                  .replaceAll('-', '_')
+                  .replaceAll(' ', '_') ??
+              '';
 
-      if (status == 'deleted') return false;
+          if (status == 'deleted') return false;
 
-      final isFinished = {
-        'finished',
-        'finish',
-        'completed',
-        'complete',
-        'ended',
-        'end',
-        'archived',
-        'closed',
-      }.contains(status) ||
-          data['isFinished'] == true ||
-          data['isCompleted'] == true ||
-          data['completed'] == true ||
-          data['finished'] == true;
+          final isFinished =
+              {
+                'finished',
+                'finish',
+                'completed',
+                'complete',
+                'ended',
+                'end',
+                'archived',
+                'closed',
+              }.contains(status) ||
+              data['isFinished'] == true ||
+              data['isCompleted'] == true ||
+              data['completed'] == true ||
+              data['finished'] == true;
 
-      // Finished quizzes belong in Quiz History, not Recent Quizzes.
-      // Keep unfinished quizzes visible regardless of creation date.
-      if (isFinished) return false;
+          // Finished quizzes belong in Quiz History, not Recent Quizzes.
+          // Keep unfinished quizzes visible regardless of creation date.
+          if (isFinished) return false;
 
-      return true;
-    }).toList()
-      ..sort((a, b) {
-        final aData = a.data() as Map<String, dynamic>;
-        final bData = b.data() as Map<String, dynamic>;
-        final aDate = _dateValue(aData['updatedAt'] ?? aData['createdAt']);
-        final bDate = _dateValue(bData['updatedAt'] ?? bData['createdAt']);
-        return bDate.compareTo(aDate);
-      });
+          return true;
+        }).toList()..sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aDate = _dateValue(aData['updatedAt'] ?? aData['createdAt']);
+          final bDate = _dateValue(bData['updatedAt'] ?? bData['createdAt']);
+          return bDate.compareTo(aDate);
+        });
 
     return Container(
       width: double.infinity,
@@ -2497,7 +2527,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
       badgeText = "Upcoming";
     }
 
-    final isLiveOrOngoing = normalized == "active" ||
+    final isLiveOrOngoing =
+        normalized == "active" ||
         normalized == "live" ||
         normalized == "ongoing" ||
         normalized == "started";
@@ -2535,10 +2566,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: (isLiveOrOngoing
-                                ? const Color(0xFF22C55E)
-                                : const Color(0xFF1E88E5))
-                            .withValues(alpha: 0.25),
+                        color:
+                            (isLiveOrOngoing
+                                    ? const Color(0xFF22C55E)
+                                    : const Color(0xFF1E88E5))
+                                .withValues(alpha: 0.25),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -2594,7 +2626,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            "$participants participant${participants == 1 ? '' : 's'}",
+                            "$participants contestant${participants == 1 ? '' : 's'}",
                             style: const TextStyle(
                               color: Color(0xFF64748B),
                               fontSize: 10.5,
@@ -2682,10 +2714,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
           const SizedBox(width: 5),
           Text(

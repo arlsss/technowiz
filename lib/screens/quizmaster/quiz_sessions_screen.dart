@@ -3611,7 +3611,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Please review participants before proceeding',
+                              'Please review contestants before proceeding',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.black54,
@@ -3921,7 +3921,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'REGISTERED PARTICIPANTS',
+                    'REGISTERED CONTESTANTS',
                     style: TextStyle(
                       color: _darkBlue,
                       fontSize: 13,
@@ -4250,7 +4250,7 @@ class ParticipantReadinessPage extends StatelessWidget {
         'title': 'LEVEL SETTINGS',
         'bullets': <String>[
           'Review each level’s timer and points.',
-          'Check the difficulty and participants to proceed.',
+          'Check the difficulty and contestants to proceed.',
         ],
       },
     ];
@@ -4748,7 +4748,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                   const SizedBox(height: 7),
                   _levelSettingRow(
                     Icons.how_to_reg_outlined,
-                    'Participants to Proceed',
+                    'Contestants to Proceed',
                     valueOrNotSet(proceedCount),
                   ),
                 ],

@@ -396,7 +396,7 @@ class _ContestantLeaderboardScreenState
                     const Padding(
                       padding: EdgeInsets.all(18),
                       child: Text(
-                        'Waiting for participants...',
+                        'Waiting for contestants...',
                         style: TextStyle(color: textMuted, fontSize: 11),
                       ),
                     )
@@ -792,7 +792,9 @@ class _ContestantLeaderboardScreenState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Material(
-        color: active ? Colors.white.withValues(alpha: 0.10) : Colors.transparent,
+        color: active
+            ? Colors.white.withValues(alpha: 0.10)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -804,7 +806,9 @@ class _ContestantLeaderboardScreenState
               children: [
                 Icon(
                   icon,
-                  color: active ? Colors.white : Colors.white.withValues(alpha: 0.58),
+                  color: active
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.58),
                   size: 21,
                 ),
                 const SizedBox(width: 13),
@@ -918,7 +922,8 @@ class _ContestantLeaderboardScreenState
                 active: false,
                 onTap: () {
                   Navigator.pop(context);
-                  showTopSnackBar(context, 
+                  showTopSnackBar(
+                    context,
                     const SnackBar(content: Text('Badges coming soon.')),
                   );
                 },
@@ -929,7 +934,8 @@ class _ContestantLeaderboardScreenState
                 active: false,
                 onTap: () {
                   Navigator.pop(context);
-                  showTopSnackBar(context, 
+                  showTopSnackBar(
+                    context,
                     const SnackBar(content: Text('History coming soon.')),
                   );
                 },

@@ -548,7 +548,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
         if (!everyoneReady) {
           _showMessage(
-            'Not all approved participants are READY yet. Please run Ready Check again.',
+            'Not all approved contestants are READY yet. Please run Ready Check again.',
           );
           return;
         }
@@ -612,7 +612,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
         if (!everyoneReady) {
           _showMessage(
-            'Not all approved contestants are READY yet. Please check the participant list.',
+            'Not all approved contestants are READY yet. Please check the contestant list.',
           );
           return;
         }
@@ -841,7 +841,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         await batch.commit();
         if (mounted) {
           _showMessage(
-            'Readiness time expired. All approved participants are now marked READY.',
+            'Readiness time expired. All approved contestants are now marked READY.',
           );
         }
       } catch (e) {
@@ -2881,7 +2881,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'PARTICIPANT STATUS',
+                              'CONTESTANT STATUS',
                               style: TextStyle(
                                 color: darkBlue,
                                 fontSize: 18,
@@ -2901,8 +2901,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           allReady
-                              ? 'All participants are ready. You can start the quiz.'
-                              : 'Waiting for all approved participants to confirm.',
+                              ? 'All contestants are ready. You can start the quiz.'
+                              : 'Waiting for all approved contestants to confirm.',
                           style: const TextStyle(
                             color: Colors.black54,
                             height: 1.35,
@@ -2966,7 +2966,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             const SizedBox(width: 9),
                             Expanded(
                               child: Text(
-                                '$readyCount / ${docs.length} PARTICIPANTS READY',
+                                '$readyCount / ${docs.length} CONTESTANTS READY',
                                 style: TextStyle(
                                   color: allReady ? Colors.green : darkBlue,
                                   fontWeight: FontWeight.bold,
@@ -2984,7 +2984,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 child: Padding(
                                   padding: EdgeInsets.all(24),
                                   child: Text(
-                                    'No approved participants found. Approve participants in the Waiting Room first.',
+                                    'No approved contestants found. Approve contestants in the Waiting Room first.',
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -3076,7 +3076,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                       await _allApprovedContestantsReady();
                                   if (!everyoneReady) {
                                     _showMessage(
-                                      'Not all approved participants are READY yet.',
+                                      'Not all approved contestants are READY yet.',
                                     );
                                     return;
                                   }
@@ -4329,7 +4329,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 const SizedBox(width: 9),
                                 const Expanded(
                                   child: Text(
-                                    'Participant Answers',
+                                    'Contestant Answers',
                                     style: TextStyle(
                                       color: darkBlue,
                                       fontWeight: FontWeight.w700,
@@ -4926,7 +4926,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
             if (rows.isEmpty) {
               return const Text(
-                'Standings will appear when participant scores are recorded.',
+                'Standings will appear when contestant scores are recorded.',
               );
             }
 
@@ -6062,7 +6062,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       children: [
                         const Expanded(
                           child: Text(
-                            'Participants to proceed',
+                            'Contestants to proceed',
                             style: TextStyle(
                               color: darkBlue,
                               fontWeight: FontWeight.w600,

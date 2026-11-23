@@ -571,7 +571,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                   else ...[
                                     _sectionHeader(
                                       'Top Performers',
-                                      'Leading participants in this competition.',
+                                      'Leading contestants in this competition.',
                                       Icons.emoji_events_rounded,
                                     ),
                                     const SizedBox(height: 10),
@@ -609,7 +609,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       (icon: Icons.dashboard_outlined, title: 'Dashboard', index: 0),
       (icon: Icons.assignment_outlined, title: 'Quizzes', index: 1),
       (icon: Icons.bar_chart_outlined, title: 'Leaderboard', index: 2),
-      (icon: Icons.people_outline, title: 'Participants', index: 3),
+      (icon: Icons.people_outline, title: 'Contestants', index: 3),
       (icon: Icons.person_outline, title: 'Profile', index: 4),
     ];
 
