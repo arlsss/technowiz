@@ -1068,28 +1068,35 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                             return a.effectiveName.compareTo(b.effectiveName);
                           });
 
+                          // Group active contestants by score to identify tied groups
+                          final Map<int, List<ContestantTally>> scoreGroups = {};
+                          for (final c in tallyList) {
+                            if (!c.isEliminated && !_tieResolvedUids.contains(c.uid)) {
+                              scoreGroups.putIfAbsent(c.score, () => []).add(c);
+                            }
+                          }
+
                           // Assign ranks (same score = same rank unless tie resolved)
                           final List<ContestantTally> rankedList = [];
                           bool hasAnyTie = false;
+                          int currentRank = 1;
 
                           for (int i = 0; i < tallyList.length; i++) {
-                            int currentRank = 1;
-                            bool isTied = false;
+                            final c = tallyList[i];
+                            if (i > 0 && c.score != tallyList[i - 1].score) {
+                              currentRank = i + 1;
+                            }
 
-                            if (i > 0) {
-                              final prev = rankedList[i - 1];
-                              if (tallyList[i].score == prev.score &&
-                                  !_tieResolvedUids.contains(tallyList[i].uid)) {
-                                currentRank = prev.rank;
-                                isTied = true;
-                                hasAnyTie = true;
-                              } else {
-                                currentRank = i + 1;
-                              }
+                            final isTied = !c.isEliminated &&
+                                !_tieResolvedUids.contains(c.uid) &&
+                                (scoreGroups[c.score]?.length ?? 0) > 1;
+
+                            if (isTied) {
+                              hasAnyTie = true;
                             }
 
                             rankedList.add(
-                              tallyList[i].copyWith(
+                              c.copyWith(
                                 rank: currentRank,
                                 isTied: isTied,
                               ),
@@ -1691,6 +1698,43 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   ),
                 ),
               ),
+              if (c.isTied) ...[
+                const SizedBox(width: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.balance_rounded,
+                        size: 10,
+                        color: Color(0xFFB45309),
+                      ),
+                      SizedBox(width: 2.5),
+                      Text(
+                        'TIE',
+                        style: TextStyle(
+                          color: Color(0xFFB45309),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           if (c.isTeam && c.teamMembers.isNotEmpty)
