@@ -6,7 +6,7 @@ import 'technowiz_theme.dart';
 /// Reusable Level Instructions UI for WaitingRoomScreen & QuizScreen.
 /// Displays the exact standard Level 1 card layout uniformly across ALL levels
 /// (Level 1, Level 2, Level 3, Level 4 and above) with TechCircuitBackground.
-class QuizInstructionsScreen extends StatelessWidget {
+class QuizInstructionsScreen extends StatefulWidget {
   final Map<String, dynamic> quizData;
   final int level;
   final String? quizCode;
@@ -18,11 +18,38 @@ class QuizInstructionsScreen extends StatelessWidget {
     this.quizCode,
   });
 
+  @override
+  State<QuizInstructionsScreen> createState() => _QuizInstructionsScreenState();
+}
+
+class _QuizInstructionsScreenState extends State<QuizInstructionsScreen> {
   static const Color _background = Color(0xFFF2FBF5);
   static const Color _primaryGreen = Color(0xFF16A34A);
   static const Color _darkGreen = Color(0xFF14532D);
   static const Color _lightGreen = Color(0xFFECFDF3);
   static const Color _textDark = Color(0xFF1F2937);
+
+  int? _proceedCount;
+  int? _points;
+  String? _questionTypes;
+
+  @override
+  void initState() {
+    super.initState();
+    _computeInitialValues();
+    _loadAsyncOverrides();
+  }
+
+  @override
+  void didUpdateWidget(covariant QuizInstructionsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.level != widget.level ||
+        oldWidget.quizCode != widget.quizCode ||
+        oldWidget.quizData != widget.quizData) {
+      _computeInitialValues();
+      _loadAsyncOverrides();
+    }
+  }
 
   int _readInt(dynamic value, {required int fallback}) {
     if (value is int) return value;
@@ -117,195 +144,6 @@ class QuizInstructionsScreen extends StatelessWidget {
     return null;
   }
 
-  Future<int> _loadProceedCountForLevel(
-    Map<String, dynamic> fallbackSettings,
-    int instructionLevel,
-  ) async {
-    final code =
-        (quizCode ??
-                quizData['quizCode'] ??
-                quizData['code'] ??
-                quizData['sessionCode'] ??
-                quizData['quizEventCode'] ??
-                '')
-            .toString()
-            .trim();
-
-    if (code.isNotEmpty) {
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('quiz_sessions')
-            .doc(code)
-            .get();
-
-        final sessionData = snapshot.data() ?? <String, dynamic>{};
-        final rawAllSettings =
-            sessionData['levelSettings'] ?? sessionData['levels'];
-
-        final savedSettings = _findLevelSettings(
-          rawAllSettings,
-          instructionLevel,
-        );
-
-        if (savedSettings != null) {
-          final savedProceed = _extractProceedCount(
-            savedSettings,
-            instructionLevel,
-          );
-          if (savedProceed != null) return savedProceed;
-
-          for (final nestedKey in [
-            'settings',
-            'levelSettings',
-            'configuration',
-            'config',
-          ]) {
-            final nested = savedSettings[nestedKey];
-            if (nested is Map) {
-              final nestedProceed = _extractProceedCount(
-                Map<String, dynamic>.from(nested),
-                instructionLevel,
-              );
-              if (nestedProceed != null) return nestedProceed;
-            }
-          }
-        }
-
-        final topLevelProceed = _extractProceedCount(
-          sessionData,
-          instructionLevel,
-        );
-        if (topLevelProceed != null) return topLevelProceed;
-      } catch (error) {
-        debugPrint(
-          'Unable to load Admin proceedCount for Level $instructionLevel: $error',
-        );
-      }
-    }
-
-    final suppliedProceed = _extractProceedCount(
-      fallbackSettings,
-      instructionLevel,
-    );
-    if (suppliedProceed != null) return suppliedProceed;
-
-    final rawQuizSettings = quizData['levelSettings'] ?? quizData['levels'];
-    final quizLevelSettings = _findLevelSettings(
-      rawQuizSettings,
-      instructionLevel,
-    );
-    if (quizLevelSettings != null) {
-      final proceed = _extractProceedCount(quizLevelSettings, instructionLevel);
-      if (proceed != null) return proceed;
-    }
-
-    final rawQuizProceed = _extractProceedCount(quizData, instructionLevel);
-    if (rawQuizProceed != null) return rawQuizProceed;
-
-    return 0;
-  }
-
-  Future<int> _loadPointsForLevel(
-    Map<String, dynamic> fallbackSettings,
-    int instructionLevel,
-  ) async {
-    final code =
-        (quizCode ??
-                quizData['quizCode'] ??
-                quizData['code'] ??
-                quizData['sessionCode'] ??
-                quizData['quizEventCode'] ??
-                '')
-            .toString()
-            .trim();
-
-    if (code.isNotEmpty) {
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('quiz_sessions')
-            .doc(code)
-            .get();
-
-        final sessionData = snapshot.data() ?? <String, dynamic>{};
-        final rawAllSettings =
-            sessionData['levelSettings'] ?? sessionData['levels'];
-
-        final savedSettings = _findLevelSettings(
-          rawAllSettings,
-          instructionLevel,
-        );
-
-        if (savedSettings != null) {
-          final savedPoints = _configuredPoints(savedSettings);
-          if (savedPoints != null) return savedPoints;
-
-          for (final nestedKey in [
-            'settings',
-            'levelSettings',
-            'configuration',
-            'config',
-          ]) {
-            final nested = savedSettings[nestedKey];
-            if (nested is Map) {
-              final nestedPoints = _configuredPoints(
-                Map<String, dynamic>.from(nested),
-              );
-              if (nestedPoints != null) return nestedPoints;
-            }
-          }
-        }
-
-        final topLevelKeys = [
-          'level${instructionLevel}Points',
-          'level${instructionLevel}PointsPerQuestion',
-          'level${instructionLevel}PointValue',
-          'pointsLevel$instructionLevel',
-          'pointsPerQuestionLevel$instructionLevel',
-        ];
-
-        for (final key in topLevelKeys) {
-          final value = sessionData[key];
-          if (value != null) {
-            final parsed = value is num
-                ? value.toInt()
-                : int.tryParse(value.toString().trim());
-            if (parsed != null) return parsed;
-          }
-        }
-      } catch (error) {
-        debugPrint(
-          'Unable to load Admin points for Level $instructionLevel: $error',
-        );
-      }
-    }
-
-    final suppliedPoints = _configuredPoints(fallbackSettings);
-    if (suppliedPoints != null) return suppliedPoints;
-
-    final rawQuizSettings = quizData['levelSettings'] ?? quizData['levels'];
-    final quizLevelSettings = _findLevelSettings(
-      rawQuizSettings,
-      instructionLevel,
-    );
-    if (quizLevelSettings != null) {
-      final points = _configuredPoints(quizLevelSettings);
-      if (points != null) return points;
-    }
-
-    final rawQuizPoints =
-        quizData['level${instructionLevel}Points'] ??
-        quizData['level${instructionLevel}PointsPerQuestion'] ??
-        quizData['level${instructionLevel}PointValue'];
-    if (rawQuizPoints != null) {
-      final parsed = rawQuizPoints is num
-          ? rawQuizPoints.toInt()
-          : int.tryParse(rawQuizPoints.toString().trim());
-      if (parsed != null) return parsed;
-    }
-
-    return instructionLevel.clamp(1, 3).toInt();
-  }
-
   String? _normalizeType(dynamic raw) {
     if (raw == null) return null;
     final original = raw.toString().trim();
@@ -362,176 +200,219 @@ class QuizInstructionsScreen extends StatelessWidget {
     return match == null ? null : int.tryParse(match.group(1)!);
   }
 
-  Future<String> _loadQuestionTypes(Map<String, dynamic> fallbackSettings) async {
+  String _extractInitialQuestionTypes(
+    Map<String, dynamic> settings,
+    int instructionLevel,
+  ) {
+    final rawAdminType =
+        settings['questionType'] ??
+        settings['questionTypes'] ??
+        settings['question_type'] ??
+        settings['question_types'] ??
+        settings['type'] ??
+        settings['types'] ??
+        settings['allowedQuestionTypes'] ??
+        widget.quizData['level${instructionLevel}QuestionType'] ??
+        widget.quizData['level${instructionLevel}QuestionTypes'] ??
+        widget.quizData['questionType'] ??
+        widget.quizData['type'];
+
+    if (rawAdminType is List && rawAdminType.isNotEmpty) {
+      final types = <String>[];
+      for (final item in rawAdminType) {
+        final t = _normalizeType(item);
+        if (t != null && !types.contains(t)) types.add(t);
+      }
+      if (types.isNotEmpty) return types.join(', ');
+    } else if (rawAdminType is String && rawAdminType.trim().isNotEmpty) {
+      final types = <String>[];
+      for (final item in rawAdminType.split(',')) {
+        final t = _normalizeType(item);
+        if (t != null && !types.contains(t)) types.add(t);
+      }
+      if (types.isNotEmpty) return types.join(', ');
+    }
+
+    return 'Identification';
+  }
+
+  void _computeInitialValues() {
+    final instructionLevel = widget.level.clamp(1, 99).toInt();
+    final dynamic allLevelSettings =
+        widget.quizData['levelSettings'] ?? widget.quizData['levels'];
+
+    Map<String, dynamic> settings = <String, dynamic>{};
+    if (allLevelSettings is Map) {
+      final normalizedTarget = 'level$instructionLevel';
+      for (final entry in allLevelSettings.entries) {
+        final normalizedKey = entry.key.toString().toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]'),
+          '',
+        );
+        if (normalizedKey == normalizedTarget && entry.value is Map) {
+          settings = Map<String, dynamic>.from(entry.value as Map);
+          break;
+        }
+      }
+    }
+
+    _proceedCount = _extractProceedCount(settings, instructionLevel) ??
+        _readInt(
+          settings['proceedCount'] ??
+              settings['participantsToProceed'] ??
+              settings['eliminateCount'] ??
+              settings['eliminationCount'] ??
+              settings['eliminations'] ??
+              widget.quizData['level${instructionLevel}ProceedCount'] ??
+              widget.quizData['level${instructionLevel}EliminateCount'],
+          fallback: 0,
+        );
+
+    _points = _configuredPoints(settings) ??
+        _configuredPoints(widget.quizData) ??
+        _readInt(
+          widget.quizData['level${instructionLevel}Points'] ??
+              widget.quizData['level${instructionLevel}PointsPerQuestion'] ??
+              widget.quizData['level${instructionLevel}PointValue'],
+          fallback: instructionLevel.clamp(1, 3),
+        );
+
+    _questionTypes = _extractInitialQuestionTypes(settings, instructionLevel);
+  }
+
+  Future<void> _loadAsyncOverrides() async {
     final code =
-        (quizCode ??
-                quizData['quizCode'] ??
-                quizData['code'] ??
-                quizData['sessionCode'] ??
-                quizData['quizEventCode'] ??
+        (widget.quizCode ??
+                widget.quizData['quizCode'] ??
+                widget.quizData['code'] ??
+                widget.quizData['sessionCode'] ??
+                widget.quizData['quizEventCode'] ??
                 '')
             .toString()
             .trim();
 
-    Map<String, dynamic> effectiveSettings =
-        Map<String, dynamic>.from(fallbackSettings);
-    Map<String, dynamic> sessionData = <String, dynamic>{};
+    if (code.isEmpty) return;
 
-    if (code.isNotEmpty) {
-      try {
-        final sessionDoc = await FirebaseFirestore.instance
-            .collection('quiz_sessions')
-            .doc(code)
-            .get();
-        if (sessionDoc.exists && sessionDoc.data() != null) {
-          sessionData = sessionDoc.data()!;
-          final rawAllSettings =
-              sessionData['levelSettings'] ?? sessionData['levels'];
-          final savedSettings = _findLevelSettings(rawAllSettings, level);
-          if (savedSettings != null) {
-            effectiveSettings = {
-              ...effectiveSettings,
-              ...savedSettings,
-            };
-          }
-        }
-      } catch (error) {
-        debugPrint('Unable to load session settings for question type: $error');
+    try {
+      final instructionLevel = widget.level.clamp(1, 99).toInt();
+      final sessionDoc = await FirebaseFirestore.instance
+          .collection('quiz_sessions')
+          .doc(code)
+          .get();
+
+      if (!sessionDoc.exists || sessionDoc.data() == null) return;
+      final sessionData = sessionDoc.data()!;
+
+      final rawAllSettings =
+          sessionData['levelSettings'] ?? sessionData['levels'];
+      final savedSettings = _findLevelSettings(
+        rawAllSettings,
+        instructionLevel,
+      );
+
+      int? newProceed;
+      int? newPoints;
+      String? newTypes;
+
+      if (savedSettings != null) {
+        newProceed = _extractProceedCount(savedSettings, instructionLevel);
+        newPoints = _configuredPoints(savedSettings);
       }
-    }
 
-    if (effectiveSettings.isEmpty) {
-      final rawQuizSettings = quizData['levelSettings'] ?? quizData['levels'];
-      final quizLevelSettings = _findLevelSettings(rawQuizSettings, level);
-      if (quizLevelSettings != null) {
-        effectiveSettings = {
-          ...effectiveSettings,
-          ...quizLevelSettings,
-        };
-      }
-    }
-
-    // Check if the level has an explicitly configured question type from Admin
-    final rawAdminType =
-        effectiveSettings['questionType'] ??
-        effectiveSettings['questionTypes'] ??
-        effectiveSettings['question_type'] ??
-        effectiveSettings['question_types'] ??
-        effectiveSettings['type'] ??
-        effectiveSettings['types'] ??
-        effectiveSettings['allowedQuestionTypes'] ??
-        sessionData['level${level}QuestionType'] ??
-        sessionData['level${level}QuestionTypes'] ??
-        quizData['level${level}QuestionType'] ??
-        quizData['level${level}QuestionTypes'];
-
-    final adminConfiguredTypes = <String>[];
-    if (rawAdminType is List) {
-      for (final item in rawAdminType) {
-        final t = _normalizeType(item);
-        if (t != null && !adminConfiguredTypes.contains(t)) {
-          adminConfiguredTypes.add(t);
-        }
-      }
-    } else if (rawAdminType is String && rawAdminType.trim().isNotEmpty) {
-      for (final item in rawAdminType.split(',')) {
-        final t = _normalizeType(item);
-        if (t != null && !adminConfiguredTypes.contains(t)) {
-          adminConfiguredTypes.add(t);
-        }
-      }
-    }
-
-    String? singleAdminType;
-    if (adminConfiguredTypes.isNotEmpty && adminConfiguredTypes.length == 1) {
-      singleAdminType = adminConfiguredTypes.first;
-    }
-
-    // Now inspect questions in the session
-    final questionTypes = <String>{};
-    if (code.isNotEmpty) {
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('quiz_sessions')
-            .doc(code)
-            .collection('questions')
-            .get();
-
-        for (final doc in snapshot.docs) {
-          final question = doc.data();
-          final assignedLevel = _questionLevel(question);
-          if (assignedLevel != level) continue;
-
-          var type = _normalizeType(
-            question['questionType'] ??
-                question['type'] ??
-                question['question_type'],
-          );
-
-          if (type == null) {
-            if (singleAdminType != null && singleAdminType != 'Mixed') {
-              type = singleAdminType;
-            } else {
-              final options = question['options'];
-              final answer = question['correctAnswer'] ?? question['answer'];
-              if (options is List && options.isNotEmpty) {
-                type = 'Multiple Choice';
-              } else if (answer is List) {
-                type = 'Enumeration';
-              }
+      newProceed ??= _extractProceedCount(sessionData, instructionLevel);
+      if (newPoints == null) {
+        final topLevelKeys = [
+          'level${instructionLevel}Points',
+          'level${instructionLevel}PointsPerQuestion',
+          'level${instructionLevel}PointValue',
+          'pointsLevel$instructionLevel',
+          'pointsPerQuestionLevel$instructionLevel',
+        ];
+        for (final key in topLevelKeys) {
+          final value = sessionData[key];
+          if (value != null) {
+            final parsed = value is num
+                ? value.toInt()
+                : int.tryParse(value.toString().trim());
+            if (parsed != null) {
+              newPoints = parsed;
+              break;
             }
           }
+        }
+      }
 
-          if (type != null) {
-            questionTypes.add(type);
+      // Load question types from questions collection
+      final questionsSnap = await FirebaseFirestore.instance
+          .collection('quiz_sessions')
+          .doc(code)
+          .collection('questions')
+          .get();
+
+      final questionTypesSet = <String>{};
+      for (final doc in questionsSnap.docs) {
+        final question = doc.data();
+        final assignedLevel = _questionLevel(question);
+        if (assignedLevel != instructionLevel) continue;
+
+        var type = _normalizeType(
+          question['questionType'] ??
+              question['type'] ??
+              question['question_type'],
+        );
+
+        if (type == null) {
+          final options = question['options'];
+          final answer = question['correctAnswer'] ?? question['answer'];
+          if (options is List && options.isNotEmpty) {
+            type = 'Multiple Choice';
+          } else if (answer is List) {
+            type = 'Enumeration';
           }
         }
-      } catch (error) {
-        debugPrint(
-          'Unable to load selected question types from questions: $error',
-        );
+
+        if (type != null) {
+          questionTypesSet.add(type);
+        }
       }
+
+      const order = [
+        'Multiple Choice',
+        'True/False',
+        'Identification',
+        'Fill in the Blank',
+        'Enumeration',
+      ];
+
+      if (questionTypesSet.isNotEmpty) {
+        final ordered = <String>[];
+        for (final t in order) {
+          if (questionTypesSet.contains(t)) ordered.add(t);
+        }
+        for (final t in questionTypesSet) {
+          if (!ordered.contains(t)) ordered.add(t);
+        }
+        newTypes = ordered.join(', ');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        if (newProceed != null) _proceedCount = newProceed;
+        if (newPoints != null) _points = newPoints;
+        if (newTypes != null && newTypes.isNotEmpty) _questionTypes = newTypes;
+      });
+    } catch (e) {
+      debugPrint('Error loading instructions overrides: $e');
     }
-
-    const order = [
-      'Multiple Choice',
-      'True/False',
-      'Identification',
-      'Fill in the Blank',
-      'Enumeration',
-    ];
-
-    if (questionTypes.isNotEmpty) {
-      final ordered = <String>[];
-      for (final t in order) {
-        if (questionTypes.contains(t)) ordered.add(t);
-      }
-      for (final t in questionTypes) {
-        if (!ordered.contains(t)) ordered.add(t);
-      }
-      return ordered.join(', ');
-    }
-
-    if (adminConfiguredTypes.isNotEmpty) {
-      final ordered = <String>[];
-      for (final t in order) {
-        if (adminConfiguredTypes.contains(t)) ordered.add(t);
-      }
-      for (final t in adminConfiguredTypes) {
-        if (!ordered.contains(t)) ordered.add(t);
-      }
-      return ordered.join(', ');
-    }
-
-    return 'Multiple Choice';
   }
 
   @override
   Widget build(BuildContext context) {
-    final instructionLevel = level.clamp(1, 99).toInt();
+    final instructionLevel = widget.level.clamp(1, 99).toInt();
 
     final dynamic allLevelSettings =
-        quizData['levelSettings'] ?? quizData['levels'];
+        widget.quizData['levelSettings'] ?? widget.quizData['levels'];
 
     Map<String, dynamic> settings = <String, dynamic>{};
     if (allLevelSettings is Map) {
@@ -552,30 +433,31 @@ class QuizInstructionsScreen extends StatelessWidget {
       settings['timerSeconds'] ??
           settings['timeSeconds'] ??
           settings['timer'] ??
-          quizData['timerSeconds'] ??
-          quizData['questionTime'],
+          widget.quizData['timerSeconds'] ??
+          widget.quizData['questionTime'],
       fallback: 30,
     );
 
-    final proceedCount = _extractProceedCount(settings, instructionLevel) ??
+    final proceedCount = _proceedCount ??
+        _extractProceedCount(settings, instructionLevel) ??
         _readInt(
           settings['proceedCount'] ??
               settings['participantsToProceed'] ??
               settings['eliminateCount'] ??
               settings['eliminationCount'] ??
               settings['eliminations'] ??
-              quizData['level${instructionLevel}ProceedCount'] ??
-              quizData['level${instructionLevel}EliminateCount'],
+              widget.quizData['level${instructionLevel}ProceedCount'] ??
+              widget.quizData['level${instructionLevel}EliminateCount'],
           fallback: 0,
         );
 
-    final points =
+    final points = _points ??
         _configuredPoints(settings) ??
-        _configuredPoints(quizData) ??
+        _configuredPoints(widget.quizData) ??
         _readInt(
-          quizData['level${instructionLevel}Points'] ??
-              quizData['level${instructionLevel}PointsPerQuestion'] ??
-              quizData['level${instructionLevel}PointValue'],
+          widget.quizData['level${instructionLevel}Points'] ??
+              widget.quizData['level${instructionLevel}PointsPerQuestion'] ??
+              widget.quizData['level${instructionLevel}PointValue'],
           fallback: instructionLevel.clamp(1, 3),
         );
 
@@ -583,7 +465,7 @@ class QuizInstructionsScreen extends StatelessWidget {
         (settings['difficulty'] ??
                 settings['levelName'] ??
                 settings['name'] ??
-                quizData['level${instructionLevel}Difficulty'] ??
+                widget.quizData['level${instructionLevel}Difficulty'] ??
                 (instructionLevel == 1
                     ? 'Easy'
                     : instructionLevel == 2
@@ -592,6 +474,18 @@ class QuizInstructionsScreen extends StatelessWidget {
             .toString()
             .trim();
     final shownDifficulty = difficulty.isEmpty ? 'Easy' : difficulty;
+
+    final String proceedText;
+    if (proceedCount <= 0) {
+      proceedText = "Contestants to proceed: All eligible contestants.";
+    } else if (proceedCount == 1) {
+      proceedText = "Contestant to proceed: 1 contestant.";
+    } else {
+      proceedText = "Contestants to proceed: $proceedCount contestant(s).";
+    }
+
+    final displayedTypes =
+        _questionTypes ?? _extractInitialQuestionTypes(settings, instructionLevel);
 
     return TechCircuitBackground(
       baseColor: _background,
@@ -661,63 +555,25 @@ class QuizInstructionsScreen extends StatelessWidget {
                       const Color(0xFF64748B),
                       "$seconds sec per question.",
                     ),
-                    FutureBuilder<int>(
-                      future: _loadProceedCountForLevel(
-                        settings,
-                        instructionLevel,
-                      ),
-                      builder: (context, proceedSnapshot) {
-                        final count = proceedSnapshot.data ?? proceedCount;
-                        final String proceedText;
-                        if (count <= 0) {
-                          proceedText =
-                              "Contestants to proceed: All eligible contestants.";
-                        } else if (count == 1) {
-                          proceedText =
-                              "Contestant to proceed: 1 contestant.";
-                        } else {
-                          proceedText =
-                              "Contestants to proceed: $count contestant(s).";
-                        }
-
-                        return _instructionItem(
-                          Icons.how_to_reg_rounded,
-                          const Color(0xFF10B981),
-                          proceedText,
-                        );
-                      },
+                    _instructionItem(
+                      Icons.how_to_reg_rounded,
+                      const Color(0xFF10B981),
+                      proceedText,
                     ),
                     _instructionItem(
                       Icons.check_box_rounded,
                       _primaryGreen,
                       "Answers cannot be changed after submission.",
                     ),
-                    FutureBuilder<String>(
-                      future: _loadQuestionTypes(settings),
-                      builder: (context, snapshot) {
-                        final types = snapshot.data;
-                        return _instructionItem(
-                          Icons.edit_note_rounded,
-                          const Color(0xFF0EA5E9),
-                          types == null
-                              ? "Question types: Loading..."
-                              : "Question types: $types.",
-                        );
-                      },
+                    _instructionItem(
+                      Icons.edit_note_rounded,
+                      const Color(0xFF0EA5E9),
+                      "Question types: $displayedTypes.",
                     ),
-                    FutureBuilder<int>(
-                      future: _loadPointsForLevel(settings, instructionLevel),
-                      builder: (context, pointsSnapshot) {
-                        final displayedPoints = pointsSnapshot.data ?? points;
-                        return _instructionItem(
-                          Icons.star_rounded,
-                          const Color(0xFFF59E0B),
-                          pointsSnapshot.connectionState ==
-                                  ConnectionState.waiting
-                              ? "Loading points for Level $instructionLevel..."
-                              : "$displayedPoints point(s) per question.",
-                        );
-                      },
+                    _instructionItem(
+                      Icons.star_rounded,
+                      const Color(0xFFF59E0B),
+                      "$points point(s) per question.",
                     ),
                     _instructionItem(
                       Icons.balance_rounded,
