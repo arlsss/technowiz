@@ -1457,19 +1457,34 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           title: const Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.green),
+              Icon(Icons.check_circle_rounded, color: Colors.green, size: 22),
               SizedBox(width: 8),
-              Text(
-                'Approve Contest Request?',
-                style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'Approve Contest Request?',
+                  style: TextStyle(
+                    color: darkBlue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.5,
+                  ),
+                ),
               ),
             ],
           ),
           content: const Text(
             'Are you sure you want to approve this contest request?\n\n'
             'The contestant\'s answer will be accepted and points will be awarded.',
+            style: TextStyle(
+              fontSize: 13.5,
+              height: 1.4,
+              color: Colors.black87,
+            ),
           ),
           actions: [
             TextButton(
@@ -1500,13 +1515,23 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           title: const Row(
             children: [
-              Icon(Icons.cancel_rounded, color: Colors.red),
+              Icon(Icons.cancel_rounded, color: Colors.red, size: 22),
               SizedBox(width: 8),
-              Text(
-                'Reject Contest Request',
-                style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'Reject Contest Request',
+                  style: TextStyle(
+                    color: darkBlue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.5,
+                  ),
+                ),
               ),
             ],
           ),
