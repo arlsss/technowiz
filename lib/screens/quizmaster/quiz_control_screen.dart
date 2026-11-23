@@ -4555,6 +4555,45 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             ),
                           ),
                           const SizedBox(width: 6),
+                          if (contestant['eliminated'] == true ||
+                              contestant['isEliminated'] == true ||
+                              (contestant['status'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+                              contestant['eliminationConfirmed'] == true) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFCA5A5),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.cancel_rounded,
+                                    size: 11,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'ELIMINATED',
+                                    style: TextStyle(
+                                      color: Color(0xFFDC2626),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
                           if (isTeam)
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -4849,6 +4888,16 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               final int score =
                   _asInt(sData['score']) ?? _asInt(jData['score']) ?? 0;
 
+              final bool isEliminated =
+                  sData['eliminated'] == true ||
+                  sData['isEliminated'] == true ||
+                  (sData['status'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+                  sData['eliminationConfirmed'] == true ||
+                  jData['eliminated'] == true ||
+                  jData['isEliminated'] == true ||
+                  (jData['status'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
+                  jData['eliminationConfirmed'] == true;
+
               rows.add({
                 'id': id,
                 'name': displayName,
@@ -4857,6 +4906,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 'personalFullName': personalFullName,
                 'teamMembers': teamMembers,
                 'score': score,
+                'isEliminated': isEliminated,
               });
             }
 
@@ -4960,15 +5010,19 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                     ),
                     leading: CircleAvatar(
                       radius: 15,
-                      backgroundColor: showRankNumbers
-                          ? Colors.blue.shade50
-                          : const Color(0xFFF1F5F9),
+                      backgroundColor: rows[i]['isEliminated'] == true
+                          ? const Color(0xFFFEE2E2)
+                          : (showRankNumbers
+                              ? Colors.blue.shade50
+                              : const Color(0xFFF1F5F9)),
                       child: Text(
                         showRankNumbers ? '${rows[i]['rank']}' : '-',
                         style: TextStyle(
-                          color: showRankNumbers
-                              ? primaryBlue
-                              : const Color(0xFF94A3B8),
+                          color: rows[i]['isEliminated'] == true
+                              ? const Color(0xFFDC2626)
+                              : (showRankNumbers
+                                  ? primaryBlue
+                                  : const Color(0xFF94A3B8)),
                           fontWeight: FontWeight.bold,
                           fontSize: showRankNumbers ? 12 : 14,
                         ),
@@ -4981,14 +5035,52 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             rows[i]['name'] as String,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: darkBlue,
+                            style: TextStyle(
+                              color: rows[i]['isEliminated'] == true
+                                  ? const Color(0xFF991B1B)
+                                  : darkBlue,
                               fontWeight: FontWeight.w700,
                               fontSize: 13.5,
                             ),
                           ),
                         ),
                         const SizedBox(width: 6),
+                        if (rows[i]['isEliminated'] == true) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFCA5A5),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cancel_rounded,
+                                  size: 11,
+                                  color: Color(0xFFDC2626),
+                                ),
+                                SizedBox(width: 3),
+                                Text(
+                                  'ELIMINATED',
+                                  style: TextStyle(
+                                    color: Color(0xFFDC2626),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         if (rows[i]['isTeam'] == true)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -5063,8 +5155,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           ),
                       ],
                     ),
-                    subtitle: ((rows[i]['teamMembers'] as List<String>?)?.isNotEmpty ?? false)
-                        ? Padding(
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if ((rows[i]['teamMembers'] as List<String>?)?.isNotEmpty ?? false)
+                          Padding(
                             padding: const EdgeInsets.only(top: 2),
                             child: Text(
                               'Members: ${(rows[i]['teamMembers'] as List<String>).join(', ')}',
@@ -5075,12 +5170,27 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 color: Color(0xFF5B7A9C),
                               ),
                             ),
-                          )
-                        : null,
+                          ),
+                        if (rows[i]['isEliminated'] == true)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Text(
+                              'Eliminated from quiz',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                     trailing: Text(
                       '${rows[i]['score']} pts',
-                      style: const TextStyle(
-                        color: darkBlue,
+                      style: TextStyle(
+                        color: rows[i]['isEliminated'] == true
+                            ? const Color(0xFFDC2626)
+                            : darkBlue,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
