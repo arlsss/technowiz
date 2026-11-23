@@ -273,7 +273,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   // ============================================================
 
   bool _hasLevel(int level) {
-    return _getFirstQuestionIndexForLevel(level) != null;
+    if (_getFirstQuestionIndexForLevel(level) != null) return true;
+    for (int i = 0; i < _questions.length; i++) {
+      if (_getQuestionLevel(_questions[i]) >= level) return true;
+    }
+    return false;
   }
 
   // ============================================================
@@ -1042,7 +1046,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     // Proceed or Eliminate on the Final Ranking screen.
 
     if (!mounted) return;
-    await _openFinalTally(isFinal: false);
+    await _openFinalRanking();
   }
 
   // ============================================================
@@ -4154,7 +4158,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           content: Text(
             hasNextLevel
                 ? 'There are still remaining questions in Level $currentLevel.\n\n'
-                    'Do you want to end Level $currentLevel now and proceed to contestant tally?'
+                    'Do you want to end Level $currentLevel now and proceed to level results?'
                 : 'There are still remaining questions or levels in this quiz.\n\n'
                     'Do you want to end the quiz now and proceed directly to Final Tally?',
           ),
