@@ -1550,6 +1550,13 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         final existing = await questionsRef.get();
         for (final doc in existing.docs) {
           final data = doc.data();
+          if (data['isTieBreaker'] == true ||
+              (data['sessionLevel'] ?? '').toString().trim().toLowerCase() ==
+                  'tie breaker') {
+            levelQuestions.putIfAbsent('Tie Breaker', () => []);
+            levelQuestions['Tie Breaker']!.add(doc.id);
+            continue;
+          }
           final oldLevel = (data['sessionLevel'] ?? data['level'] ?? 'Level 1')
               .toString();
           final normalized = oldLevel.toLowerCase().startsWith('level ')
@@ -1649,6 +1656,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                 data['quizLevel'] ??
                 'Uncategorized',
             'sessionLevel': currentLevel,
+            'isTieBreaker': currentLevel.trim().toLowerCase() == 'tie breaker',
             'order': nextOrder,
             'addedAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
@@ -1658,10 +1666,17 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         }
       }
 
+      final regularLevels = levelQuestions.keys
+          .where((k) => k.trim().toLowerCase() != 'tie breaker')
+          .toList();
+
       batch.set(quizRef, {
-        'levels': levelQuestions.keys.toList(),
+        'levels': regularLevels,
         'levelQuestions': levelQuestions,
         'questionIds': allAssignedIds.toList(),
+        'tieBreakerQuestionIds': levelQuestions['Tie Breaker'] ??
+            levelQuestions['tie breaker'] ??
+            [],
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -2275,6 +2290,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       await quizRef.set({
         'levelQuestions': levelQuestions,
         'questionIds': allAssignedIds.toList(),
+        'tieBreakerQuestionIds': levelQuestions['Tie Breaker'] ??
+            levelQuestions['tie breaker'] ??
+            [],
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -2400,7 +2418,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     if (rawLevels is List) {
       for (final value in rawLevels) {
         final level = value.toString().trim();
-        if (level.isNotEmpty && !result.contains(level)) {
+        if (level.isNotEmpty &&
+            level.toLowerCase() != 'tie breaker' &&
+            !result.contains(level)) {
           result.add(level);
         }
       }
@@ -2410,7 +2430,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     if (rawMap is Map) {
       for (final key in rawMap.keys) {
         final level = key.toString().trim();
-        if (level.isNotEmpty && !result.contains(level)) {
+        if (level.isNotEmpty &&
+            level.toLowerCase() != 'tie breaker' &&
+            !result.contains(level)) {
           result.add(level);
         }
       }
@@ -3478,8 +3500,13 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                           final allDocs = snapshot.data?.docs ?? [];
                           final docs = allDocs.where((doc) {
                             final data = doc.data();
+                            final isTieBreaker = data['isTieBreaker'] == true;
                             final level = (data['sessionLevel'] ?? '')
                                 .toString();
+                            if (isTieBreaker ||
+                                level.trim().toLowerCase() == 'tie breaker') {
+                              return false;
+                            }
                             if (level != effectiveSelectedLevel) return false;
                             if (questionSearch.isEmpty) return true;
                             return getQuestionText(
@@ -3491,6 +3518,11 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                           return _buildQuestionList(docs);
                         },
                       ),
+
+                    const SizedBox(height: 30),
+
+                    // TIE BREAKER QUESTIONS
+                    _buildTieBreakerSection(phone: phone),
 
                     const SizedBox(height: 30),
 
@@ -3593,6 +3625,178 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // =========================================================
+  // TIE BREAKER QUESTIONS SECTION
+  // =========================================================
+
+  Widget _buildTieBreakerSection({required bool phone}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        phone
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tie Breaker Questions',
+                    style: TextStyle(
+                      color: textDark,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Manage questions used only when contestants have tied scores.',
+                    style: TextStyle(color: textGrey, fontSize: 11),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => openAddQuestions('Tie Breaker'),
+                      icon: const Icon(Icons.add_rounded, size: 17),
+                      label: const Text('ADD TIE BREAKER'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryPurple,
+                        side: const BorderSide(color: primaryPurple),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tie Breaker Questions',
+                          style: TextStyle(
+                            color: textDark,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Manage questions used only when contestants have tied scores.',
+                          style: TextStyle(color: textGrey, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => openAddQuestions('Tie Breaker'),
+                    icon: const Icon(Icons.add_rounded, size: 17),
+                    label: const Text('ADD TIE BREAKER'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryPurple,
+                      side: const BorderSide(color: primaryPurple),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+        const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: quizRef.collection('questions').orderBy('order').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: CircularProgressIndicator(color: primaryPurple),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return _errorBox(snapshot.error.toString());
+            }
+
+            final allDocs = snapshot.data?.docs ?? [];
+            final docs = allDocs.where((doc) {
+              final data = doc.data();
+              final isTieBreaker = data['isTieBreaker'] == true;
+              final level = (data['sessionLevel'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+              return isTieBreaker || level == 'tie breaker';
+            }).toList();
+
+            if (docs.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE8DFFF)),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.balance_rounded,
+                      size: 40,
+                      color: Colors.amber.shade700,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No Tie Breaker Questions',
+                      style: TextStyle(
+                        color: textDark,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Click "ADD TIE BREAKER" to assign questions for tie-breaking.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey, fontSize: 11),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: docs.map((doc) => _assignedQuestionTile(doc)).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -4352,6 +4556,7 @@ class _AddQuestionsDialogState extends State<AddQuestionsDialog> {
     setState(() {
       for (final doc in snapshot.docs) {
         final docData = doc.data();
+        final isTieBreaker = docData['isTieBreaker'] == true;
         final docLevel =
             (docData['sessionLevel'] ?? docData['level'] ?? 'Level 1')
                 .toString();
@@ -4359,10 +4564,20 @@ class _AddQuestionsDialogState extends State<AddQuestionsDialog> {
             ? docLevel
             : 'Level $docLevel';
 
-        if (normalized.trim().toLowerCase() == currentLevel) {
-          selectedIds.add(doc.id);
+        if (currentLevel == 'tie breaker') {
+          if (isTieBreaker || docLevel.trim().toLowerCase() == 'tie breaker') {
+            selectedIds.add(doc.id);
+          } else {
+            assignedToOtherLevels.add(doc.id);
+          }
         } else {
-          assignedToOtherLevels.add(doc.id);
+          if (isTieBreaker || docLevel.trim().toLowerCase() == 'tie breaker') {
+            assignedToOtherLevels.add(doc.id);
+          } else if (normalized.trim().toLowerCase() == currentLevel) {
+            selectedIds.add(doc.id);
+          } else {
+            assignedToOtherLevels.add(doc.id);
+          }
         }
       }
 

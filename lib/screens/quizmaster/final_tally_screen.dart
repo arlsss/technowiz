@@ -215,7 +215,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   // TIE BREAKER ACTION
   // ============================================================
 
-  void _handleTieBreaker(List<ContestantTally> contestants) {
+  Future<void> _handleTieBreaker(List<ContestantTally> contestants) async {
     if (contestants.isEmpty) return;
 
     // Group contestants by score
@@ -292,7 +292,23 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
       return;
     }
 
-    // Ties detected! Show Tie-Breaker Dialog
+    // Fetch Admin's Tie Breaker Questions from Firestore
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> tieBreakerQuestions = [];
+    try {
+      final snap =
+          await _sessionRef.collection('questions').orderBy('order').get();
+      tieBreakerQuestions = snap.docs.where((doc) {
+        final data = doc.data();
+        final isTB = data['isTieBreaker'] == true;
+        final sLvl =
+            (data['sessionLevel'] ?? '').toString().trim().toLowerCase();
+        return isTB || sLvl == 'tie breaker';
+      }).toList();
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    // Ties detected! Show Tie-Breaker Dialog with questions set by Admin
     showDialog<void>(
       context: context,
       builder: (ctx) {
@@ -389,7 +405,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                         const SizedBox(height: 8),
                         ...group.map((c) {
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            padding: const EdgeInsets.symmetric(vertical: 3),
                             child: Row(
                               children: [
                                 const Icon(
@@ -398,23 +414,52 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                   color: Colors.amber,
                                 ),
                                 Expanded(
-                                  child: Text(
-                                    c.effectiveName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                      color: QuizMasterColors.darkBlue,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        c.effectiveName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: QuizMasterColors.darkBlue,
+                                        ),
+                                      ),
+                                      if (c.submissionTimeMs > 0)
+                                        Text(
+                                          'Last submission: ${DateTime.fromMillisecondsSinceEpoch(c.submissionTimeMs).toLocal().toString().substring(14, 19)}',
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () => _awardTieBreakerPoint(ctx, c),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF16A34A),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      '+1 PT',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 11,
+                                      ),
                                     ),
                                   ),
                                 ),
-                                if (c.submissionTimeMs > 0)
-                                  Text(
-                                    'Last: ${DateTime.fromMillisecondsSinceEpoch(c.submissionTimeMs).toLocal().toString().substring(14, 19)}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
                               ],
                             ),
                           );
@@ -423,11 +468,148 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                     ),
                   );
                 }),
+
+                // Admin-set Tie Breaker Questions section
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 8, bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.help_outline_rounded,
+                            size: 16,
+                            color: QuizMasterColors.primaryBlue,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Admin Tie Breaker Questions (${tieBreakerQuestions.length})',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                              color: QuizMasterColors.darkBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (tieBreakerQuestions.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            'No tie-breaker questions configured by Admin yet.\nYou can resolve by speed or award +1 PT manually.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.black54,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        )
+                      else
+                        ...tieBreakerQuestions.asMap().entries.map((entry) {
+                          final idx = entry.key + 1;
+                          final qData = entry.value.data();
+                          final qText = (qData['questionText'] ??
+                                  qData['question'] ??
+                                  qData['text'] ??
+                                  '')
+                              .toString();
+                          final qAns = (qData['correctAnswer'] ??
+                                  qData['answer'] ??
+                                  '')
+                              .toString();
+
+                          return Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: QuizMasterColors.primaryBlue
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Q$idx',
+                                        style: const TextStyle(
+                                          color: QuizMasterColors.primaryBlue,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10.5,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        qText,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12,
+                                          color: QuizMasterColors.darkBlue,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 14,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        'Answer: $qAns',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF15803D),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 6),
                 const Text(
-                  'Options:\n• RESOLVE BY SPEED: Uses earliest submission time to determine higher rank.\n• KEEP SHARED: Keeps tied contestants sharing the same rank.',
+                  'Options:\n• Tap "+1 PT" next to a contestant to award point for a correct tie-breaker answer.\n• RESOLVE BY SPEED: Uses earliest submission time to determine higher rank.\n• KEEP SHARED: Keeps tied contestants sharing the same rank.',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     color: Colors.black54,
                     height: 1.35,
                   ),
@@ -459,6 +641,48 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         );
       },
     );
+  }
+
+  Future<void> _awardTieBreakerPoint(
+    BuildContext dialogCtx,
+    ContestantTally contestant,
+  ) async {
+    try {
+      final scoreRef = _sessionRef.collection('scores').doc(contestant.uid);
+      await scoreRef.set({
+        'score': FieldValue.increment(1),
+        'totalScore': FieldValue.increment(1),
+        'tieBreakerWon': true,
+        'tieBreakerResolved': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      _tieResolvedUids.add(contestant.uid);
+
+      if (dialogCtx.mounted) {
+        Navigator.pop(dialogCtx);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '+1 Point awarded to ${contestant.effectiveName}! Tie resolved.',
+            ),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update score: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _resolveTieBySpeed(List<ContestantTally> contestants) async {
@@ -948,7 +1172,10 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                               ),
 
                               // Bottom Action Bar ("TIE BREAKER" & "FINISH QUIZ")
-                              _buildBottomActionBar(rankedList),
+                              _buildBottomActionBar(
+                                rankedList,
+                                hasAnyTie: hasAnyTie,
+                              ),
                             ],
                           );
                         },
@@ -1528,7 +1755,10 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   // BOTTOM ACTION BAR ("TIE BREAKER" & "FINISH QUIZ")
   // ============================================================
 
-  Widget _buildBottomActionBar(List<ContestantTally> contestants) {
+  Widget _buildBottomActionBar(
+    List<ContestantTally> contestants, {
+    required bool hasAnyTie,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1547,36 +1777,38 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
       ),
       child: Row(
         children: [
-          // TIE BREAKER BUTTON
-          Expanded(
-            child: SizedBox(
-              height: 48,
-              child: OutlinedButton.icon(
-                onPressed: () => _handleTieBreaker(contestants),
-                icon: Icon(
-                  Icons.balance_rounded,
-                  color: Colors.amber.shade900,
-                  size: 20,
-                ),
-                label: Text(
-                  'TIE BREAKER',
-                  style: TextStyle(
+          // TIE BREAKER BUTTON: Only shown if a tie is detected
+          if (hasAnyTie) ...[
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () => _handleTieBreaker(contestants),
+                  icon: Icon(
+                    Icons.balance_rounded,
                     color: Colors.amber.shade900,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    size: 20,
                   ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFFBEB),
-                  side: BorderSide(color: Colors.amber.shade400, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  label: Text(
+                    'TIE BREAKER',
+                    style: TextStyle(
+                      color: Colors.amber.shade900,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFFBEB),
+                    side: BorderSide(color: Colors.amber.shade400, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
 
           // FINISH QUIZ BUTTON (or NEXT LEVEL if intermediate)
           Expanded(
