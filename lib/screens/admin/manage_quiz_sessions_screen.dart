@@ -2864,36 +2864,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                             fontWeight: FontWeight.w700,
                           );
 
-                          // Keep all three actions aligned in one row when
+                          // Keep actions aligned in one row when
                           // there is enough room; stack safely on very narrow
                           // layouts instead of letting individual buttons wrap.
                           if (actionConstraints.maxWidth >= 340) {
                             return Row(
                               children: [
                                 Expanded(
-                                  flex: 5,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => openAddQuestions(
-                                      effectiveSelectedLevel,
-                                    ),
-                                    icon: const Icon(
-                                      Icons.add_rounded,
-                                      size: 15,
-                                    ),
-                                    label: const FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text('ADD QUESTIONS'),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: buttonPadding,
-                                      textStyle: labelStyle,
-                                      minimumSize: const Size(0, 38),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  flex: 3,
+                                  flex: 1,
                                   child: FilledButton.icon(
                                     onPressed: (published && !isFinished)
                                         ? null
@@ -2916,7 +2894,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
-                                  flex: 4,
+                                  flex: 1,
                                   child: OutlinedButton.icon(
                                     onPressed: published
                                         ? () => togglePublished(false)
@@ -2945,16 +2923,6 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                             spacing: 6,
                             runSpacing: 6,
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: () =>
-                                    openAddQuestions(effectiveSelectedLevel),
-                                icon: const Icon(Icons.add_rounded, size: 16),
-                                label: const Text('ADD QUESTIONS'),
-                                style: OutlinedButton.styleFrom(
-                                  padding: buttonPadding,
-                                  textStyle: labelStyle,
-                                ),
-                              ),
                               FilledButton.icon(
                                 onPressed: (published && !isFinished)
                                     ? null
@@ -3772,7 +3740,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Use "ADD QUESTIONS" above to '
+            'Use "ADD QUESTION" in Level Settings above to '
             'choose questions for this level.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey, fontSize: 12),
