@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // NOTE: i-adjust ang path kung lahi ang folder sa final_ranking_screen.dart
 // pananglitan: '../quizmaster/final_ranking_screen.dart'
 import 'final_ranking_screen.dart';
+import 'final_tally_screen.dart';
 import 'contestant_readiness_page.dart';
 import 'quizmaster_dashboard.dart';
 import 'quizmaster_theme.dart';
@@ -1041,7 +1042,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     // Proceed or Eliminate on the Final Ranking screen.
 
     if (!mounted) return;
-    await _openFinalRanking();
+    await _openFinalTally(isFinal: false);
   }
 
   // ============================================================
@@ -1824,8 +1825,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                     .toString()
                                     .trim()
                               : m.toString().trim();
-                          if (s.isNotEmpty && !teamMembers.contains(s))
+                          if (s.isNotEmpty && !teamMembers.contains(s)) {
                             teamMembers.add(s);
+                          }
                         }
                       }
 
@@ -2525,6 +2527,43 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       isSuccess: isSuccess,
       isWarning: isWarning,
     );
+  }
+
+  // ============================================================
+  // OPEN FINAL TALLY (TABLE FORM WITH CONTESTANT STATS & TIE BREAKER)
+  // ============================================================
+
+  Future<void> _openFinalTally({bool isFinal = false}) async {
+    if (!mounted || _finalRankingOpening) return;
+
+    _finalRankingOpening = true;
+    try {
+      await Navigator.of(context).push<void>(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) => FinalTallyScreen(
+            quizCode: widget.quizCode,
+            level: _currentLevel,
+            isFinal: isFinal,
+            onFinishQuiz: () async {
+              await _finishQuiz();
+              if (!mounted) return;
+              await _openFinalRanking(isFinal: true);
+            },
+            onProceedToNextLevel: () async {
+              if (!mounted) return;
+              await _openFinalRanking(isFinal: false);
+            },
+          ),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        ),
+      );
+      if (mounted) {
+        await _rememberQuizControlPage();
+      }
+    } finally {
+      _finalRankingOpening = false;
+    }
   }
 
   // ============================================================
@@ -3510,8 +3549,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   .toString()
                                   .trim()
                             : m.toString().trim();
-                        if (s.isNotEmpty && !teamMembers.contains(s))
+                        if (s.isNotEmpty && !teamMembers.contains(s)) {
                           teamMembers.add(s);
+                        }
                       }
                     }
 
@@ -4071,10 +4111,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     ScaffoldMessenger.of(context).clearSnackBars();
 
-    await _finishQuiz();
-
     if (!mounted) return;
-    await _openFinalRanking(isFinal: true);
+    await _openFinalTally(isFinal: true);
   }
 
   void _confirmFinishQuiz() {
@@ -4093,7 +4131,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       return;
     }
 
-    // 2. On the last question of the final level, go directly to Final Ranking.
+    // 2. On the last question of the final level, go directly to Final Tally.
     if (isFinalQuestionOfQuiz) {
       _finishQuizAndOpenFinalRanking();
       return;
@@ -4116,9 +4154,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           content: Text(
             hasNextLevel
                 ? 'There are still remaining questions in Level $currentLevel.\n\n'
-                    'Do you want to end Level $currentLevel now and proceed to level results?'
+                    'Do you want to end Level $currentLevel now and proceed to contestant tally?'
                 : 'There are still remaining questions or levels in this quiz.\n\n'
-                    'Do you want to end the quiz now and proceed directly to the Final Ranking?',
+                    'Do you want to end the quiz now and proceed directly to Final Tally?',
           ),
           actions: [
             TextButton(
@@ -5770,8 +5808,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   final s = m is Map
                       ? (m['name'] ?? '').toString().trim()
                       : m.toString().trim();
-                  if (s.isNotEmpty && !teamMembers.contains(s))
+                  if (s.isNotEmpty && !teamMembers.contains(s)) {
                     teamMembers.add(s);
+                  }
                 }
               }
 

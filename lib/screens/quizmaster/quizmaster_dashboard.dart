@@ -15,6 +15,7 @@ import 'manage_participants_screen.dart';
 import 'quiz_control_screen.dart';
 import 'contestant_readiness_page.dart';
 import 'final_ranking_screen.dart';
+import 'final_tally_screen.dart';
 import 'submitted_answers_screen.dart';
 
 import '../login_screen.dart';
@@ -152,6 +153,22 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                   MaterialPageRoute(builder: (_) => const QuizSessionsScreen()),
                 );
               },
+            );
+          } else {
+            page = const QuizSessionsScreen();
+          }
+          break;
+        case 'tally':
+          if (quizCode.isNotEmpty) {
+            final savedLevel =
+                prefs.getInt(QuizMasterNavPersistence.rankingLevelKey) ?? 1;
+            final isFinal =
+                prefs.getBool(QuizMasterNavPersistence.rankingIsFinalKey) ??
+                    true;
+            page = FinalTallyScreen(
+              quizCode: quizCode,
+              level: savedLevel,
+              isFinal: isFinal,
             );
           } else {
             page = const QuizSessionsScreen();
