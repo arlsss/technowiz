@@ -542,7 +542,19 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
     required String contestantName,
     required int score,
     required int rank,
+    bool isConfirmed = false,
   }) async {
+    if (isConfirmed) {
+      if (context.mounted) {
+        showQuizMasterTopNotification(
+          context,
+          'Cannot rejoin: Elimination is already confirmed for $contestantName.',
+          isError: true,
+        );
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -2356,7 +2368,11 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                 children: [
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
+                      backgroundColor: isConfirmed
+                          ? Colors.grey.shade400
+                          : Colors.green.shade700,
+                      disabledBackgroundColor: Colors.grey.shade400,
+                      disabledForegroundColor: Colors.white70,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(
@@ -2369,13 +2385,16 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    onPressed: () => _rejoinContestant(
-                      context: context,
-                      contestantId: playerId,
-                      contestantName: playerName,
-                      score: score,
-                      rank: rank,
-                    ),
+                    onPressed: isConfirmed
+                        ? null
+                        : () => _rejoinContestant(
+                              context: context,
+                              contestantId: playerId,
+                              contestantName: playerName,
+                              score: score,
+                              rank: rank,
+                              isConfirmed: isConfirmed,
+                            ),
                     child: const Text(
                       'REJOIN',
                       style: TextStyle(
