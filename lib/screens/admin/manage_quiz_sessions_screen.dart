@@ -3169,20 +3169,64 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.tune_rounded,
                                   color: primaryPurple,
                                   size: 20,
                                 ),
-                                SizedBox(width: 8),
-                                Text(
-                                  editingLevelName == null
-                                      ? 'Level Settings'
-                                      : 'Edit $editingLevelName',
-                                  style: TextStyle(
-                                    color: textDark,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    editingLevelName == null
+                                        ? 'Level Settings'
+                                        : 'Edit $editingLevelName',
+                                    style: const TextStyle(
+                                      color: textDark,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    final currentLvlText =
+                                        addLevelController.text.trim();
+                                    final String targetLevel;
+                                    if (editingLevelName != null) {
+                                      targetLevel = editingLevelName!;
+                                    } else if (currentLvlText.isNotEmpty) {
+                                      targetLevel = currentLvlText
+                                              .toLowerCase()
+                                              .startsWith('level')
+                                          ? currentLvlText
+                                          : 'Level $currentLvlText';
+                                    } else if (effectiveSelectedLevel
+                                        .isNotEmpty) {
+                                      targetLevel = effectiveSelectedLevel;
+                                    } else {
+                                      targetLevel = 'Level 1';
+                                    }
+                                    openAddQuestions(targetLevel);
+                                  },
+                                  icon: const Icon(Icons.add_rounded, size: 16),
+                                  label: const Text('ADD QUESTION'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: primaryPurple,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: const Size(0, 32),
+                                    visualDensity: VisualDensity.compact,
+                                    textStyle: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                 ),
                               ],
