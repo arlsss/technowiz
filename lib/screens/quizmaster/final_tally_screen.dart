@@ -954,8 +954,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         subtitle: 'Code: $quizCode',
         badgeText: 'TECHNOWIZ • SCOREBOARD',
         badgeIcon: Icons.table_chart_rounded,
-        showBackButton: true,
-        onBack: () => Navigator.of(context).pop(),
+        showBackButton: false,
       ),
       body: QuizMasterCircuitBackground(
         child: SafeArea(
