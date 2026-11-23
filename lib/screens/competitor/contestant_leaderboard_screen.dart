@@ -172,16 +172,26 @@ class _ContestantLeaderboardScreenState
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
+      final bool isGm = data['isGrandmaster'] == true ||
+          data['hallOfFame'] == true ||
+          (data['unlockedBadges'] is List &&
+              (data['unlockedBadges'] as List).length >= 14);
 
       final current = grouped[key];
 
       if (current == null) {
-        grouped[key] = _RankEntry(name: display, score: 0, members: members);
+        grouped[key] = _RankEntry(
+          name: display,
+          score: 0,
+          members: members,
+          isGrandmaster: isGm,
+        );
       } else {
         grouped[key] = _RankEntry(
           name: current.name,
           score: current.score,
           members: {...current.members, ...members}.toList(),
+          isGrandmaster: current.isGrandmaster || isGm,
         );
       }
     }
@@ -197,16 +207,26 @@ class _ContestantLeaderboardScreenState
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
+      final bool isGm = data['isGrandmaster'] == true ||
+          data['hallOfFame'] == true ||
+          (data['unlockedBadges'] is List &&
+              (data['unlockedBadges'] as List).length >= 14);
 
       final current = grouped[key];
       if (current == null) {
-        grouped[key] = _RankEntry(name: name, score: score, members: members);
+        grouped[key] = _RankEntry(
+          name: name,
+          score: score,
+          members: members,
+          isGrandmaster: isGm,
+        );
       } else {
         // A team can have several member score documents; combine them.
         grouped[key] = _RankEntry(
           name: current.name,
           score: current.score + score,
           members: {...current.members, ...members}.toList(),
+          isGrandmaster: current.isGrandmaster || isGm,
         );
       }
     }
@@ -433,15 +453,28 @@ class _ContestantLeaderboardScreenState
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        entry.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: textDark,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              entry.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: textDark,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          if (entry.isGrandmaster) ...[
+                                            const SizedBox(width: 4),
+                                            const Text(
+                                              '👑',
+                                              style: TextStyle(fontSize: 11),
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                       if (entry.members.isNotEmpty)
                                         Text(
@@ -618,15 +651,28 @@ class _ContestantLeaderboardScreenState
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            entries[i].name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: textDark,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  entries[i].name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: textDark,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (entries[i].isGrandmaster) ...[
+                                const SizedBox(width: 4),
+                                const Text(
+                                  '👑',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ],
                           ),
                           if (entries[i].members.isNotEmpty)
                             Text(
@@ -993,10 +1039,12 @@ class _RankEntry {
   final String name;
   final int score;
   final List<String> members;
+  final bool isGrandmaster;
 
   const _RankEntry({
     required this.name,
     required this.score,
     this.members = const [],
+    this.isGrandmaster = false,
   });
 }

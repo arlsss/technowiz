@@ -1,7 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 /// Model representing a single competitor badge
 class BadgeItem {
@@ -64,7 +68,7 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
 
   bool _loading = true;
   String? _error;
-  String _selectedCategory = 'All'; // 'All', 'Rankings', 'Mastery', 'Milestones', 'Unlocked'
+  String _selectedCategory = 'All'; // 'All', 'Rankings', 'Mastery', 'Milestones', 'Prestige', 'Unlocked'
 
   List<BadgeItem> _badges = [];
   int _totalCompletedQuizzes = 0;
@@ -73,6 +77,10 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
   int _silverCount = 0;
   int _bronzeCount = 0;
   int _top10Count = 0;
+  bool _isGrandmaster = false;
+  String _contestantDisplayName = 'Contestant';
+  String _teamName = '';
+  String _schoolName = '';
 
   @override
   void initState() {
@@ -106,6 +114,16 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
       final userDoc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final userData = userDoc.data() ?? {};
+      _contestantDisplayName = (userData['displayName'] ??
+              userData['name'] ??
+              user.displayName ??
+              'Contestant')
+          .toString()
+          .trim();
+      _teamName = (userData['teamName'] ?? '').toString().trim();
+      _schoolName = (userData['schoolName'] ?? userData['address'] ?? '')
+          .toString()
+          .trim();
       final rawUnlocked = userData['unlockedBadges'];
       final storedBadgeIds = <String>{};
       if (rawUnlocked is List) {
@@ -453,17 +471,127 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
         ),
       ];
 
+      // Check Core Badges (14 core badges)
+      final coreUnlockedCount =
+          computedBadges.where((b) => b.isUnlocked).length;
+      final bool isGrandmasterAchieved = coreUnlockedCount >= 14 ||
+          userData['isGrandmaster'] == true ||
+          userData['hallOfFame'] == true;
+
+      // --- PRESTIGE & LEGEND TIER BADGES ---
+      final prestigeBadges = <BadgeItem>[
+        BadgeItem(
+          id: 'half_century_scorer',
+          title: 'Century Contender',
+          subtitle: '50+ Career Points',
+          category: 'Prestige',
+          description:
+              'Accumulated an extraordinary total of 50 or more points across your TechNoWiz tournament career.',
+          requirement:
+              'Earn 50 cumulative career points across all quiz competitions.',
+          color: const Color(0xFF6366F1),
+          icon: Icons.diamond_rounded,
+          isUnlocked: totalCumulativeScore >= 50 ||
+              storedBadgeIds.contains('half_century_scorer'),
+          currentProgress: totalCumulativeScore.clamp(0, 50),
+          maxProgress: 50,
+          earnedDetails:
+              totalCumulativeScore >= 50 ? '$totalCumulativeScore pts' : null,
+        ),
+        BadgeItem(
+          id: 'quiz_legend_veteran',
+          title: 'Quiz Legend',
+          subtitle: '10 Tournaments Completed',
+          category: 'Prestige',
+          description:
+              'Demonstrated enduring commitment and passion by completing 10 full official tournaments.',
+          requirement: 'Complete at least 10 quiz competitions.',
+          color: const Color(0xFF8B5CF6),
+          icon: Icons.workspace_premium_rounded,
+          isUnlocked: completedQuizzes >= 10 ||
+              storedBadgeIds.contains('quiz_legend_veteran'),
+          currentProgress: completedQuizzes.clamp(0, 10),
+          maxProgress: 10,
+          earnedDetails:
+              completedQuizzes >= 10 ? '$completedQuizzes Quizzes' : null,
+        ),
+        BadgeItem(
+          id: 'triple_crown',
+          title: 'Triple Crown',
+          subtitle: '3x Gold Champion',
+          category: 'Prestige',
+          description:
+              'Conquered 3 separate official tournaments with 1st place Championship victories.',
+          requirement: 'Win Rank #1 (Gold Trophy) in at least 3 tournaments.',
+          color: const Color(0xFFD97706),
+          icon: Icons.emoji_events_rounded,
+          trophyAsset: 'assets/trophies/gold_trophy_3d.jpg',
+          isUnlocked:
+              goldTrophies >= 3 || storedBadgeIds.contains('triple_crown'),
+          currentProgress: goldTrophies.clamp(0, 3),
+          maxProgress: 3,
+          earnedDetails: goldTrophies >= 3 ? '$goldTrophies Titles' : null,
+        ),
+        BadgeItem(
+          id: 'speed_demon',
+          title: 'Speed Demon',
+          subtitle: '7-Answer Streak Master',
+          category: 'Prestige',
+          description:
+              'Demonstrated lightning reflexes and pinpoint accuracy by maintaining a high correct streak.',
+          requirement:
+              'Achieve a winning streak of at least 7 correct answers.',
+          color: const Color(0xFF06B6D4),
+          icon: Icons.electric_bolt_rounded,
+          isUnlocked:
+              maxStreak >= 7 || storedBadgeIds.contains('speed_demon'),
+          currentProgress: maxStreak.clamp(0, 7),
+          maxProgress: 7,
+          earnedDetails: maxStreak >= 7 ? '$maxStreak Streak' : null,
+        ),
+        BadgeItem(
+          id: 'grandmaster_elite',
+          title: 'Grandmaster Elite',
+          subtitle: '100% Core Master',
+          category: 'Prestige',
+          description:
+              'Unlocked all 14 Core Championship Badges and inducted into the official Hall of Fame.',
+          requirement:
+              'Unlock all 14 core ranking, mastery, and milestone badges.',
+          color: const Color(0xFFEAB308),
+          icon: Icons.stars_rounded,
+          isUnlocked: isGrandmasterAchieved ||
+              storedBadgeIds.contains('grandmaster_elite'),
+          currentProgress: coreUnlockedCount.clamp(0, 14),
+          maxProgress: 14,
+          earnedDetails: isGrandmasterAchieved ? 'Grandmaster Status' : null,
+        ),
+      ];
+
+      computedBadges.addAll(prestigeBadges);
+
       // Automatically sync newly earned badges to user's profile doc in background
       final newlyUnlockedIds = computedBadges
           .where((b) => b.isUnlocked && !storedBadgeIds.contains(b.id))
           .map((b) => b.id)
           .toList();
 
-      if (newlyUnlockedIds.isNotEmpty) {
+      if (newlyUnlockedIds.isNotEmpty || isGrandmasterAchieved) {
         try {
-          await FirebaseFirestore.instance.collection('users').doc(uid).set({
-            'unlockedBadges': FieldValue.arrayUnion(newlyUnlockedIds),
-          }, SetOptions(merge: true));
+          final Map<String, dynamic> updatePayload = {};
+          if (newlyUnlockedIds.isNotEmpty) {
+            updatePayload['unlockedBadges'] =
+                FieldValue.arrayUnion(newlyUnlockedIds);
+          }
+          if (isGrandmasterAchieved) {
+            updatePayload['isGrandmaster'] = true;
+            updatePayload['grandmasterTitle'] = 'Grandmaster';
+            updatePayload['hallOfFame'] = true;
+          }
+          await FirebaseFirestore.instance.collection('users').doc(uid).set(
+                updatePayload,
+                SetOptions(merge: true),
+              );
         } catch (_) {}
       }
 
@@ -476,6 +604,7 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
           _silverCount = silverTrophies;
           _bronzeCount = bronzeTrophies;
           _top10Count = top10Finishes;
+          _isGrandmaster = isGrandmasterAchieved;
           _loading = false;
         });
       }
@@ -573,6 +702,71 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
         isUnlocked: false,
         currentProgress: 0,
         maxProgress: 1,
+      ),
+      const BadgeItem(
+        id: 'half_century_scorer',
+        title: 'Century Contender',
+        subtitle: '50+ Career Points',
+        category: 'Prestige',
+        description: 'Earn 50 cumulative career points across all quiz competitions.',
+        requirement: 'Reach 50 total career points.',
+        color: Color(0xFF6366F1),
+        icon: Icons.diamond_rounded,
+        isUnlocked: false,
+        currentProgress: 0,
+        maxProgress: 50,
+      ),
+      const BadgeItem(
+        id: 'quiz_legend_veteran',
+        title: 'Quiz Legend',
+        subtitle: '10 Tournaments Completed',
+        category: 'Prestige',
+        description: 'Complete at least 10 quiz competitions.',
+        requirement: 'Participate in and finish 10 tournaments.',
+        color: Color(0xFF8B5CF6),
+        icon: Icons.workspace_premium_rounded,
+        isUnlocked: false,
+        currentProgress: 0,
+        maxProgress: 10,
+      ),
+      const BadgeItem(
+        id: 'triple_crown',
+        title: 'Triple Crown',
+        subtitle: '3x Gold Champion',
+        category: 'Prestige',
+        description: 'Win Rank #1 (Gold Trophy) in at least 3 tournaments.',
+        requirement: 'Achieve 3 Championship wins.',
+        color: Color(0xFFD97706),
+        icon: Icons.emoji_events_rounded,
+        isUnlocked: false,
+        currentProgress: 0,
+        maxProgress: 3,
+      ),
+      const BadgeItem(
+        id: 'speed_demon',
+        title: 'Speed Demon',
+        subtitle: '7-Answer Streak Master',
+        category: 'Prestige',
+        description: 'Achieve a continuous streak of 7 correct answers.',
+        requirement: 'Win 7 questions in a row.',
+        color: Color(0xFF06B6D4),
+        icon: Icons.electric_bolt_rounded,
+        isUnlocked: false,
+        currentProgress: 0,
+        maxProgress: 7,
+      ),
+      const BadgeItem(
+        id: 'grandmaster_elite',
+        title: 'Grandmaster Elite',
+        subtitle: '100% Core Master',
+        category: 'Prestige',
+        description: 'Unlock all 14 core championship badges.',
+        requirement: 'Inducted into the TechNoWiz Hall of Fame.',
+        color: Color(0xFFEAB308),
+        icon: Icons.stars_rounded,
+        isUnlocked: false,
+        currentProgress: 0,
+        maxProgress: 14,
       ),
     ];
   }
@@ -854,6 +1048,10 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
     final rankingsCount = _badges.where((b) => b.category == 'Rankings').length;
     final masteryCount = _badges.where((b) => b.category == 'Mastery').length;
     final milestonesCount = _badges.where((b) => b.category == 'Milestones').length;
+    final prestigeCount = _badges.where((b) => b.category == 'Prestige').length;
+    final coreBadges = _badges.where((b) => b.category != 'Prestige').toList();
+    final coreUnlocked = coreBadges.where((b) => b.isUnlocked).length;
+    final bool isGrandmaster = _isGrandmaster || coreUnlocked >= 14;
     final unlockedRatio =
         totalCount > 0 ? (unlockedCount / totalCount).clamp(0.0, 1.0) : 0.0;
 
@@ -956,7 +1154,9 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
                       children: [
                         Expanded(
                           child: Text(
-                            '$unlockedCount of $totalCount Badges Unlocked',
+                            isGrandmaster
+                                ? '$coreUnlocked of 14 Core Badges (100% Mastered 👑)'
+                                : '$unlockedCount of $totalCount Badges Unlocked',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -968,7 +1168,9 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '${(unlockedRatio * 100).toStringAsFixed(0)}%',
+                          isGrandmaster && unlockedRatio >= 1.0
+                              ? '100%'
+                              : '${(unlockedRatio * 100).toStringAsFixed(0)}%',
                           style: const TextStyle(
                             color: Color(0xFFFDE047), // Gold
                             fontSize: 14,
@@ -1022,6 +1224,12 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
               ),
               const SizedBox(height: 20),
 
+              // 👑 Grandmaster Reward & Hall of Fame Banner (When 14/14 Unlocked)
+              if (isGrandmaster) ...[
+                _buildGrandmasterRewardBanner(),
+                const SizedBox(height: 20),
+              ],
+
               // Category Filter Tabs (Straight single line, smoothly swipeable)
               ScrollConfiguration(
                 behavior: const _SwipeableScrollBehavior(),
@@ -1038,6 +1246,8 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
                       _buildCategoryFilterChip('Mastery', Icons.psychology_rounded, masteryCount),
                       const SizedBox(width: 8),
                       _buildCategoryFilterChip('Milestones', Icons.military_tech_rounded, milestonesCount),
+                      const SizedBox(width: 8),
+                      _buildCategoryFilterChip('Prestige', Icons.auto_awesome_rounded, prestigeCount),
                       const SizedBox(width: 8),
                       _buildCategoryFilterChip('Unlocked', Icons.check_circle_outline_rounded, unlockedCount),
                     ],
@@ -1193,6 +1403,465 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGrandmasterRewardBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF78350F), // Deep warm bronze
+            Color(0xFFB45309), // Amber gold
+            Color(0xFFD97706), // Rich gold
+            Color(0xFFF59E0B), // Vibrant gold
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFFDE047),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Text('👑', style: TextStyle(fontSize: 26)),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TECHNOWIZ GRANDMASTER',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'HALL OF FAME INDUCTEE • 100% COMPLETE',
+                      style: TextStyle(
+                        color: Color(0xFFFEF3C7),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Incredible achievement! You have unlocked all 14 Core Championship Badges and officially conquered the arena. '
+            'Your personalized Official Certificate of Mastery & Hall of Fame is ready to download.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _claimGrandmasterCertificate(
+                contestantName: _contestantDisplayName,
+              ),
+              icon: const Icon(
+                Icons.workspace_premium_rounded,
+                size: 20,
+                color: Color(0xFF78350F),
+              ),
+              label: const Text(
+                'Claim Certificate of Mastery (PDF)',
+                style: TextStyle(
+                  color: Color(0xFF78350F),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF78350F),
+                elevation: 4,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _claimGrandmasterCertificate({
+    required String contestantName,
+  }) async {
+    final pdf = pw.Document();
+
+    final safeName = contestantName.trim().isNotEmpty
+        ? contestantName.trim()
+        : 'Contestant';
+
+    final effectiveTeam = _teamName.trim();
+    final effectiveSchool = _schoolName.trim();
+
+    pw.MemoryImage? certLogoImage;
+    try {
+      final bytes = await rootBundle.load('assets/images/certificate_logo.jpg');
+      certLogoImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (e) {
+      debugPrint('Error loading certificate logo asset: $e');
+    }
+
+    final now = DateTime.now();
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    final dateString = '${months[now.month - 1]} ${now.day}, ${now.year}';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(16),
+        build: (pw.Context context) {
+          return pw.Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: pw.BoxDecoration(
+              color: const PdfColor.fromInt(0xFFFFFDF8),
+              borderRadius: pw.BorderRadius.circular(16),
+              border: pw.Border.all(
+                color: const PdfColor.fromInt(0xFF0F172A),
+                width: 3.5,
+              ),
+            ),
+            child: pw.Container(
+              margin: const pw.EdgeInsets.all(6),
+              decoration: pw.BoxDecoration(
+                borderRadius: pw.BorderRadius.circular(12),
+                border: pw.Border.all(
+                  color: const PdfColor.fromInt(0xFFD97706),
+                  width: 1.5,
+                ),
+              ),
+              padding: const pw.EdgeInsets.fromLTRB(28, 20, 28, 20),
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  // Header
+                  pw.Column(
+                    children: [
+                      if (certLogoImage != null)
+                        pw.Image(certLogoImage, height: 42)
+                      else
+                        pw.Container(height: 10),
+                      pw.SizedBox(height: 5),
+                      pw.Text(
+                        'TECHNOWIZ COMPETITION ARENA',
+                        style: pw.TextStyle(
+                          fontSize: 11,
+                          fontWeight: pw.FontWeight.bold,
+                          color: const PdfColor.fromInt(0xFF475569),
+                          letterSpacing: 3.5,
+                        ),
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        'OFFICIAL CERTIFICATE OF MASTERY & HALL OF FAME',
+                        style: pw.TextStyle(
+                          fontSize: 17,
+                          fontWeight: pw.FontWeight.bold,
+                          color: const PdfColor.fromInt(0xFFB45309),
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Container(
+                        width: 220,
+                        height: 2,
+                        color: const PdfColor.fromInt(0xFFF59E0B),
+                      ),
+                    ],
+                  ),
+
+                  // Presentation
+                  pw.Text(
+                    'This prestigious distinction of Grandmaster is proudly conferred upon',
+                    style: const pw.TextStyle(
+                      fontSize: 11,
+                      color: PdfColor.fromInt(0xFF64748B),
+                    ),
+                  ),
+
+                  // Name
+                  pw.Column(
+                    children: [
+                      pw.Text(
+                        effectiveTeam.isNotEmpty
+                            ? effectiveTeam.toUpperCase()
+                            : safeName.toUpperCase(),
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(
+                          fontSize: 26,
+                          fontWeight: pw.FontWeight.bold,
+                          color: const PdfColor.fromInt(0xFF0F172A),
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      if (effectiveTeam.isNotEmpty &&
+                          safeName.toLowerCase() !=
+                              effectiveTeam.toLowerCase()) ...[
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          'Team Leader / Contestant: $safeName',
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColor.fromInt(0xFF475569),
+                          ),
+                        ),
+                      ],
+                      if (effectiveSchool.isNotEmpty) ...[
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          effectiveSchool,
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColor.fromInt(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                      pw.SizedBox(height: 6),
+                      pw.Container(
+                        width: 420,
+                        height: 1.5,
+                        color: const PdfColor.fromInt(0xFF0F172A),
+                      ),
+                    ],
+                  ),
+
+                  // Citation
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 40),
+                    child: pw.Text(
+                      'In highest recognition of achieving 100% completion across all 14 Championship Badges. '
+                      'By virtue of superior technical problem solving, flawless accuracy, and unrelenting dedication to academic excellence, '
+                      'the recipient is permanently enshrined into the TechNoWiz Hall of Fame with the honorary title of Grandmaster.',
+                      textAlign: pw.TextAlign.center,
+                      style: const pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColor.fromInt(0xFF334155),
+                        lineSpacing: 2.2,
+                      ),
+                    ),
+                  ),
+
+                  // Career Highlights Strip
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 6),
+                    decoration: pw.BoxDecoration(
+                      color: const PdfColor.fromInt(0xFFFEF3C7),
+                      borderRadius: pw.BorderRadius.circular(8),
+                      border: pw.Border.all(
+                        color: const PdfColor.fromInt(0xFFFDE68A),
+                      ),
+                    ),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                      children: [
+                        pw.Text('CORE BADGES: 14/14 UNLOCKED (100%)',
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: const PdfColor.fromInt(0xFF92400E))),
+                        pw.Text('CAREER POINTS: $_totalPoints PTS',
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: const PdfColor.fromInt(0xFF92400E))),
+                        pw.Text('TOURNAMENTS: $_totalCompletedQuizzes DONE',
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: const PdfColor.fromInt(0xFF92400E))),
+                        pw.Text(
+                            'TROPHIES: $_goldCount GOLD • $_silverCount SILVER • $_bronzeCount BRONZE',
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: const PdfColor.fromInt(0xFF92400E))),
+                      ],
+                    ),
+                  ),
+
+                  // Signatures & Seal
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      // Date
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'DATE ISSUED',
+                            style: pw.TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: const PdfColor.fromInt(0xFF64748B),
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            dateString,
+                            style: pw.TextStyle(
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.bold,
+                              color: const PdfColor.fromInt(0xFF0F172A),
+                            ),
+                          ),
+                          pw.Container(
+                            width: 130,
+                            height: 1,
+                            color: const PdfColor.fromInt(0xFF94A3B8),
+                            margin: const pw.EdgeInsets.only(top: 4),
+                          ),
+                        ],
+                      ),
+
+                      // Grandmaster Seal
+                      pw.Column(
+                        children: [
+                          pw.Container(
+                            width: 50,
+                            height: 50,
+                            decoration: pw.BoxDecoration(
+                              shape: pw.BoxShape.circle,
+                              border: pw.Border.all(
+                                color: const PdfColor.fromInt(0xFFD97706),
+                                width: 2,
+                              ),
+                            ),
+                            child: pw.Center(
+                              child: pw.Text(
+                                'GRAND\nMASTER',
+                                textAlign: pw.TextAlign.center,
+                                style: pw.TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: const PdfColor.fromInt(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            'OFFICIAL SEAL',
+                            style: pw.TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: const PdfColor.fromInt(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Signature
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(
+                            'TECHNOWIZ ARENA COMMITTEE',
+                            style: pw.TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: const PdfColor.fromInt(0xFF64748B),
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            'Quizmaster & Evaluation Board',
+                            style: pw.TextStyle(
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.bold,
+                              color: const PdfColor.fromInt(0xFF0F172A),
+                            ),
+                          ),
+                          pw.Container(
+                            width: 170,
+                            height: 1,
+                            color: const PdfColor.fromInt(0xFF94A3B8),
+                            margin: const pw.EdgeInsets.only(top: 4),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    final cleanName = safeName
+        .replaceAll(' ', '_')
+        .replaceAll(RegExp(r'[^\w\.-]'), '');
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: 'TechNoWiz_Grandmaster_Certificate_$cleanName.pdf',
     );
   }
 

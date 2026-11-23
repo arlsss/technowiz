@@ -235,6 +235,45 @@ class ContestantProfilePanel extends StatelessWidget {
                     letterSpacing: -0.2,
                   ),
                 ),
+                if (profileData['isGrandmaster'] == true ||
+                    profileData['hallOfFame'] == true ||
+                    ((profileData['unlockedBadges'] as List?)?.length ?? 0) >= 14) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('👑 ', style: TextStyle(fontSize: 13)),
+                        Text(
+                          'GRANDMASTER • HALL OF FAME',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   email,
