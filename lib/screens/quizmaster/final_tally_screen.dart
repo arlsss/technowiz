@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'quizmaster_theme.dart';
 import 'final_ranking_screen.dart';
+import 'quiz_control_screen.dart';
 import '../../navigation_persistence.dart';
 
 /// Contestant Tally Model
@@ -113,7 +114,6 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
       _responseSubs = {};
 
-  bool _isResolvingTie = false;
   bool _isFinishing = false;
   final Set<String> _tieResolvedUids = {};
 
@@ -505,7 +505,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 6),
                           child: Text(
-                            'No tie-breaker questions configured by Admin yet.\nYou can resolve by speed or award +1 PT manually.',
+                            'No tie-breaker questions configured by Admin yet.\nYou can use QUIZ AGAIN or award +1 PT manually.',
                             style: TextStyle(
                               fontSize: 11.5,
                               color: Colors.black54,
@@ -605,13 +605,49 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 6),
-                const Text(
-                  'Options:\n• Tap "+1 PT" next to a contestant to award point for a correct tie-breaker answer.\n• RESOLVE BY SPEED: Uses earliest submission time to determine higher rank.\n• KEEP SHARED: Keeps tied contestants sharing the same rank.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.black54,
-                    height: 1.35,
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.assignment_outlined,
+                            size: 15,
+                            color: QuizMasterColors.primaryBlue,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Quiz Instructions for Tie-Breaker:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: QuizMasterColors.darkBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '• Present the tie-breaker questions below to the tied contestants.\n'
+                        '• QUIZ AGAIN: Starts or resumes the quiz round for tied contestants.\n'
+                        '• +1 PT: Tap "+1 PT" beside the contestant who answers correctly to award a point.\n'
+                        '• KEEP SHARED: Finalizes the standings with tied contestants sharing the same rank without further questions.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF475569),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -623,14 +659,14 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
               child: const Text('KEEP SHARED'),
             ),
             ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                _resolveTieBySpeed(contestants);
+                await _handleQuizAgain();
               },
-              icon: const Icon(Icons.flash_on_rounded, size: 18),
-              label: const Text('RESOLVE BY SPEED'),
+              icon: const Icon(Icons.replay_rounded, size: 18),
+              label: const Text('QUIZ AGAIN'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber.shade800,
+                backgroundColor: const Color(0xFF15803D),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -685,108 +721,29 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     }
   }
 
-  Future<void> _resolveTieBySpeed(List<ContestantTally> contestants) async {
-    if (_isResolvingTie) return;
-    setState(() => _isResolvingTie = true);
-
+  Future<void> _handleQuizAgain() async {
     try {
-      final sorted = List<ContestantTally>.from(contestants);
-      sorted.sort((a, b) {
-        final scoreCompare = b.score.compareTo(a.score);
-        if (scoreCompare != 0) return scoreCompare;
-
-        // Earliest submission wins
-        if (a.submissionTimeMs > 0 && b.submissionTimeMs > 0) {
-          return a.submissionTimeMs.compareTo(b.submissionTimeMs);
-        } else if (a.submissionTimeMs > 0) {
-          return -1;
-        } else if (b.submissionTimeMs > 0) {
-          return 1;
-        }
-        return a.uid.compareTo(b.uid);
-      });
-
-      final batch = FirebaseFirestore.instance.batch();
-      final officialRanksMap = <String, int>{};
-
-      for (int i = 0; i < sorted.length; i++) {
-        final rank = i + 1;
-        final c = sorted[i];
-        officialRanksMap[c.uid] = rank;
-        _tieResolvedUids.add(c.uid);
-
-        batch.set(
-          _sessionRef.collection('scores').doc(c.uid),
-          {
-            'rank': rank,
-            'levelRank': rank,
-            'currentRank': rank,
-            'rankLevel': widget.level,
-            'tieBreakerResolved': true,
-            'rankUpdatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-
-        batch.set(
-          _sessionRef.collection('join_requests').doc(c.uid),
-          {
-            'rank': rank,
-            'levelRank': rank,
-            'currentRank': rank,
-            'rankLevel': widget.level,
-            'tieBreakerResolved': true,
-          },
-          SetOptions(merge: true),
-        );
-      }
-
-      batch.set(
-        _sessionRef,
-        {
-          'officialRanks': officialRanksMap,
-          'tieBreakerResolved': true,
-          'rankingUpdatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      await batch.commit();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Tie resolved by submission speed! Rankings updated.',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Color(0xFF16A34A),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
+      await _sessionRef.set({
+        'tieBreakerActive': true,
+        'status': 'waiting',
+        'isFinished': false,
+        'currentQuestion': 0,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('RESOLVE TIE ERROR: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to resolve tie: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isResolvingTie = false);
-      }
+      debugPrint('Error activating tie breaker: $e');
+    }
+
+    if (!mounted) return;
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QuizControlScreen(quizCode: widget.quizCode),
+        ),
+      );
     }
   }
 

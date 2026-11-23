@@ -291,14 +291,21 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   List<QueryDocumentSnapshot> _sortSelectedQuestions(
     List<QueryDocumentSnapshot> docs,
   ) {
-    final result = docs.where((doc) {
+    final isTieBreakerActive = _quizData?['tieBreakerActive'] == true;
+    final filtered = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
-      if (data['isTieBreaker'] == true) return false;
+      final isTB = data['isTieBreaker'] == true;
       final sessionLevel =
           (data['sessionLevel'] ?? '').toString().trim().toLowerCase();
-      if (sessionLevel == 'tie breaker') return false;
+      final isTieLevel = sessionLevel == 'tie breaker';
+      if (isTieBreakerActive) {
+        return isTB || isTieLevel;
+      }
+      if (isTB || isTieLevel) return false;
       return true;
     }).toList();
+
+    final result = (isTieBreakerActive && filtered.isEmpty) ? docs : filtered;
 
     int getLevel(QueryDocumentSnapshot doc) {
       // Use the same level parser used by the question screen and level flow,

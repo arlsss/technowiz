@@ -1154,7 +1154,22 @@ class _QuizScreenState extends State<QuizScreen> {
     // MUST match QuizControlScreen._sortSelectedQuestions exactly:
     // level -> order -> createdAt -> document ID.
     // currentQuestion is a global index into this sorted list.
-    final sorted = [...docs];
+    final isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
+    final filtered = docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final isTB = data['isTieBreaker'] == true;
+      final sessionLevel =
+          (data['sessionLevel'] ?? '').toString().trim().toLowerCase();
+      final isTieLevel = sessionLevel == 'tie breaker';
+      if (isTieBreakerActive) {
+        return isTB || isTieLevel;
+      }
+      if (isTB || isTieLevel) return false;
+      return true;
+    }).toList();
+    final sourceDocs =
+        (isTieBreakerActive && filtered.isEmpty) ? docs : filtered;
+    final sorted = [...sourceDocs];
 
     int getLevel(QueryDocumentSnapshot doc) {
       final data = doc.data() as Map<String, dynamic>;
