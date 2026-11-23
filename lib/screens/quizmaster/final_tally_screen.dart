@@ -23,6 +23,8 @@ class ContestantTally {
   final int submissionTimeMs;
   final bool isEliminated;
   final bool isTied;
+  final Map<int, int> levelPoints;
+  final int? eliminatedLevel;
 
   const ContestantTally({
     required this.uid,
@@ -39,6 +41,8 @@ class ContestantTally {
     required this.submissionTimeMs,
     required this.isEliminated,
     required this.isTied,
+    this.levelPoints = const {},
+    this.eliminatedLevel,
   });
 
   String get effectiveName {
@@ -51,6 +55,8 @@ class ContestantTally {
   ContestantTally copyWith({
     int? rank,
     bool? isTied,
+    Map<int, int>? levelPoints,
+    int? eliminatedLevel,
   }) {
     return ContestantTally(
       uid: uid,
@@ -67,6 +73,8 @@ class ContestantTally {
       submissionTimeMs: submissionTimeMs,
       isEliminated: isEliminated,
       isTied: isTied ?? this.isTied,
+      levelPoints: levelPoints ?? this.levelPoints,
+      eliminatedLevel: eliminatedLevel ?? this.eliminatedLevel,
     );
   }
 }
@@ -164,6 +172,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         int unanswered = 0;
         int contested = 0;
         int latestTimeMs = 0;
+        final Map<int, int> levelPoints = {};
 
         for (final doc in snapshot.docs) {
           final data = doc.data();
@@ -191,6 +200,33 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
             final ms = answeredAt.millisecondsSinceEpoch;
             if (ms > latestTimeMs) latestTimeMs = ms;
           }
+
+          // Accumulate points per level
+          final rawLvl =
+              data['sessionLevel'] ?? data['level'] ?? data['questionLevel'];
+          int? lvl;
+          if (rawLvl is num) {
+            lvl = rawLvl.toInt();
+          } else if (rawLvl != null) {
+            final match = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+            if (match != null) lvl = int.tryParse(match.group(1)!);
+          }
+          lvl ??= 1;
+
+          final rawPts = data['points'] ?? data['score'];
+          int pts = 0;
+          if (rawPts is num) {
+            pts = rawPts.toInt();
+          } else if (rawPts != null) {
+            pts = int.tryParse(rawPts.toString()) ?? 0;
+          }
+          if (pts == 0 && (answerStatus == 'correct' || rawCorrect == true)) {
+            pts = 1;
+          }
+
+          if (pts > 0 && (rawCorrect == true || answerStatus == 'correct')) {
+            levelPoints[lvl] = (levelPoints[lvl] ?? 0) + pts;
+          }
         }
 
         if (mounted) {
@@ -201,6 +237,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
               'unanswered': unanswered,
               'contested': contested,
               'latestTimeMs': latestTimeMs,
+              'levelPoints': levelPoints,
             };
           });
         }
@@ -1028,6 +1065,31 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
 
                             final int respTimeMs =
                                 (respData['latestTimeMs'] as num?)?.toInt() ?? 0;
+                            final Map<int, int> levelPoints =
+                                Map<int, int>.from(respData['levelPoints'] ?? {});
+
+                            int? elimLevel;
+                            final rawElim = sData['eliminatedLevel'] ??
+                                sData['eliminatedAtLevel'] ??
+                                sData['decisionLevel'] ??
+                                data['eliminatedLevel'] ??
+                                data['eliminatedAtLevel'] ??
+                                data['decisionLevel'];
+                            if (rawElim is num) {
+                              elimLevel = rawElim.toInt();
+                            } else if (rawElim != null) {
+                              elimLevel = int.tryParse(rawElim.toString());
+                            }
+                            if (isElim && elimLevel == null) {
+                              if (levelPoints.isNotEmpty) {
+                                elimLevel = levelPoints.keys
+                                    .reduce((a, b) => a > b ? a : b);
+                              } else {
+                                elimLevel = widget.level > 1
+                                    ? widget.level - 1
+                                    : 1;
+                              }
+                            }
 
                             tallyList.add(
                               ContestantTally(
@@ -1045,6 +1107,8 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                 submissionTimeMs: respTimeMs,
                                 isEliminated: isElim,
                                 isTied: false,
+                                levelPoints: levelPoints,
+                                eliminatedLevel: elimLevel,
                               ),
                             );
                           }
@@ -1103,6 +1167,39 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                             );
                           }
 
+                          // Compute maxLevel across session configuration and contestant scores
+                          int maxLevel = widget.level;
+                          if (sessionData['levelSettings'] is Map) {
+                            for (final k in (sessionData['levelSettings'] as Map).keys) {
+                              final m = RegExp(r'(\d+)').firstMatch(k.toString());
+                              if (m != null) {
+                                final lvl = int.tryParse(m.group(1)!);
+                                if (lvl != null && lvl > maxLevel) maxLevel = lvl;
+                              }
+                            }
+                          }
+                          if (sessionData['levels'] is List) {
+                            for (final item in (sessionData['levels'] as List)) {
+                              final m = RegExp(r'(\d+)').firstMatch(item.toString());
+                              if (m != null) {
+                                final lvl = int.tryParse(m.group(1)!);
+                                if (lvl != null && lvl > maxLevel) maxLevel = lvl;
+                              }
+                            }
+                          }
+                          final rawTotalLevels = sessionData['totalLevels'] ??
+                              sessionData['totalLevel'] ??
+                              sessionData['currentLevel'];
+                          if (rawTotalLevels is num && rawTotalLevels.toInt() > maxLevel) {
+                            maxLevel = rawTotalLevels.toInt();
+                          }
+                          for (final c in rankedList) {
+                            for (final lvl in c.levelPoints.keys) {
+                              if (lvl > maxLevel) maxLevel = lvl;
+                            }
+                          }
+                          if (maxLevel < 1) maxLevel = 1;
+
                           return Column(
                             children: [
                               // Top Summary Banner
@@ -1131,7 +1228,11 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                           14,
                                           20,
                                         ),
-                                        child: _buildTableCard(rankedList),
+                                        child: _buildTableCard(
+                                          rankedList,
+                                          scoreByUid: scoreByUid,
+                                          maxLevel: maxLevel,
+                                        ),
                                       ),
                               ),
 
@@ -1280,7 +1381,102 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   // TABLE FORM CARD
   // ============================================================
 
-  Widget _buildTableCard(List<ContestantTally> contestants) {
+  int _getContestantLevelScore(
+    ContestantTally c,
+    int lvl,
+    Map<String, dynamic>? sData,
+    int maxLevel,
+  ) {
+    if (c.levelPoints.containsKey(lvl)) {
+      return c.levelPoints[lvl]!;
+    }
+    if (sData != null) {
+      final levelKey = 'level${lvl}Score';
+      final altKey = 'level_$lvl';
+      if (sData.containsKey(levelKey)) {
+        final val = sData[levelKey];
+        if (val is num) return val.toInt();
+        final parsed = int.tryParse(val?.toString() ?? '');
+        if (parsed != null) return parsed;
+      }
+      if (sData.containsKey(altKey)) {
+        final val = sData[altKey];
+        if (val is num) return val.toInt();
+        final parsed = int.tryParse(val?.toString() ?? '');
+        if (parsed != null) return parsed;
+      }
+      if (sData['levelScores'] is Map) {
+        final map = sData['levelScores'] as Map;
+        final val = map['Level $lvl'] ?? map['$lvl'];
+        if (val is num) return val.toInt();
+        if (val != null) {
+          final parsed = int.tryParse(val.toString());
+          if (parsed != null) return parsed;
+        }
+      }
+    }
+    // If only 1 level overall, or contestant only participated in level 1 (e.g. eliminated at lvl 1)
+    if (lvl == 1 && (maxLevel == 1 || c.eliminatedLevel == 1)) {
+      return c.score;
+    }
+    return 0;
+  }
+
+  Widget _buildLevelScoreCell(
+    ContestantTally c,
+    int lvl,
+    Map<String, dynamic>? sData,
+    int maxLevel,
+  ) {
+    // Check if contestant was eliminated in an earlier level
+    final bool isEliminatedBeforeThisLevel =
+        c.isEliminated && c.eliminatedLevel != null && lvl > c.eliminatedLevel!;
+
+    if (isEliminatedBeforeThisLevel) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        alignment: Alignment.center,
+        child: const Text(
+          '—',
+          style: TextStyle(
+            color: QuizMasterColors.textMuted,
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+          ),
+        ),
+      );
+    }
+
+    final int pts = _getContestantLevelScore(c, lvl, sData, maxLevel);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: pts > 0 ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: pts > 0 ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Text(
+        '$pts pts',
+        style: TextStyle(
+          color: pts > 0 ? const Color(0xFF15803D) : QuizMasterColors.textMuted,
+          fontWeight: FontWeight.w800,
+          fontSize: 12.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableCard(
+    List<ContestantTally> contestants, {
+    required Map<String, Map<String, dynamic>> scoreByUid,
+    required int maxLevel,
+  }) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -1302,7 +1498,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
           physics: const BouncingScrollPhysics(),
           child: DataTable(
             horizontalMargin: 16,
-            columnSpacing: 18,
+            columnSpacing: 20,
             headingRowHeight: 46,
             dataRowMinHeight: 56,
             dataRowMaxHeight: 64,
@@ -1313,8 +1509,8 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                 width: 1,
               ),
             ),
-            columns: const [
-              DataColumn(
+            columns: [
+              const DataColumn(
                 label: Text(
                   'RANK',
                   style: TextStyle(
@@ -1324,7 +1520,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   ),
                 ),
               ),
-              DataColumn(
+              const DataColumn(
                 label: Text(
                   'CONTESTANT',
                   style: TextStyle(
@@ -1334,93 +1530,20 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   ),
                 ),
               ),
-              DataColumn(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle_rounded,
-                      color: Color(0xFF16A34A),
-                      size: 15,
+              for (int lvl = 1; lvl <= maxLevel; lvl++)
+                DataColumn(
+                  label: Text(
+                    'LEVEL $lvl',
+                    style: const TextStyle(
+                      color: QuizMasterColors.darkBlue,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
                     ),
-                    SizedBox(width: 4),
-                    Text(
-                      'CHECK',
-                      style: TextStyle(
-                        color: Color(0xFF16A34A),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              DataColumn(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.cancel_rounded,
-                      color: Color(0xFFDC2626),
-                      size: 15,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'WRONG',
-                      style: TextStyle(
-                        color: Color(0xFFDC2626),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              DataColumn(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.help_rounded,
-                      color: Color(0xFFD97706),
-                      size: 15,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'UNANSWERED',
-                      style: TextStyle(
-                        color: Color(0xFFD97706),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              DataColumn(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.balance_rounded,
-                      color: Color(0xFF7C3AED),
-                      size: 15,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'CONTEST',
-                      style: TextStyle(
-                        color: Color(0xFF7C3AED),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              DataColumn(
+              const DataColumn(
                 label: Text(
-                  'SCORE',
+                  'TOTAL SCORE',
                   style: TextStyle(
                     color: QuizMasterColors.darkBlue,
                     fontWeight: FontWeight.w800,
@@ -1430,6 +1553,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
               ),
             ],
             rows: contestants.map((c) {
+              final sData = scoreByUid[c.uid];
               return DataRow(
                 color: WidgetStateProperty.resolveWith<Color?>((states) {
                   if (c.rank % 2 == 0) {
@@ -1444,107 +1568,11 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   // Contestant Cell
                   DataCell(_buildContestantCell(c)),
 
-                  // Check (Correct) Cell
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFBBF7D0)),
-                      ),
-                      child: Text(
-                        '✔ ${c.correctCount}',
-                        style: const TextStyle(
-                          color: Color(0xFF15803D),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ),
-                  ),
+                  // Level Score Cells
+                  for (int lvl = 1; lvl <= maxLevel; lvl++)
+                    DataCell(_buildLevelScoreCell(c, lvl, sData, maxLevel)),
 
-                  // Wrong Cell
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFECACA)),
-                      ),
-                      child: Text(
-                        '✖ ${c.wrongCount}',
-                        style: const TextStyle(
-                          color: Color(0xFFB91C1C),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Unanswered Cell
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: Text(
-                        '? ${c.unansweredCount}',
-                        style: const TextStyle(
-                          color: Color(0xFFB45309),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Contest Cell
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: c.contestedCount > 0
-                            ? const Color(0xFFF3E8FF)
-                            : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: c.contestedCount > 0
-                              ? const Color(0xFFE9D5FF)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Text(
-                        '⚖ ${c.contestedCount}',
-                        style: TextStyle(
-                          color: c.contestedCount > 0
-                              ? const Color(0xFF7E22CE)
-                              : Colors.black45,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Score Cell
+                  // Total Score Cell
                   DataCell(
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1552,10 +1580,12 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: QuizMasterColors.primaryBlue.withValues(alpha: 0.10),
+                        color: QuizMasterColors.primaryBlue
+                            .withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: QuizMasterColors.primaryBlue.withValues(alpha: 0.25),
+                          color: QuizMasterColors.primaryBlue
+                              .withValues(alpha: 0.25),
                         ),
                       ),
                       child: Text(
@@ -1698,6 +1728,31 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   ),
                 ),
               ),
+              if (c.isEliminated) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: const Color(0xFFFECACA),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: const Text(
+                    'ELIMINATED',
+                    style: TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
               if (c.isTied) ...[
                 const SizedBox(width: 5),
                 Container(
