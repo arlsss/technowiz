@@ -1090,13 +1090,38 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
       quizData,
       ['participationGuidelines', 'guidelines', 'rules', 'instructions'],
       fallback:
-          'Stay on this page while waiting.\\nFollow the Quiz Master’s directions.\\nRead the instructions before each level.\\nSubmit your answers before the timer ends.',
+          'Stay on this page while waiting.\nFollow the Quiz Master’s directions.\nRead the instructions before each level.\nSubmit your answers before the timer ends.\nIn case of a tie in scores, tied contestants will enter a Tie Breaker round.',
     );
-    final guidelineItems = generalGuidelines
-        .split(RegExp(r'\\n|[.!?](?:\\s+|$)'))
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
+
+    List<String> guidelineItems = [];
+    if (generalGuidelines.contains('\n') || generalGuidelines.contains(r'\n')) {
+      guidelineItems = generalGuidelines
+          .split(RegExp(r'\\n|\r?\n'))
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    } else {
+      guidelineItems = generalGuidelines
+          .split(RegExp(r'[.!?](?:\s+|$)'))
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
+    guidelineItems = guidelineItems.map((item) {
+      final trimmed = item.trim();
+      return trimmed.endsWith('.') ? trimmed : '$trimmed.';
+    }).toList();
+
+    const tieBreakerGuideline =
+        'In case of a tie in scores, tied contestants will enter a Tie Breaker round.';
+    if (!guidelineItems.any((item) =>
+        item.toLowerCase().contains('tie breaker') ||
+        item.toLowerCase().contains('tie-breaker') ||
+        item.toLowerCase().contains('tie in scores') ||
+        item.toLowerCase().contains('tiebreaker'))) {
+      guidelineItems.add(tieBreakerGuideline);
+    }
 
     return Container(
       width: double.infinity,
@@ -1131,7 +1156,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'PARTICIPANTS GUIDELINES',
+                  'CONTESTANT GUIDELINES',
                   style: TextStyle(
                     color: textDark,
                     fontSize: 15,
