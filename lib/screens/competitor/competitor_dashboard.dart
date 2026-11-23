@@ -272,7 +272,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       final snapshot = await ref.get();
       final data = snapshot.data() ?? {};
 
-      final bool isBlocked = data['isBlocked'] == true ||
+      final bool isBlocked =
+          data['isBlocked'] == true ||
           (data['status']?.toString().trim().toLowerCase() == 'blocked');
       if (isBlocked) {
         if (mounted) {
@@ -399,10 +400,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     final String returnPage = _showHistory
         ? 'history'
         : _showLeaderboard
-            ? 'leaderboard'
-            : _showBadges
-                ? 'badges'
-                : 'dashboard';
+        ? 'leaderboard'
+        : _showBadges
+        ? 'badges'
+        : 'dashboard';
     await _saveCurrentPage(returnPage);
   }
 
@@ -835,7 +836,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
         final status = data['status']?.toString().trim().toLowerCase() ?? '';
 
-        final isElim = data['eliminated'] == true ||
+        final isElim =
+            data['eliminated'] == true ||
             data['isEliminated'] == true ||
             status == 'eliminated' ||
             data['contestantDecision']?.toString().trim().toLowerCase() ==
@@ -875,10 +877,16 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
       final personalName = user.displayName?.trim().isNotEmpty == true
           ? user.displayName!.trim()
-          : (profileData['fullName'] ?? profileData['name'] ?? user.email?.split('@').first ?? 'Contestant').toString().trim();
+          : (profileData['fullName'] ??
+                    profileData['name'] ??
+                    user.email?.split('@').first ??
+                    'Contestant')
+                .toString()
+                .trim();
 
-      final String effectiveName =
-          isTeam && teamName.isNotEmpty ? teamName : personalName;
+      final String effectiveName = isTeam && teamName.isNotEmpty
+          ? teamName
+          : personalName;
 
       await requestRef.set({
         'uid': uid,
@@ -1114,7 +1122,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
       final status = data['status']?.toString().trim().toLowerCase() ?? '';
 
-      final isElim = data['eliminated'] == true ||
+      final isElim =
+          data['eliminated'] == true ||
           data['isEliminated'] == true ||
           status == 'eliminated' ||
           data['contestantDecision']?.toString().trim().toLowerCase() ==
@@ -1253,8 +1262,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
     final descriptionText =
         descriptionValue?.toString().trim().isNotEmpty == true
-            ? descriptionValue.toString().trim()
-            : 'No description provided';
+        ? descriptionValue.toString().trim()
+        : 'No description provided';
 
     final bool isOngoing =
         status == 'active' || status == 'ongoing' || status == 'started';
@@ -1603,9 +1612,14 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                       builder: (context, requestSnapshot) {
                         final requestData = requestSnapshot.data?.data() ?? {};
                         final requestStatus =
-                            requestData['status']?.toString().trim().toLowerCase() ?? '';
+                            requestData['status']
+                                ?.toString()
+                                .trim()
+                                .toLowerCase() ??
+                            '';
 
-                        final isEliminated = requestData['eliminated'] == true ||
+                        final isEliminated =
+                            requestData['eliminated'] == true ||
                             requestData['isEliminated'] == true ||
                             requestStatus == 'eliminated' ||
                             requestData['contestantDecision']
@@ -2018,10 +2032,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       _pageBeforeProfile = _showLeaderboard
           ? 'leaderboard'
           : _showBadges
-              ? 'badges'
-              : _showHistory
-                  ? 'history'
-                  : 'dashboard';
+          ? 'badges'
+          : _showHistory
+          ? 'history'
+          : 'dashboard';
 
       _saveCurrentPage('profile');
     }
@@ -2482,8 +2496,6 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
         'A verification email was sent to your new email address. Please verify it to complete the email change.',
       );
     }
-
-
 
     if (authNameError != null) {
       parts.add('Name: $authNameError');
@@ -2973,7 +2985,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       },
     );
 
-    if (confirmed != true || !mounted || !dialogContext.mounted || !profileDrawerContext.mounted) return;
+    if (confirmed != true ||
+        !mounted ||
+        !dialogContext.mounted ||
+        !profileDrawerContext.mounted) {
+      return;
+    }
 
     await _saveProfile(
       context: dialogContext,
@@ -3407,12 +3424,13 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return docs.first;
   }
 
+  final Map<String, Map<String, dynamic>> _userDocCache = {};
+
   Future<List<Map<String, dynamic>>> _buildLeaderboardRows(
     String quizCode,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> joinDocs,
   ) async {
-    final users = <String, Map<String, dynamic>>{};
     final uids = <String>{};
 
     for (final doc in joinDocs) {
@@ -3429,19 +3447,26 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       if (uid.isNotEmpty) uids.add(uid);
     }
 
-    await Future.wait(
-      uids.map((uid) async {
-        try {
-          final snap = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .get();
-          users[uid] = snap.data() ?? {};
-        } catch (_) {
-          users[uid] = {};
-        }
-      }),
-    );
+    final uidsToFetch = uids
+        .where((u) => !_userDocCache.containsKey(u))
+        .toList();
+    if (uidsToFetch.isNotEmpty) {
+      await Future.wait(
+        uidsToFetch.map((uid) async {
+          try {
+            final snap = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .get();
+            _userDocCache[uid] = snap.data() ?? {};
+          } catch (_) {
+            _userDocCache[uid] = {};
+          }
+        }),
+      );
+    }
+
+    final users = _userDocCache;
 
     final grouped = <String, Map<String, dynamic>>{};
 
@@ -3579,10 +3604,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
 
     final result = grouped.values.toList();
     result.sort((a, b) {
-      final aElim = a['eliminated'] == true ||
+      final aElim =
+          a['eliminated'] == true ||
           a['isEliminated'] == true ||
           (a['status'] ?? '').toString().toLowerCase() == 'eliminated';
-      final bElim = b['eliminated'] == true ||
+      final bElim =
+          b['eliminated'] == true ||
           b['isEliminated'] == true ||
           (b['status'] ?? '').toString().toLowerCase() == 'eliminated';
       if (aElim != bElim) {
@@ -3600,18 +3627,96 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return result;
   }
 
-  Widget _buildRankTrophyBadge(int rank, {bool isEliminated = false}) {
+  _LeaderboardProcessedData _processLeaderboardData(
+    List<Map<String, dynamic>> rows,
+  ) {
+    if (rows.isEmpty) {
+      return const _LeaderboardProcessedData(tiers: [], tableRows: []);
+    }
+
+    // Partition into active vs eliminated
+    final activeRows = <Map<String, dynamic>>[];
+    final eliminatedRows = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      final isElim =
+          row['eliminated'] == true ||
+          row['isEliminated'] == true ||
+          (row['status'] ?? '').toString().toLowerCase() == 'eliminated';
+      if (isElim) {
+        eliminatedRows.add(Map<String, dynamic>.from(row));
+      } else {
+        activeRows.add(Map<String, dynamic>.from(row));
+      }
+    }
+
+    // Group active rows by score
+    final Map<int, List<Map<String, dynamic>>> scoreGroups = {};
+    for (final row in activeRows) {
+      final score = _scoreToInt(row['score']);
+      scoreGroups.putIfAbsent(score, () => []).add(row);
+    }
+
+    final sortedScores = scoreGroups.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+    final List<_PodiumTierData> tiers = [];
+    int currentRank = 1;
+    for (final score in sortedScores) {
+      final group = scoreGroups[score]!;
+      final isTied = group.length > 1;
+      for (final item in group) {
+        item['rank'] = currentRank;
+        item['isTied'] = isTied;
+      }
+      tiers.add(_PodiumTierData(
+        rank: currentRank,
+        score: score,
+        entries: group,
+        isTied: isTied,
+      ));
+      currentRank++;
+    }
+
+    // Top 3 tiers go to podium
+    final Set<String> top3Ids = {};
+    for (int i = 0; i < tiers.length && i < 3; i++) {
+      for (final e in tiers[i].entries) {
+        final id = e['uid']?.toString() ?? e['displayName']?.toString() ?? '';
+        if (id.isNotEmpty) top3Ids.add(id);
+      }
+    }
+
+    // Table rows: active contestants from rank 4+ and eliminated contestants
+    final tableRows = <Map<String, dynamic>>[];
+    for (final row in activeRows) {
+      final id = row['uid']?.toString() ?? row['displayName']?.toString() ?? '';
+      if (!top3Ids.contains(id)) {
+        tableRows.add(row);
+      }
+    }
+    for (final row in eliminatedRows) {
+      row['rank'] = currentRank;
+      row['isEliminated'] = true;
+      row['isTied'] = false;
+      tableRows.add(row);
+    }
+
+    return _LeaderboardProcessedData(tiers: tiers, tableRows: tableRows);
+  }
+
+  Widget _buildRankTrophyBadge(
+    int rank, {
+    bool isEliminated = false,
+    bool isTied = false,
+  }) {
+    Widget badge;
     if (isEliminated) {
-      return Container(
+      badge = Container(
         width: 26,
         height: 26,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: const Color(0xFFFEE2E2),
-          border: Border.all(
-            color: const Color(0xFFFCA5A5),
-            width: 1.2,
-          ),
+          border: Border.all(color: const Color(0xFFFCA5A5), width: 1.2),
         ),
         alignment: Alignment.center,
         child: Text(
@@ -3623,20 +3728,18 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
         ),
       );
-    }
-
-    if (rank <= 3) {
+    } else if (rank <= 3) {
       final trophyAsset = rank == 1
           ? 'assets/trophies/gold_trophy_3d.jpg'
           : (rank == 2
-              ? 'assets/trophies/silver_trophy_3d.jpg'
-              : 'assets/trophies/bronze_trophy_3d.jpg');
+                ? 'assets/trophies/silver_trophy_3d.jpg'
+                : 'assets/trophies/bronze_trophy_3d.jpg');
 
       final rankColor = rank == 1
           ? const Color(0xFFF59E0B)
           : (rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
 
-      return Stack(
+      badge = Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
@@ -3662,8 +3765,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   rank == 1
                       ? Icons.emoji_events_rounded
                       : (rank == 2
-                          ? Icons.workspace_premium_rounded
-                          : Icons.military_tech_rounded),
+                            ? Icons.workspace_premium_rounded
+                            : Icons.military_tech_rounded),
                   size: 18,
                   color: rankColor,
                 ),
@@ -3695,13 +3798,11 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
         ],
       );
-    }
-
-    if (rank >= 4 && rank <= 10) {
+    } else if (rank >= 4 && rank <= 10) {
       const badgeAsset = 'assets/trophies/top10_badge_3d.jpg';
       const rankColor = Color(0xFF16A34A);
 
-      return Stack(
+      badge = Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
@@ -3756,57 +3857,58 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
         ],
       );
-    }
-
-    return Container(
-      width: 26,
-      height: 26,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFFF8FAFC),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.2,
+    } else {
+      badge = Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFF8FAFC),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         ),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '$rank',
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF64748B),
-        ),
-      ),
-    );
-  }
-
-  Widget _leaderboardRows(List<Map<String, dynamic>> rows) {
-    if (rows.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(
-          child: Text(
-            'Waiting for contestants to join...',
-            style: TextStyle(color: Colors.black54, fontSize: 13),
+        alignment: Alignment.center,
+        child: Text(
+          '$rank',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF64748B),
           ),
         ),
       );
     }
 
-    // Rank 4 to pataas, plus makita pud ang na-eliminate nga contestant
-    final standingsRows = <MapEntry<int, Map<String, dynamic>>>[];
-    for (int i = 0; i < rows.length; i++) {
-      final rank = i + 1;
-      final row = rows[i];
-      final isEliminated = row['eliminated'] == true ||
-          row['isEliminated'] == true ||
-          (row['status'] ?? '').toString().toLowerCase() == 'eliminated';
-      if (rank >= 4 || isEliminated) {
-        standingsRows.add(MapEntry(rank, row));
-      }
+    if (isTied) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          badge,
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFFDE68A), width: 0.8),
+            ),
+            child: const Text(
+              'TIE',
+              style: TextStyle(
+                fontSize: 6.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFB45309),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
+      );
     }
 
+    return badge;
+  }
+
+  Widget _leaderboardRows(List<Map<String, dynamic>> standingsRows) {
     if (standingsRows.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -3875,16 +3977,18 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
         ),
         ...List.generate(standingsRows.length, (index) {
-          final entry = standingsRows[index];
-          final rank = entry.key;
-          final row = entry.value;
+          final row = standingsRows[index];
+          final rank = row['rank'] as int? ?? (index + 4);
+          final isTied = row['isTied'] == true;
           final score = _scoreToInt(row['score']);
-          final isEliminated = row['eliminated'] == true ||
+          final isEliminated =
+              row['eliminated'] == true ||
               row['isEliminated'] == true ||
               (row['status'] ?? '').toString().toLowerCase() == 'eliminated';
 
           final currentUid = FirebaseAuth.instance.currentUser?.uid;
-          final isCurrentUser = currentUid != null &&
+          final isCurrentUser =
+              currentUid != null &&
               (row['uid'] == currentUid ||
                   (row['uids'] as List?)?.contains(currentUid) == true);
 
@@ -3894,14 +3998,14 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
               color: isEliminated
                   ? const Color(0xFFFFF7F7)
                   : (isCurrentUser
-                      ? const Color(0xFFF0FDF4)
-                      : (rank == 1
-                          ? const Color(0xFFFFFDF5)
-                          : (rank == 2
-                              ? const Color(0xFFFAFBFC)
-                              : (rank == 3
-                                  ? const Color(0xFFFFFBF7)
-                                  : Colors.transparent)))),
+                        ? const Color(0xFFF0FDF4)
+                        : (rank == 1
+                              ? const Color(0xFFFFFDF5)
+                              : (rank == 2
+                                    ? const Color(0xFFFAFBFC)
+                                    : (rank == 3
+                                          ? const Color(0xFFFFFBF7)
+                                          : Colors.transparent)))),
               border: Border(
                 top: BorderSide(
                   color: isEliminated ? const Color(0xFFFECACA) : softBorder,
@@ -3916,6 +4020,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                     child: _buildRankTrophyBadge(
                       rank,
                       isEliminated: isEliminated,
+                      isTied: isTied,
                     ),
                   ),
                 ),
@@ -3929,14 +4034,16 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                           color: isEliminated
                               ? const Color(0xFFFEE2E2)
                               : (rank == 1
-                                  ? const Color(0xFFFEF3C7)
-                                  : (rank == 2
-                                      ? const Color(0xFFF1F5F9)
-                                      : (rank == 3
-                                          ? const Color(0xFFFFEDD5)
-                                          : (rank <= 10
-                                              ? lightGreen
-                                              : const Color(0xFFF8FAFC))))),
+                                    ? const Color(0xFFFEF3C7)
+                                    : (rank == 2
+                                          ? const Color(0xFFF1F5F9)
+                                          : (rank == 3
+                                                ? const Color(0xFFFFEDD5)
+                                                : (rank <= 10
+                                                      ? lightGreen
+                                                      : const Color(
+                                                          0xFFF8FAFC,
+                                                        ))))),
                           borderRadius: BorderRadius.circular(10),
                           border: isEliminated
                               ? Border.all(
@@ -3944,23 +4051,23 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                   width: 1,
                                 )
                               : (rank <= 3
-                                  ? Border.all(
-                                      color: rank == 1
-                                          ? const Color(0xFFFDE68A)
-                                          : (rank == 2
-                                              ? const Color(0xFFCBD5E1)
-                                              : const Color(0xFFFED7AA)),
-                                      width: 1,
-                                    )
-                                  : (rank <= 10
-                                      ? Border.all(
-                                          color: const Color(0xFFBBF7D0),
-                                          width: 1,
-                                        )
-                                      : Border.all(
-                                          color: const Color(0xFFE2E8F0),
-                                          width: 1,
-                                        ))),
+                                    ? Border.all(
+                                        color: rank == 1
+                                            ? const Color(0xFFFDE68A)
+                                            : (rank == 2
+                                                  ? const Color(0xFFCBD5E1)
+                                                  : const Color(0xFFFED7AA)),
+                                        width: 1,
+                                      )
+                                    : (rank <= 10
+                                          ? Border.all(
+                                              color: const Color(0xFFBBF7D0),
+                                              width: 1,
+                                            )
+                                          : Border.all(
+                                              color: const Color(0xFFE2E8F0),
+                                              width: 1,
+                                            ))),
                         ),
                         child: Icon(
                           row['isTeam'] == true
@@ -3969,14 +4076,16 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                           color: isEliminated
                               ? const Color(0xFFDC2626)
                               : (rank == 1
-                                  ? const Color(0xFFD97706)
-                                  : (rank == 2
-                                      ? const Color(0xFF64748B)
-                                      : (rank == 3
-                                          ? const Color(0xFFB45309)
-                                          : (rank <= 10
-                                              ? primaryGreen
-                                              : const Color(0xFF64748B))))),
+                                    ? const Color(0xFFD97706)
+                                    : (rank == 2
+                                          ? const Color(0xFF64748B)
+                                          : (rank == 3
+                                                ? const Color(0xFFB45309)
+                                                : (rank <= 10
+                                                      ? primaryGreen
+                                                      : const Color(
+                                                          0xFF64748B,
+                                                        ))))),
                           size: 19,
                         ),
                       ),
@@ -4011,8 +4120,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFFEE2E2),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                             border: Border.all(
                                               color: const Color(0xFFFCA5A5),
                                               width: 0.8,
@@ -4073,8 +4183,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFFEE2E2),
-                                        borderRadius:
-                                            BorderRadius.circular(4),
+                                        borderRadius: BorderRadius.circular(4),
                                         border: Border.all(
                                           color: const Color(0xFFFCA5A5),
                                           width: 0.8,
@@ -4100,8 +4209,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: primaryGreen,
-                                        borderRadius:
-                                            BorderRadius.circular(6),
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: const Text(
                                         'YOU',
@@ -4210,11 +4318,15 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return fallback;
   }
 
-  String _getLeaderboardLevelTitle(int level, [Map<String, dynamic>? sessionData]) {
+  String _getLeaderboardLevelTitle(
+    int level, [
+    Map<String, dynamic>? sessionData,
+  ]) {
     if (sessionData != null) {
       final rawSettings = sessionData['levelSettings'];
       if (rawSettings is Map) {
-        final setting = rawSettings['Level $level'] ??
+        final setting =
+            rawSettings['Level $level'] ??
             rawSettings['level $level'] ??
             rawSettings['$level'] ??
             rawSettings['Level$level'] ??
@@ -4246,7 +4358,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     }
   }
 
-  Color _getLeaderboardLevelColor(int level, [Map<String, dynamic>? sessionData]) {
+  Color _getLeaderboardLevelColor(
+    int level, [
+    Map<String, dynamic>? sessionData,
+  ]) {
     final title = _getLeaderboardLevelTitle(level, sessionData).toLowerCase();
     if (title.contains('easy')) return const Color(0xFF16A34A);
     if (title.contains('moderate') || title.contains('medium')) {
@@ -4308,7 +4423,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           for (final doc in responsesSnap.docs) {
             final data = doc.data();
             final lvl = _parseLeaderboardLevel(data['level']);
-            final isCorrect = data['isCorrect'] == true ||
+            final isCorrect =
+                data['isCorrect'] == true ||
                 data['answerStatus']?.toString().toLowerCase() == 'correct';
             if (lvl == selectedLevel && isCorrect) {
               final pts = int.tryParse(data['points']?.toString() ?? '') ?? 1;
@@ -4325,32 +4441,32 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     final levelRows = <Map<String, dynamic>>[];
     for (final base in baseRows) {
       int rowLevelScore = 0;
-      final uidsList = (base['uids'] as List?)?.cast<String>() ??
+      final uidsList =
+          (base['uids'] as List?)?.cast<String>() ??
           (base['uid'] != null ? [base['uid'].toString()] : <String>[]);
 
       for (final u in uidsList) {
         rowLevelScore += uidLevelScores[u] ?? 0;
       }
 
-      levelRows.add({
-        ...base,
-        'score': rowLevelScore,
-        'level': selectedLevel,
-      });
+      levelRows.add({...base, 'score': rowLevelScore, 'level': selectedLevel});
     }
 
     levelRows.sort((a, b) {
-      final aElim = a['eliminated'] == true ||
+      final aElim =
+          a['eliminated'] == true ||
           a['isEliminated'] == true ||
           (a['status'] ?? '').toString().toLowerCase() == 'eliminated';
-      final bElim = b['eliminated'] == true ||
+      final bElim =
+          b['eliminated'] == true ||
           b['isEliminated'] == true ||
           (b['status'] ?? '').toString().toLowerCase() == 'eliminated';
       if (aElim != bElim) {
         return aElim ? 1 : -1;
       }
-      final scoreCompare =
-          _scoreToInt(b['score']).compareTo(_scoreToInt(a['score']));
+      final scoreCompare = _scoreToInt(
+        b['score'],
+      ).compareTo(_scoreToInt(a['score']));
       if (scoreCompare != 0) return scoreCompare;
       return (a['displayName']?.toString() ?? '').toLowerCase().compareTo(
         (b['displayName']?.toString() ?? '').toLowerCase(),
@@ -4361,7 +4477,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   }
 
   Widget _buildLeaderboardQuizHistoryPicker({
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> publishedSessions,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>>
+    publishedSessions,
     required QueryDocumentSnapshot<Map<String, dynamic>> selectedSession,
   }) {
     return Container(
@@ -4422,14 +4539,14 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   final data = session.data();
                   final title =
                       data['quizTitle']?.toString().trim().isNotEmpty == true
-                          ? data['quizTitle'].toString().trim()
-                          : (data['title']?.toString().trim().isNotEmpty == true
-                              ? data['title'].toString().trim()
-                              : 'Quiz Session');
+                      ? data['quizTitle'].toString().trim()
+                      : (data['title']?.toString().trim().isNotEmpty == true
+                            ? data['title'].toString().trim()
+                            : 'Quiz Session');
                   final code =
                       data['quizCode']?.toString().trim().isNotEmpty == true
-                          ? data['quizCode'].toString().trim()
-                          : session.id;
+                      ? data['quizCode'].toString().trim()
+                      : session.id;
                   final s =
                       data['status']?.toString().toLowerCase().trim() ?? '';
                   final live =
@@ -4453,8 +4570,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                             color: live
                                 ? const Color(0xFFDCFCE7)
                                 : (waiting
-                                    ? const Color(0xFFFEF3C7)
-                                    : const Color(0xFFF1F5F9)),
+                                      ? const Color(0xFFFEF3C7)
+                                      : const Color(0xFFF1F5F9)),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -4465,8 +4582,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                               color: live
                                   ? const Color(0xFF15803D)
                                   : (waiting
-                                      ? const Color(0xFFB45309)
-                                      : const Color(0xFF475569)),
+                                        ? const Color(0xFFB45309)
+                                        : const Color(0xFF475569)),
                             ),
                           ),
                         ),
@@ -4711,8 +4828,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   rows: rowsSnapshot.data!,
                   isLive: isLive,
                   isWaiting: isWaiting,
-                  levelTitle:
-                      _getLeaderboardLevelTitle(_leaderboardSelectedLevel!, session.data()),
+                  levelTitle: _getLeaderboardLevelTitle(
+                    _leaderboardSelectedLevel!,
+                    session.data(),
+                  ),
                 );
               },
             );
@@ -4722,10 +4841,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     );
   }
 
-  Widget _buildPodiumCard(List<Map<String, dynamic>> rows) {
-    final first = rows.isNotEmpty ? rows[0] : null;
-    final second = rows.length > 1 ? rows[1] : null;
-    final third = rows.length > 2 ? rows[2] : null;
+  Widget _buildPodiumCard(List<_PodiumTierData> tiers) {
+    final first = tiers.isNotEmpty ? tiers[0] : null;
+    final second = tiers.length > 1 ? tiers[1] : null;
+    final third = tiers.length > 2 ? tiers[2] : null;
 
     return Container(
       width: double.infinity,
@@ -4789,13 +4908,13 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Expanded(
-                child: _buildPodiumPerson(entry: second, rank: 2, height: 95),
+                child: _buildPodiumPerson(tier: second, rank: 2, height: 95),
               ),
               Expanded(
-                child: _buildPodiumPerson(entry: first, rank: 1, height: 125),
+                child: _buildPodiumPerson(tier: first, rank: 1, height: 125),
               ),
               Expanded(
-                child: _buildPodiumPerson(entry: third, rank: 3, height: 80),
+                child: _buildPodiumPerson(tier: third, rank: 3, height: 80),
               ),
             ],
           ),
@@ -4805,16 +4924,17 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   }
 
   Widget _buildPodiumPerson({
-    required Map<String, dynamic>? entry,
+    required _PodiumTierData? tier,
     required int rank,
     required double height,
   }) {
+    final nonNullTier = tier;
     final bool isFirst = rank == 1;
     final trophyAsset = rank == 1
         ? 'assets/trophies/gold_trophy_3d.jpg'
         : (rank == 2
-            ? 'assets/trophies/silver_trophy_3d.jpg'
-            : 'assets/trophies/bronze_trophy_3d.jpg');
+              ? 'assets/trophies/silver_trophy_3d.jpg'
+              : 'assets/trophies/bronze_trophy_3d.jpg');
 
     final rankColor = rank == 1
         ? const Color(0xFFF59E0B)
@@ -4827,19 +4947,21 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
           )
         : (rank == 2
-            ? const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
-              )
-            : const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA)],
-              ));
+              ? const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+                )
+              : const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA)],
+                ));
 
-    final name = entry?['displayName']?.toString() ?? '---';
-    final score = entry != null ? _scoreToInt(entry['score']) : 0;
+    final bool hasEntries =
+        nonNullTier != null && nonNullTier.entries.isNotEmpty;
+    final bool isTied = nonNullTier?.isTied == true;
+    final score = nonNullTier?.score ?? 0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -4860,7 +4982,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             ],
           ),
           child: ClipOval(
-            child: entry != null
+            child: hasEntries
                 ? Image.asset(
                     trophyAsset,
                     fit: BoxFit.cover,
@@ -4882,48 +5004,87 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
         ),
         const SizedBox(height: 6),
 
-        // Contestant / Team Name
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: darkGreen,
-            ),
-          ),
-        ),
-        if (entry?['eliminated'] == true ||
-            entry?['isEliminated'] == true ||
-            (entry?['status'] ?? '').toString().toLowerCase() == 'eliminated') ...[
-          const SizedBox(height: 2),
+        // TIED Badge if multiple contestants share this podium step
+        if (isTied && nonNullTier != null) ...[
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFDE68A), width: 0.8),
             ),
-            child: const Text(
-              'ELIMINATED',
-              style: TextStyle(
+            child: Text(
+              'TIED (${nonNullTier.entries.length})',
+              style: const TextStyle(
                 fontSize: 7.5,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFFDC2626),
+                color: Color(0xFFB45309),
                 letterSpacing: 0.3,
               ),
             ),
           ),
+          const SizedBox(height: 2),
         ],
+
+        // Contestant / Team Name(s)
+        ConstrainedBox(
+          constraints: BoxConstraints(minHeight: isTied ? 36 : 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!hasEntries)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    '---',
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black38,
+                    ),
+                  ),
+                )
+              else ...[
+                for (int i = 0; i < nonNullTier.entries.length && i < 2; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 1,
+                    ),
+                    child: Text(
+                      nonNullTier.entries[i]['displayName']?.toString() ??
+                          'Contestant',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTied ? 10 : 11,
+                        fontWeight: FontWeight.w800,
+                        color: darkGreen,
+                      ),
+                    ),
+                  ),
+                if (nonNullTier.entries.length > 2)
+                  Text(
+                    '+${nonNullTier.entries.length - 2} more',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: primaryGreen,
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
         const SizedBox(height: 2),
 
         // Score
         Text(
-          entry != null ? '$score pts' : '-',
+          hasEntries ? '$score pts' : '-',
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
@@ -4962,13 +5123,32 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                 ],
               ),
               child: Center(
-                child: Text(
-                  '$rank',
-                  style: TextStyle(
-                    fontSize: isFirst ? 18 : 15,
-                    fontWeight: FontWeight.w900,
-                    color: rankColor,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$rank',
+                      style: TextStyle(
+                        fontSize: isTied
+                            ? (isFirst ? 14 : 12)
+                            : (isFirst ? 18 : 15),
+                        fontWeight: FontWeight.w900,
+                        color: rankColor,
+                        height: 1,
+                      ),
+                    ),
+                    if (isTied)
+                      Text(
+                        'TIE',
+                        style: TextStyle(
+                          fontSize: isFirst ? 6.5 : 5.5,
+                          fontWeight: FontWeight.w900,
+                          color: rankColor,
+                          letterSpacing: 0.3,
+                          height: 1,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -5017,11 +5197,13 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       );
     }
 
+    final processed = _processLeaderboardData(rows);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (rows.isNotEmpty) ...[
-          _buildPodiumCard(rows),
+          _buildPodiumCard(processed.tiers),
           const SizedBox(height: 16),
         ],
         Container(
@@ -5043,7 +5225,10 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: const BoxDecoration(
                   color: Color(0xFFF7FAF8),
                   border: Border(bottom: BorderSide(color: softBorder)),
@@ -5089,7 +5274,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   ],
                 ),
               ),
-              _leaderboardRows(rows),
+              _leaderboardRows(processed.tableRows),
             ],
           ),
         ),
@@ -5202,16 +5387,18 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                       status == 'ended';
                   final quizCode =
                       sessionData['quizCode']?.toString().trim().isNotEmpty ==
-                              true
-                          ? sessionData['quizCode'].toString().trim()
-                          : selectedSession.id;
+                          true
+                      ? sessionData['quizCode'].toString().trim()
+                      : selectedSession.id;
 
                   final quizTitle =
-                      sessionData['quizTitle']?.toString().trim().isNotEmpty == true
-                          ? sessionData['quizTitle'].toString().trim()
-                          : (sessionData['title']?.toString().trim().isNotEmpty == true
-                              ? sessionData['title'].toString().trim()
-                              : 'TechNoWiz Quiz');
+                      sessionData['quizTitle']?.toString().trim().isNotEmpty ==
+                          true
+                      ? sessionData['quizTitle'].toString().trim()
+                      : (sessionData['title']?.toString().trim().isNotEmpty ==
+                                true
+                            ? sessionData['title'].toString().trim()
+                            : 'TechNoWiz Quiz');
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -5244,10 +5431,16 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                   child: Row(
                                     children: [
                                       Container(
-                                        padding: EdgeInsets.all(mobile ? 8 : 10),
+                                        padding: EdgeInsets.all(
+                                          mobile ? 8 : 10,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.16),
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.16,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                         child: Icon(
                                           Icons.emoji_events_rounded,
@@ -5258,7 +5451,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
@@ -5297,7 +5491,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: Colors.white30),
                                     ),
@@ -5332,7 +5528,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: Colors.white30),
                                     ),
@@ -5364,7 +5562,9 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: Colors.white30),
                                     ),
@@ -5461,8 +5661,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                                             isLive
                                                 ? 'Active'
                                                 : (isWaiting
-                                                    ? 'Waiting'
-                                                    : 'Final Results'),
+                                                      ? 'Waiting'
+                                                      : 'Final Results'),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
@@ -5817,11 +6017,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFF093E22),
-                Color(0xFF14532D),
-                Color(0xFF15803D),
-              ],
+              colors: [Color(0xFF093E22), Color(0xFF14532D), Color(0xFF15803D)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -5909,42 +6105,44 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: teamMembers.map(
-                      (member) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.22),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.person_rounded,
-                              size: 11.5,
-                              color: Color(0xFFA7F3D0),
+                    children: teamMembers
+                        .map(
+                          (member) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              member,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: memberSize,
-                                fontWeight: FontWeight.w600,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ).toList(),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.person_rounded,
+                                  size: 11.5,
+                                  color: Color(0xFFA7F3D0),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  member,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: memberSize,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
               ] else ...[
                 Text(
@@ -6136,43 +6334,43 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           bottom: false,
           child: LayoutBuilder(
             builder: (context, constraints) {
-          final desktop = constraints.maxWidth >= 900;
+              final desktop = constraints.maxWidth >= 900;
 
-          if (desktop) {
-            return Row(
-              children: [
-                _desktopSidebar(),
-                Expanded(
-                  child: IndexedStack(
-                    index: _selectedBottomNavigationIndex,
-                    children: [
-                      _dashboardContent(mobile: false),
-                      _leaderboardContent(mobile: false),
-                      _badgesContent(mobile: false),
-                      const ContestantHistoryScreen(mobile: false),
-                    ],
+              if (desktop) {
+                return Row(
+                  children: [
+                    _desktopSidebar(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: _selectedBottomNavigationIndex,
+                        children: [
+                          _dashboardContent(mobile: false),
+                          _leaderboardContent(mobile: false),
+                          _badgesContent(mobile: false),
+                          const ContestantHistoryScreen(mobile: false),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return IndexedStack(
+                index: _selectedBottomNavigationIndex,
+                children: [
+                  _dashboardContent(mobile: true),
+                  _leaderboardContent(mobile: true),
+                  _badgesContent(mobile: true),
+                  ContestantHistoryScreen(
+                    mobile: true,
+                    mobileHeader: _mobileHeader(),
                   ),
-                ),
-              ],
-            );
-          }
-
-          return IndexedStack(
-            index: _selectedBottomNavigationIndex,
-            children: [
-              _dashboardContent(mobile: true),
-              _leaderboardContent(mobile: true),
-              _badgesContent(mobile: true),
-              ContestantHistoryScreen(
-                mobile: true,
-                mobileHeader: _mobileHeader(),
-              ),
-            ],
-          );
-        },
+                ],
+              );
+            },
+          ),
+        ),
       ),
-    ),
-  ),
     );
   }
 
@@ -6303,9 +6501,33 @@ class _LeaderboardSwipeableScrollBehavior extends MaterialScrollBehavior {
 
   @override
   Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.stylus,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
+}
+
+class _PodiumTierData {
+  final int rank;
+  final int score;
+  final List<Map<String, dynamic>> entries;
+  final bool isTied;
+
+  const _PodiumTierData({
+    required this.rank,
+    required this.score,
+    required this.entries,
+    required this.isTied,
+  });
+}
+
+class _LeaderboardProcessedData {
+  final List<_PodiumTierData> tiers;
+  final List<Map<String, dynamic>> tableRows;
+
+  const _LeaderboardProcessedData({
+    required this.tiers,
+    required this.tableRows,
+  });
 }

@@ -1707,12 +1707,40 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   // ================================================================
 
+  List<_LeaderboardRankTier> _buildRankTiers(List<_LeaderboardEntry> entries) {
+    final activeEntries = entries.where((e) => !e.eliminated).toList();
+    if (activeEntries.isEmpty) return [];
+
+    final Map<int, List<_LeaderboardEntry>> scoreGroups = {};
+    for (final entry in activeEntries) {
+      scoreGroups.putIfAbsent(entry.score, () => []).add(entry);
+    }
+
+    final sortedScores = scoreGroups.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    final List<_LeaderboardRankTier> tiers = [];
+    int rank = 1;
+    for (final score in sortedScores) {
+      final group = scoreGroups[score]!;
+      tiers.add(_LeaderboardRankTier(
+        rank: rank,
+        score: score,
+        entries: group,
+        isTied: group.length > 1,
+      ));
+      rank++;
+    }
+    return tiers;
+  }
+
   Widget _podium(List<_LeaderboardEntry> entries) {
-    final first = entries.isNotEmpty ? entries[0] : null;
+    final tiers = _buildRankTiers(entries);
+    final first = tiers.isNotEmpty ? tiers[0] : null;
 
-    final second = entries.length > 1 ? entries[1] : null;
+    final second = tiers.length > 1 ? tiers[1] : null;
 
-    final third = entries.length > 2 ? entries[2] : null;
+    final third = tiers.length > 2 ? tiers[2] : null;
 
     return Container(
       width: double.infinity,
@@ -1804,14 +1832,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
             children: [
               Expanded(
-                child: _podiumPerson(entry: second, rank: 2, height: 105),
+                child: _podiumPerson(tier: second, rank: 2, height: 105),
               ),
 
               Expanded(
-                child: _podiumPerson(entry: first, rank: 1, height: 135),
+                child: _podiumPerson(tier: first, rank: 1, height: 135),
               ),
 
-              Expanded(child: _podiumPerson(entry: third, rank: 3, height: 90)),
+              Expanded(child: _podiumPerson(tier: third, rank: 3, height: 90)),
             ],
           ),
         ],
@@ -1826,15 +1854,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   // ================================================================
 
   Widget _podiumPerson({
-    required _LeaderboardEntry? entry,
+    required _LeaderboardRankTier? tier,
 
     required int rank,
 
     required double height,
   }) {
+    final nonNullTier = tier;
     final bool isFirst = rank == 1;
+    final bool hasEntries =
+        nonNullTier != null && nonNullTier.entries.isNotEmpty;
+    final bool isTied = nonNullTier?.isTied == true;
+    final score = nonNullTier?.score ?? 0;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // ==========================================================
 
@@ -1882,43 +1916,83 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
-        // ==========================================================
-        // NAME
-        // ==========================================================
-        Text(
-          entry?.name ?? '---',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: textDark,
-          ),
-        ),
-
-        if (entry?.eliminated == true) ...[
-          const SizedBox(height: 2),
+        if (isTied && nonNullTier != null) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFFDE68A),
+                width: 0.8,
+              ),
             ),
-            child: const Text(
-              'ELIMINATED',
-              style: TextStyle(
+            child: Text(
+              'TIED (${nonNullTier.entries.length})',
+              style: const TextStyle(
                 fontSize: 7.5,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFFDC2626),
+                color: Color(0xFFB45309),
                 letterSpacing: 0.3,
               ),
             ),
           ),
+          const SizedBox(height: 2),
         ],
+
+        // ==========================================================
+        // NAME(S)
+        // ==========================================================
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: isTied ? 36 : 22,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!hasEntries)
+                const Text(
+                  '---',
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: textDark,
+                  ),
+                )
+              else ...[
+                for (int i = 0; i < nonNullTier.entries.length && i < 2; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                    child: Text(
+                      nonNullTier.entries[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTied ? 10 : 11,
+                        fontWeight: FontWeight.w800,
+                        color: textDark,
+                      ),
+                    ),
+                  ),
+                if (nonNullTier.entries.length > 2)
+                  Text(
+                    '+${nonNullTier.entries.length - 2} more',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: primaryPurple,
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
 
         const SizedBox(height: 3),
 
@@ -1926,7 +2000,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         // SCORE
         // ==========================================================
         Text(
-          '${entry?.score ?? 0} pts',
+          hasEntries ? '$score pts' : '0 pts',
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
@@ -2021,13 +2095,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       return const SizedBox.shrink();
     }
 
-    // Rank 4 to pataas, plus makita pud ang na-eliminate nga contestant
-    final standingsEntries = <MapEntry<int, _LeaderboardEntry>>[];
-    for (int i = 0; i < entries.length; i++) {
-      final rank = i + 1;
-      final entry = entries[i];
-      if (rank >= 4 || entry.eliminated) {
-        standingsEntries.add(MapEntry(rank, entry));
+    final tiers = _buildRankTiers(entries);
+    final Set<String> top3Ids = {};
+    final Map<String, int> rankMap = {};
+    final Map<String, bool> tieMap = {};
+    for (int i = 0; i < tiers.length; i++) {
+      final tier = tiers[i];
+      for (final e in tier.entries) {
+        final key = e.id.isNotEmpty ? e.id : e.name;
+        rankMap[key] = tier.rank;
+        tieMap[key] = tier.isTied;
+        if (i < 3) {
+          top3Ids.add(key);
+        }
+      }
+    }
+
+    final standingsEntries = <({_LeaderboardEntry entry, int rank, bool isTied})>[];
+    for (final entry in entries) {
+      final key = entry.id.isNotEmpty ? entry.id : entry.name;
+      final rank = rankMap[key] ?? (tiers.length + 1);
+      final isTied = tieMap[key] == true;
+      if (!top3Ids.contains(key) || entry.eliminated) {
+        standingsEntries.add((entry: entry, rank: rank, isTied: isTied));
       }
     }
 
@@ -2075,7 +2165,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           : Column(
               children: [
                 for (final item in standingsEntries)
-                  _rankingItem(item.value, item.key),
+                  _rankingItem(item.entry, item.rank, isTied: item.isTied),
               ],
             ),
     );
@@ -2085,7 +2175,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   // RANKING ITEM
   // ================================================================
 
-  Widget _rankingItem(_LeaderboardEntry entry, int rank) {
+  Widget _rankingItem(_LeaderboardEntry entry, int rank, {bool isTied = false}) {
     final bool isFirst = rank == 1;
     final bool isSecond = rank == 2;
     final bool isTop3 = rank <= 3;
@@ -2255,6 +2345,33 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             color: Color(0xFF475569),
           ),
         ),
+      );
+    }
+
+    if (isTied) {
+      leadingWidget = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          leadingWidget,
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFFDE68A), width: 0.8),
+            ),
+            child: const Text(
+              'TIE',
+              style: TextStyle(
+                fontSize: 6.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFB45309),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -2859,6 +2976,20 @@ class _LeaderboardEntry {
     this.eliminated = false,
     this.status = '',
     this.lastSubmissionTime,
+  });
+}
+
+class _LeaderboardRankTier {
+  final int rank;
+  final int score;
+  final List<_LeaderboardEntry> entries;
+  final bool isTied;
+
+  const _LeaderboardRankTier({
+    required this.rank,
+    required this.score,
+    required this.entries,
+    required this.isTied,
   });
 }
 
