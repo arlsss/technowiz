@@ -674,10 +674,10 @@ class QuizInstructionsScreen extends StatelessWidget {
                               "Contestants to proceed: All eligible contestants.";
                         } else if (count == 1) {
                           proceedText =
-                              "Contestant to proceed: Top 1 contestant.";
+                              "Contestant to proceed: 1 contestant.";
                         } else {
                           proceedText =
-                              "Contestants to proceed: Top $count contestant(s).";
+                              "Contestants to proceed: $count contestant(s).";
                         }
 
                         return _instructionItem(
