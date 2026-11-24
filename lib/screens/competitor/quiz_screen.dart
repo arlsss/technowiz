@@ -6395,13 +6395,19 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  '${item['score']} pts',
-                                  style: const TextStyle(
-                                    color: primaryGreen,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
+                                Builder(
+                                  builder: (_) {
+                                    final int scoreVal =
+                                        (item['score'] as num?)?.toInt() ?? 0;
+                                    return Text(
+                                      '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
+                                      style: const TextStyle(
+                                        color: primaryGreen,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -8622,7 +8628,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                             ),
                                                           ),
                                                           child: Text(
-                                                            "Level $lvl: ${myLevelScores[lvl]} pts",
+                                                            "Level $lvl: ${myLevelScores[lvl]} ${(myLevelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
                                                             style:
                                                                 const TextStyle(
                                                               fontSize: 12,
@@ -9068,7 +9074,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         child: Text(
-                          "L$lvl: ${item.levelScores[lvl] ?? 0} pts",
+                          "L$lvl: ${item.levelScores[lvl] ?? 0} ${(item.levelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
@@ -9092,7 +9098,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         child: Text(
-                          "TB: +${item.tieBreakerScore} pts",
+                          "TB: +${item.tieBreakerScore} ${item.tieBreakerScore == 1 ? 'pt' : 'pts'}",
                           style: const TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
@@ -9687,7 +9693,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                   if (myRow != null) ...[
                                     const SizedBox(height: 8),
                                     Text(
-                                      "Final Score: ${myRow['score']} pts",
+                                      "Final Score: ${myRow['score']} ${(myRow['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}",
                                       style: TextStyle(
                                         color: Colors.black.withValues(alpha: 0.7),
                                         fontSize: 13,
@@ -9978,7 +9984,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                     BorderRadius.circular(20),
                                               ),
                                               child: Text(
-                                                '${row['score']} pts',
+                                                '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
                                                 style: TextStyle(
                                                   color: rank == 1
                                                       ? const Color(0xFF173426)
@@ -10199,7 +10205,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            '${row['score']} pts',
+                                            '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
                                             style: TextStyle(
                                               color: eliminated
                                                   ? Colors.red.shade700
