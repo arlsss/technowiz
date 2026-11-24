@@ -1522,9 +1522,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   : (rank == 1
                       ? 'Champion'
                       : (rank == 2
-                          ? '1st Runner-Up'
+                          ? '2nd Place'
                           : (rank == 3
-                              ? '2nd Runner-Up'
+                              ? '3rd Place'
                               : 'Finalist')));
 
               final displayName = c.teamName.isNotEmpty ? c.teamName : c.name;
@@ -2860,7 +2860,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               Expanded(
                 child: _buildPodiumHighlightCard(
                   rank: 2,
-                  title: '1st Runner-Up',
+                  title: '2nd Place',
                   contestant: top2,
                   color: const Color(0xFF64748B),
                   bg: const Color(0xFFF8FAFC),
@@ -2873,7 +2873,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               Expanded(
                 child: _buildPodiumHighlightCard(
                   rank: 3,
-                  title: '2nd Runner-Up',
+                  title: '3rd Place',
                   contestant: top3,
                   color: const Color(0xFFD97706),
                   bg: const Color(0xFFFFF7ED),
@@ -2960,10 +2960,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     required ReportContestant contestant,
     required Color color,
     required Color bg,
-    required String quizTitle,
+    String? quizTitle,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
@@ -3029,55 +3029,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 fontSize: 11.5,
                 fontWeight: FontWeight.w900,
                 color: color,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          InkWell(
-            onTap: () {
-              final displayName = contestant.teamName.isNotEmpty
-                  ? contestant.teamName
-                  : contestant.name;
-              _printCertificate(
-                contestantName: displayName,
-                quizTitle: quizTitle,
-                rank: rank,
-                teamName: contestant.teamName,
-                school: contestant.school,
-                totalScore: contestant.totalScore,
-                level1Score: contestant.level1Score,
-                level2Score: contestant.level2Score,
-                level3Score: contestant.level3Score,
-                quizCode: selectedQuizCode ?? '',
-                quizDate: _dateText(),
-                eliminated: false,
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3.5),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color.withValues(alpha: 0.35)),
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.workspace_premium_rounded, size: 12, color: color),
-                    const SizedBox(width: 3),
-                    Text(
-                      'Certificate',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
