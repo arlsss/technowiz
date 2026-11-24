@@ -637,6 +637,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final PdfColor primaryPdfColor;
     final PdfColor topTitlePdfColor;
     final String rankCitationText;
+    final String winVerbPhrase;
 
     if (rank == 1 && !eliminated) {
       // 1ST PLACE - GOLD EDITION
@@ -645,7 +646,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       navyPdfColor = const PdfColor.fromInt(0xFF0B192C);
       primaryPdfColor = const PdfColor.fromInt(0xFFB45309);
       topTitlePdfColor = const PdfColor.fromInt(0xFFC59B27);
-      rankCitationText = 'CHAMPION';
+      rankCitationText = 'RANK 1 (CHAMPION)';
+      winVerbPhrase = 'having successfully emerged and won as ';
     } else if (rank == 2 && !eliminated) {
       // 2ND PLACE - SILVER EDITION
       primaryColorHex = '#94A3B8';
@@ -653,7 +655,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       navyPdfColor = const PdfColor.fromInt(0xFF0F172A);
       primaryPdfColor = const PdfColor.fromInt(0xFF475569);
       topTitlePdfColor = const PdfColor.fromInt(0xFF64748B);
-      rankCitationText = '2ND PLACE';
+      rankCitationText = 'RANK 2 (1ST RUNNER-UP)';
+      winVerbPhrase = 'having successfully emerged and won as ';
     } else if (rank == 3 && !eliminated) {
       // 3RD PLACE - BRONZE EDITION
       primaryColorHex = '#CD7F32';
@@ -661,7 +664,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       navyPdfColor = const PdfColor.fromInt(0xFF1E1B18);
       primaryPdfColor = const PdfColor.fromInt(0xFF9A3412);
       topTitlePdfColor = const PdfColor.fromInt(0xFFC2410C);
-      rankCitationText = '3RD PLACE';
+      rankCitationText = 'RANK 3 (2ND RUNNER-UP)';
+      winVerbPhrase = 'having successfully emerged and won as ';
     } else {
       // RANK 4+ & PARTICIPANTS - GREEN EDITION
       primaryColorHex = '#10B981';
@@ -669,7 +673,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       navyPdfColor = const PdfColor.fromInt(0xFF064E3B);
       primaryPdfColor = const PdfColor.fromInt(0xFF047857);
       topTitlePdfColor = const PdfColor.fromInt(0xFF059669);
-      rankCitationText = rank > 0 ? 'RANK $rank' : 'FINALIST';
+      rankCitationText = rank > 0 ? 'RANK $rank' : 'CONTESTANT';
+      winVerbPhrase = rank > 0
+          ? 'having successfully competed and achieved '
+          : 'having actively participated and competed as an official ';
     }
 
     final cornerTopLeftSvg = _getCertCornerTopLeftSvg(frameNavyHex, primaryColorHex);
@@ -979,17 +986,35 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                           ],
                         ),
 
-                        // Citation Statement
+                        // Citation Statement (Full, formal academic citation)
                         pw.Container(
-                          width: 580,
-                          child: pw.Text(
-                            'for achieving $rankCitationText in the ${config.eventName.trim()} during the ${config.occasionName.trim()}, held on $dateString, at ${config.venue.trim().isNotEmpty ? config.venue.trim() : "BSIT Building"}.',
+                          width: 610,
+                          child: pw.RichText(
                             textAlign: pw.TextAlign.center,
-                            style: const pw.TextStyle(
-                              fontSize: 10,
-                              fontWeight: pw.FontWeight.normal,
-                              color: PdfColor.fromInt(0xFF1E293B),
-                              lineSpacing: 2,
+                            text: pw.TextSpan(
+                              style: const pw.TextStyle(
+                                fontSize: 10,
+                                color: PdfColor.fromInt(0xFF1E293B),
+                                lineSpacing: 2.6,
+                              ),
+                              children: [
+                                const pw.TextSpan(
+                                  text:
+                                      'in high recognition of their exemplary brilliance, intellectual competence, and outstanding competitive performance, ',
+                                ),
+                                pw.TextSpan(text: winVerbPhrase),
+                                pw.TextSpan(
+                                  text: rankCitationText,
+                                  style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: navyPdfColor,
+                                  ),
+                                ),
+                                pw.TextSpan(
+                                  text:
+                                      ' in the ${config.eventName.trim()} during the ${config.occasionName.trim()}, held on $dateString, at ${config.venue.trim().isNotEmpty ? config.venue.trim() : "BSIT Building"}.',
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -4535,13 +4560,32 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
 
                           // Citation preview
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Text(
-                              'for achieving CHAMPION in the ${_eventController.text.trim()} during the ${_occasionController.text.trim()}, held on [Date of Event], at ${_venueController.text.trim()}.',
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: RichText(
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 8.5,
-                                color: Color(0xFF1E293B),
+                              text: TextSpan(
+                                style: const TextStyle(
+                                  fontSize: 8.5,
+                                  color: Color(0xFF1E293B),
+                                  height: 1.35,
+                                ),
+                                children: [
+                                  const TextSpan(
+                                    text:
+                                        'in high recognition of their exemplary brilliance, intellectual competence, and outstanding competitive performance, having successfully emerged and won as ',
+                                  ),
+                                  const TextSpan(
+                                    text: 'RANK 1 (CHAMPION)',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        ' in the ${_eventController.text.trim()} during the ${_occasionController.text.trim()}, held on [Date of Event], at ${_venueController.text.trim()}.',
+                                  ),
+                                ],
                               ),
                             ),
                           ),
