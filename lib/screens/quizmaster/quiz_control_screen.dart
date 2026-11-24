@@ -92,6 +92,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   String? _tieBreakerLeadingName;
   int _tieBreakerLeadingScore = -1;
 
+  final Map<String, Map<int, int>> _levelScoresCache = {};
+  final Map<String, StreamSubscription> _responseSubs = {};
+  String? _lastSyncedQuizCode;
+
   Map<String, dynamic>? _quizData;
 
   List<QueryDocumentSnapshot> _questions = [];
@@ -132,6 +136,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         .snapshots()
         .listen((snap) {
           if (!mounted) return;
+          _syncOrFetchLevelScores(
+            widget.quizCode,
+            snap.docs,
+            quizData: _quizData,
+          );
           _updateTieBreakerScoreState(snap.docs);
         });
   }
@@ -151,7 +160,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     for (final doc in scoreDocs) {
       if (tiedUids.contains(doc.id)) {
         final data = doc.data();
-        final s = int.tryParse(data['score']?.toString() ?? '0') ?? 0;
+        final s = _getContestantEffectiveScore(data, uid: doc.id);
         final n = (data['teamName'] ?? data['name'] ?? doc.id).toString();
         scoresMap[doc.id] = s;
         namesMap[doc.id] = n;
@@ -203,8 +212,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
         for (final doc in scoresSnap.docs) {
           if (tiedUids.contains(doc.id)) {
-            final s =
-                int.tryParse(doc.data()['score']?.toString() ?? '0') ?? 0;
+            final s = _getContestantEffectiveScore(doc.data(), uid: doc.id);
             if (s > highestScore) {
               highestScore = s;
               winnerUid = doc.id;
@@ -323,6 +331,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     RefreshBlocker.unblock();
     _sessionDeletionSubscription?.cancel();
     _scoresSubscription?.cancel();
+    for (final sub in _responseSubs.values) {
+      sub.cancel();
+    }
+    _responseSubs.clear();
     _timer?.cancel();
     _readyCheckTimer?.cancel();
     super.dispose();
@@ -2619,7 +2631,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         final List<Map<String, dynamic>> participantScores = [];
         for (final doc in scoresSnap.docs) {
           final sData = doc.data();
-          final int score = int.tryParse(sData['score']?.toString() ?? '') ?? 0;
+          final int score = _getContestantEffectiveScore(sData, uid: doc.id);
           final rawUpdated = sData['updatedAt'];
           final int timeMs = rawUpdated is Timestamp
               ? rawUpdated.millisecondsSinceEpoch
@@ -2697,13 +2709,15 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 ranksByUid[doc.id] ?? (ranksByUid.length + 1);
             final int score =
                 scoresByUid[doc.id] ??
-                (int.tryParse(doc.data()['score']?.toString() ?? '') ?? 0);
+                _getContestantEffectiveScore(doc.data(), uid: doc.id);
             batch.set(doc.reference, {
               'finalRank': assignedRank,
               'rank': assignedRank,
               'levelRank': assignedRank,
               'currentRank': assignedRank,
               'finalScore': score,
+              'score': score,
+              'totalScore': score,
             }, SetOptions(merge: true));
           }
           await batch.commit();
@@ -4070,6 +4084,188 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         data['leftQuiz'] == true;
   }
 
+  int _getAdminPointsForLevel(int level, Map<String, dynamic>? quizData) {
+    if (quizData == null) return level;
+    final rawSettings = quizData['levelSettings'] ?? quizData['levels'];
+    if (rawSettings is Map) {
+      final target = 'level$level';
+      for (final entry in rawSettings.entries) {
+        final norm = entry.key
+            .toString()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if ((norm == target || norm == '$level') && entry.value is Map) {
+          final val = entry.value['pointsPerCorrectAnswer'] ??
+              entry.value['points_per_correct_answer'] ??
+              entry.value['pointsPerQuestion'] ??
+              entry.value['points'];
+          if (val is num && val > 0) return val.toInt();
+          if (val != null) {
+            final p = int.tryParse(val.toString());
+            if (p != null && p > 0) return p;
+          }
+        }
+      }
+    }
+    for (final key in [
+      'level${level}Points',
+      'level${level}PointsPerCorrectAnswer',
+      'level${level}PointsPerQuestion',
+      'level_${level}_points',
+    ]) {
+      final val = quizData[key];
+      if (val is num && val > 0) return val.toInt();
+      if (val != null) {
+        final p = int.tryParse(val.toString());
+        if (p != null && p > 0) return p;
+      }
+    }
+    return level;
+  }
+
+  void _syncOrFetchLevelScores(
+    String quizCode,
+    List<QueryDocumentSnapshot> scoreDocs, {
+    Map<String, dynamic>? quizData,
+  }) {
+    if (quizCode.isEmpty) return;
+
+    if (_lastSyncedQuizCode != quizCode) {
+      _lastSyncedQuizCode = quizCode;
+      _levelScoresCache.clear();
+      for (final sub in _responseSubs.values) {
+        sub.cancel();
+      }
+      _responseSubs.clear();
+    }
+
+    for (final doc in scoreDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final uid = (data['uid'] ?? doc.id).toString();
+
+      if (!_responseSubs.containsKey(uid)) {
+        final sub = FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(quizCode)
+            .collection('answers')
+            .doc(uid)
+            .collection('responses')
+            .snapshots()
+            .listen((responsesSnap) {
+          if (!mounted) return;
+          final Map<int, int> userLevelScores = {};
+          int totalRespPoints = 0;
+          for (final r in responsesSnap.docs) {
+            final rData = r.data();
+            final rawLvl = rData['level'] ?? rData['sessionLevel'];
+            int lvl = 1;
+            if (rawLvl is num) {
+              lvl = rawLvl.toInt();
+            } else if (rawLvl != null) {
+              final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+              if (m != null) lvl = int.tryParse(m.group(1)!) ?? 1;
+            }
+            final rawPts = rData['points'] ?? rData['score'];
+            final isCorrect = rData['isCorrect'] == true ||
+                (rData['answerStatus'] ?? '').toString().toLowerCase() ==
+                    'correct' ||
+                (rData['contestStatus'] ?? '').toString().toLowerCase() ==
+                    'approved';
+            if (isCorrect) {
+              final adminPts =
+                  _getAdminPointsForLevel(lvl, quizData ?? _quizData);
+              int pts = adminPts > 0 ? adminPts : (_asInt(rawPts) ?? 0);
+              if (pts <= 0) pts = 1;
+              userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
+              totalRespPoints += pts;
+            }
+          }
+
+          if (responsesSnap.docs.isNotEmpty || userLevelScores.isNotEmpty) {
+            setState(() {
+              _levelScoresCache[uid] = userLevelScores;
+            });
+
+            final updateData = <String, dynamic>{};
+            for (final entry in userLevelScores.entries) {
+              updateData['level${entry.key}Score'] = entry.value;
+              updateData['level_${entry.key}'] = entry.value;
+            }
+            updateData['levelScores'] = {
+              for (final entry in userLevelScores.entries)
+                'Level ${entry.key}': entry.value,
+            };
+            final int tiePts = _asInt(data['tieBreakerScore']) ?? 0;
+            final int realTotal = totalRespPoints + tiePts;
+            updateData['score'] = realTotal;
+            updateData['totalScore'] = realTotal;
+            doc.reference
+                .set(updateData, SetOptions(merge: true))
+                .catchError((_) {});
+          }
+        }, onError: (_) {});
+        _responseSubs[uid] = sub;
+      }
+    }
+  }
+
+  int _getContestantEffectiveScore(
+    Map<String, dynamic> sData, {
+    Map<String, dynamic>? jData,
+    String? uid,
+  }) {
+    final tiePts = _asInt(sData['tieBreakerScore']) ??
+        _asInt(jData?['tieBreakerScore']) ??
+        0;
+
+    // 1. If we have live cached response scores from responses subcollection
+    if (uid != null && _levelScoresCache.containsKey(uid)) {
+      final cached = _levelScoresCache[uid];
+      if (cached != null) {
+        final cachedSum = cached.values.fold<int>(0, (acc, val) => acc + val);
+        return cachedSum + tiePts;
+      }
+    }
+
+    // 2. Sum up configured level scores from levelScores map and level1Score..level20Score
+    final Map<int, int> levelPointsMap = {};
+    if (sData['levelScores'] is Map) {
+      (sData['levelScores'] as Map).forEach((k, v) {
+        final m = RegExp(r'\d+').firstMatch(k.toString());
+        final lvlNum = m != null ? int.tryParse(m.group(0)!) ?? 0 : 0;
+        final p = _asInt(v) ?? 0;
+        if (lvlNum > 0 && p > 0) {
+          levelPointsMap[lvlNum] = p;
+        }
+      });
+    }
+
+    for (int l = 1; l <= 20; l++) {
+      final val = _asInt(sData['level${l}Score']) ??
+          _asInt(sData['level_$l']) ??
+          _asInt(sData['level$l']) ??
+          0;
+      if (val > 0 &&
+          (!levelPointsMap.containsKey(l) || levelPointsMap[l]! < val)) {
+        levelPointsMap[l] = val;
+      }
+    }
+
+    final int sumOfLevels =
+        levelPointsMap.values.fold<int>(0, (acc, val) => acc + val);
+
+    if (sumOfLevels > 0) {
+      return sumOfLevels + tiePts;
+    }
+
+    final stored = _asInt(sData['score']) ??
+        _asInt(sData['totalScore']) ??
+        _asInt(jData?['score']) ??
+        0;
+
+    return stored;
+  }
+
   // ============================================================
   // NEXT QUESTION CARD
   //
@@ -4116,7 +4312,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         fallbackName)
                     .toString();
                 final score =
-                    int.tryParse(sc['score']?.toString() ?? '0') ?? 0;
+                    _getContestantEffectiveScore(sc, jData: req, uid: uid);
                 final isReady =
                     req['tieBreakerReady'] == true || _isConfirmed(req);
                 tiedData.add({
@@ -5771,6 +5967,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             final requestDocs = requestsSnapshot.data?.docs ?? [];
             final scoreDocs = scoresSnapshot.data?.docs ?? [];
 
+            _syncOrFetchLevelScores(
+              widget.quizCode,
+              scoreDocs,
+              quizData: _quizData,
+            );
+
             final Map<String, Map<String, dynamic>> joinByUid = {};
             final Map<String, Map<String, dynamic>> joinByName = {};
 
@@ -5898,22 +6100,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 }
               }
 
-              int score =
-                  _asInt(sData['score']) ?? _asInt(sData['totalScore']) ?? _asInt(jData['score']) ?? 0;
-              int lvlSum = 0;
-              for (int l = 1; l <= 20; l++) {
-                lvlSum += _asInt(sData['level${l}Score']) ?? _asInt(sData['level_$l']) ?? 0;
+              final score = _getContestantEffectiveScore(
+                sData,
+                jData: jData,
+                uid: id,
+              );
+
+              // Auto-heal inflated or outdated score in Firestore score document
+              final storedScore = _asInt(sData['score']);
+              if (storedScore != null && storedScore != score) {
+                quizRef.collection('scores').doc(id).set({
+                  'score': score,
+                  'totalScore': score,
+                }, SetOptions(merge: true)).catchError((_) {});
               }
-              if (sData['levelScores'] is Map) {
-                int mSum = 0;
-                for (final v in (sData['levelScores'] as Map).values) {
-                  mSum += _asInt(v) ?? 0;
-                }
-                if (mSum > lvlSum) lvlSum = mSum;
-              }
-              if (lvlSum > score) score = lvlSum;
-              final tiePts = _asInt(sData['tieBreakerScore']) ?? 0;
-              if (tiePts > 0 && score < (lvlSum + tiePts)) score += tiePts;
 
               final bool isEliminated =
                   sData['eliminated'] == true ||
@@ -6212,15 +6412,23 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           ),
                       ],
                     ),
-                    trailing: Text(
-                      '${rows[i]['score']} pts',
-                      style: TextStyle(
-                        color: rows[i]['isEliminated'] == true
-                            ? const Color(0xFFDC2626)
-                            : darkBlue,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
+                    trailing: Builder(
+                      builder: (context) {
+                        final int sc = (rows[i]['score'] as int?) ?? 0;
+                        final String label = sc == 0
+                            ? '0'
+                            : (sc == 1 ? '1 pt' : '$sc pts');
+                        return Text(
+                          label,
+                          style: TextStyle(
+                            color: rows[i]['isEliminated'] == true
+                                ? const Color(0xFFDC2626)
+                                : darkBlue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        );
+                      },
                     ),
                   ),
               ],
