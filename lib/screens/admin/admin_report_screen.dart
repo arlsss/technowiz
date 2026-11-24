@@ -51,6 +51,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       TextEditingController();
 
   CertificateConfig _certificateConfig = CertificateConfig.defaultTemplate();
+  ReportConfig _reportConfig = ReportConfig.defaultTemplate();
 
   final Map<String, Map<int, int>> _levelScoresCache = {};
   final Set<String> _syncingUids = {};
@@ -90,6 +91,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       }
     } catch (_) {}
     await _loadCertificateConfig(selectedQuizCode);
+    await _loadReportConfig(selectedQuizCode);
     if (mounted) setState(() {});
     await _savePage();
   }
@@ -209,6 +211,152 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               quizCode: selectedQuizCode ?? 'SAMPLE',
               quizDate: _dateText(),
               customConfig: previewConfig,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // =========================================================
+  // REPORT CONFIG (SIGNATURES) PERSISTENCE & MANAGEMENT
+  // =========================================================
+
+  Future<void> _loadReportConfig([String? quizCode]) async {
+    final code = quizCode ?? selectedQuizCode;
+    try {
+      if (code != null && code.trim().isNotEmpty) {
+        final doc = await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(code.trim())
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['reportConfig'] is Map) {
+            final config = ReportConfig.fromMap(
+              Map<String, dynamic>.from(data['reportConfig'] as Map),
+            );
+            if (mounted) {
+              setState(() => _reportConfig = config);
+            }
+            return;
+          }
+        }
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final savedStr = prefs.getString('global_report_config');
+      if (savedStr != null && savedStr.trim().isNotEmpty) {
+        final decoded = jsonDecode(savedStr);
+        if (decoded is Map) {
+          final config = ReportConfig.fromMap(
+            Map<String, dynamic>.from(decoded),
+          );
+          if (mounted) {
+            setState(() => _reportConfig = config);
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading report config: $e');
+    }
+
+    if (mounted) {
+      setState(() => _reportConfig = ReportConfig.defaultTemplate());
+    }
+  }
+
+  Future<void> _saveReportConfig(ReportConfig config) async {
+    setState(() => _reportConfig = config);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('global_report_config', jsonEncode(config.toMap()));
+
+      if (selectedQuizCode != null && selectedQuizCode!.trim().isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(selectedQuizCode!.trim())
+            .set(
+          {'reportConfig': config.toMap()},
+          SetOptions(merge: true),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving report config: $e');
+    }
+  }
+
+  void _openManageReportSignaturesDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return _ManageReportSignaturesDialog(
+          initialConfig: _reportConfig,
+          quizCode: selectedQuizCode ?? '',
+          onSave: (newConfig) async {
+            await _saveReportConfig(newConfig);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Report signatures updated successfully!'),
+                  backgroundColor: Color(0xFF16A34A),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onPreview: (previewConfig) async {
+            await _generateOfficialReportPdf(
+              quizTitle: 'TechNoWiz Championship Quiz',
+              quizCode: selectedQuizCode ?? 'SAMPLE',
+              quizStatus: 'FINISHED',
+              quizDate: _dateText(),
+              location: 'Main Auditorium',
+              rankings: const [],
+              participants: const [],
+              section: ReportPrintSection.scoreSummaryOnly,
+              customConfig: previewConfig,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openExportReportOptionsDialog({
+    required String quizTitle,
+    required String quizCode,
+    required String quizStatus,
+    required String quizDate,
+    required String location,
+    required List<ReportContestant> rankings,
+    required List<ReportContestant> participants,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return _ExportReportOptionsDialog(
+          quizTitle: quizTitle,
+          quizCode: quizCode,
+          reportConfig: _reportConfig,
+          onEditSignatures: () {
+            Navigator.of(dialogContext).pop();
+            _openManageReportSignaturesDialog();
+          },
+          onExport: (section) async {
+            Navigator.of(dialogContext).pop();
+            await _generateOfficialReportPdf(
+              quizTitle: quizTitle,
+              quizCode: quizCode,
+              quizStatus: quizStatus,
+              quizDate: quizDate,
+              location: location,
+              rankings: rankings,
+              participants: participants,
+              section: section,
             );
           },
         );
@@ -1003,8 +1151,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     required String location,
     required List<ReportContestant> rankings,
     required List<ReportContestant> participants,
+    ReportPrintSection section = ReportPrintSection.allSeparatePages,
+    ReportConfig? customConfig,
   }) async {
     final pdf = pw.Document();
+    final cfg = customConfig ?? _reportConfig;
 
     // Summary calculations
     final totalParticipants = participants.length;
@@ -1017,359 +1168,556 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             .toStringAsFixed(1)
         : '0.0';
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        header: (context) {
-          return pw.Container(
-            margin: const pw.EdgeInsets.only(bottom: 16),
-            padding: const pw.EdgeInsets.only(bottom: 10),
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                bottom: pw.BorderSide(color: PdfColors.deepPurple700, width: 2),
-              ),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'TECHNOWIZ COMPETITION SYSTEM',
-                      style: pw.TextStyle(
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.deepPurple800,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      'Official Session Report & Documentation',
-                      style: const pw.TextStyle(
-                        fontSize: 10,
-                        color: PdfColors.grey700,
-                      ),
-                    ),
-                  ],
-                ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      'Generated: ${_dateText()}',
-                      style: const pw.TextStyle(
-                        fontSize: 9,
-                        color: PdfColors.grey700,
-                      ),
-                    ),
-                    pw.Text(
-                      'Quiz Code: $quizCode',
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.deepPurple800,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-        footer: (context) {
-          return pw.Container(
-            margin: const pw.EdgeInsets.only(top: 14),
-            padding: const pw.EdgeInsets.only(top: 8),
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                top: pw.BorderSide(color: PdfColors.grey300, width: 1),
-              ),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  'TechNoWiz - System Generated Official Document',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-                ),
-                pw.Text(
-                  'Page ${context.pageNumber} of ${context.pagesCount}',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-                ),
-              ],
-            ),
-          );
-        },
-        build: (context) => [
-          // Section 1: Event Information & Summary Box
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.grey100,
-              borderRadius: pw.BorderRadius.circular(8),
-              border: pw.Border.all(color: PdfColors.grey300),
-            ),
-            child: pw.Column(
+    pw.Widget buildPdfHeader(pw.Context context, {required String sectionTitle}) {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 12),
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(color: PdfColors.deepPurple700, width: 2),
+          ),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  quizTitle,
+                  cfg.institutionTitle.isNotEmpty
+                      ? cfg.institutionTitle
+                      : 'TECHNOWIZ COMPETITION SYSTEM',
                   style: pw.TextStyle(
                     fontSize: 15,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.black,
+                    color: PdfColors.deepPurple800,
+                    letterSpacing: 0.8,
                   ),
                 ),
-                pw.SizedBox(height: 6),
-                pw.Row(
-                  children: [
-                    pw.Expanded(
-                      child: pw.Text(
-                        'Date: ${quizDate.isNotEmpty ? quizDate : _dateText()}',
-                        style: const pw.TextStyle(fontSize: 9.5),
-                      ),
-                    ),
-                    pw.Expanded(
-                      child: pw.Text(
-                        'Location: ${location.isNotEmpty ? location : "Main Hall"}',
-                        style: const pw.TextStyle(fontSize: 9.5),
-                      ),
-                    ),
-                    pw.Expanded(
-                      child: pw.Text(
-                        'Status: ${quizStatus.toUpperCase()}',
-                        style: pw.TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: quizStatus.toLowerCase().contains('finish')
-                              ? PdfColors.green800
-                              : PdfColors.deepPurple700,
-                        ),
-                      ),
-                    ),
-                  ],
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  cfg.documentSubtitle.isNotEmpty
+                      ? cfg.documentSubtitle
+                      : 'Official Session Report & Documentation',
+                  style: const pw.TextStyle(
+                    fontSize: 9.5,
+                    color: PdfColors.grey700,
+                  ),
                 ),
               ],
             ),
-          ),
-          pw.SizedBox(height: 16),
-
-          // Section 2: Score Summary KPI Table
-          pw.Text(
-            '1. SCORE SUMMARY & STATISTICS',
-            style: pw.TextStyle(
-              fontSize: 11,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.deepPurple800,
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'Generated: ${_dateText()}',
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey700,
+                  ),
+                ),
+                pw.Text(
+                  'Quiz Code: $quizCode',
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.deepPurple800,
+                  ),
+                ),
+              ],
             ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget buildPdfEventInfoBox() {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          color: PdfColors.grey100,
+          borderRadius: pw.BorderRadius.circular(6),
+          border: pw.Border.all(color: PdfColors.grey300),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              quizTitle,
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.black,
+              ),
+            ),
+            pw.SizedBox(height: 5),
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Text(
+                    'Date: ${quizDate.isNotEmpty ? quizDate : _dateText()}',
+                    style: const pw.TextStyle(fontSize: 9),
+                  ),
+                ),
+                pw.Expanded(
+                  child: pw.Text(
+                    'Location: ${location.isNotEmpty ? location : "Main Hall"}',
+                    style: const pw.TextStyle(fontSize: 9),
+                  ),
+                ),
+                pw.Expanded(
+                  child: pw.Text(
+                    'Status: ${quizStatus.toUpperCase()}',
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                      color: quizStatus.toLowerCase().contains('finish')
+                          ? PdfColors.green800
+                          : PdfColors.deepPurple700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget buildPdfFooter(pw.Context context) {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(top: 12),
+        padding: const pw.EdgeInsets.only(top: 6),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            top: pw.BorderSide(color: PdfColors.grey300, width: 1),
           ),
-          pw.SizedBox(height: 6),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'TechNoWiz - System Generated Official Document',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+            pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget buildPdfSignatures() {
+      final sigs = cfg.signatories;
+      if (sigs.isEmpty) return pw.SizedBox();
+
+      final lineWidth = sigs.length >= 3 ? 140.0 : 170.0;
+
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(top: 24),
+        child: pw.Row(
+          mainAxisAlignment: sigs.length == 1
+              ? pw.MainAxisAlignment.center
+              : pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: sigs.map((s) {
+            final prefix = s.label.trim();
+            final name = s.name.trim();
+            final displayTitle = s.title.trim();
+            final fullLabel = prefix.isNotEmpty && name.isNotEmpty
+                ? '$prefix $name'
+                : (name.isNotEmpty ? name : prefix);
+
+            return pw.Column(
+              crossAxisAlignment: sigs.length == 1
+                  ? pw.CrossAxisAlignment.center
+                  : pw.CrossAxisAlignment.start,
+              children: [
+                if (s.showLine)
+                  pw.Container(
+                    width: lineWidth,
+                    height: 1,
+                    color: PdfColors.black,
+                  ),
+                pw.SizedBox(height: 4),
+                pw.Container(
+                  width: lineWidth,
+                  child: pw.Text(
+                    fullLabel,
+                    style: pw.TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.black,
+                    ),
+                    textAlign: sigs.length == 1
+                        ? pw.TextAlign.center
+                        : pw.TextAlign.start,
+                  ),
+                ),
+                if (displayTitle.isNotEmpty) ...[
+                  pw.SizedBox(height: 1),
+                  pw.Container(
+                    width: lineWidth,
+                    child: pw.Text(
+                      displayTitle,
+                      style: const pw.TextStyle(
+                        fontSize: 8,
+                        color: PdfColors.grey800,
+                      ),
+                      textAlign: sigs.length == 1
+                          ? pw.TextAlign.center
+                          : pw.TextAlign.start,
+                    ),
+                  ),
+                ],
+              ],
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    List<pw.Widget> buildTable1Widgets() {
+      final total = rankings.isNotEmpty ? rankings.length : 1;
+      final l1Avg = rankings.isNotEmpty
+          ? (rankings.map((c) => c.level1Score).reduce((a, b) => a + b) / total).toStringAsFixed(1)
+          : '0.0';
+      final l2Avg = rankings.isNotEmpty
+          ? (rankings.map((c) => c.level2Score).reduce((a, b) => a + b) / total).toStringAsFixed(1)
+          : '0.0';
+      final l3Avg = rankings.isNotEmpty
+          ? (rankings.map((c) => c.level3Score).reduce((a, b) => a + b) / total).toStringAsFixed(1)
+          : '0.0';
+      final l1Max = rankings.isNotEmpty
+          ? rankings.map((c) => c.level1Score).reduce((a, b) => a > b ? a : b)
+          : 0;
+      final l2Max = rankings.isNotEmpty
+          ? rankings.map((c) => c.level2Score).reduce((a, b) => a > b ? a : b)
+          : 0;
+      final l3Max = rankings.isNotEmpty
+          ? rankings.map((c) => c.level3Score).reduce((a, b) => a > b ? a : b)
+          : 0;
+
+      return [
+        pw.Text(
+          '1. SCORE SUMMARY & STATISTICS',
+          style: pw.TextStyle(
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.deepPurple800,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.TableHelper.fromTextArray(
+          headers: [
+            'Total Contestants',
+            'Active / Completed',
+            'Eliminated',
+            'Top Score',
+            'Average Score',
+          ],
+          data: [
+            [
+              '$totalParticipants',
+              '$totalFinished',
+              '$totalEliminated',
+              '$topScore pts',
+              '$averageScore pts',
+            ]
+          ],
+          headerStyle: pw.TextStyle(
+            fontSize: 9,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.white,
+          ),
+          headerDecoration: const pw.BoxDecoration(
+            color: PdfColors.deepPurple700,
+          ),
+          cellAlignment: pw.Alignment.center,
+          cellStyle: pw.TextStyle(
+            fontSize: 9.5,
+            fontWeight: pw.FontWeight.bold,
+          ),
+          cellPadding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        ),
+        pw.SizedBox(height: 18),
+        pw.Text(
+          'COMPETITION LEVEL BREAKDOWN & ANALYSIS',
+          style: pw.TextStyle(
+            fontSize: 10,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.grey800,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.TableHelper.fromTextArray(
+          headers: [
+            'Competition Stage',
+            'Average Score',
+            'Highest Score',
+            'Assessment Type',
+          ],
+          data: [
+            ['Level 1 (Easy / Elimination)', '$l1Avg pts', '$l1Max pts', 'Multiple Choice / Elimination'],
+            ['Level 2 (Moderate)', '$l2Avg pts', '$l2Max pts', 'Core Subject Problem Solving'],
+            ['Level 3 (Difficult / Final)', '$l3Avg pts', '$l3Max pts', 'Championship & Advanced Level'],
+          ],
+          headerStyle: pw.TextStyle(
+            fontSize: 8.5,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.white,
+          ),
+          headerDecoration: const pw.BoxDecoration(
+            color: PdfColors.deepPurple900,
+          ),
+          cellStyle: const pw.TextStyle(fontSize: 8.5),
+          cellAlignment: pw.Alignment.centerLeft,
+          headerAlignment: pw.Alignment.centerLeft,
+          cellPadding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 6),
+        ),
+      ];
+    }
+
+    List<pw.Widget> buildTable2Widgets() {
+      return [
+        pw.Text(
+          '2. FINAL STANDINGS & RANKINGS',
+          style: pw.TextStyle(
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.deepPurple800,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        if (rankings.isEmpty)
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(12),
+            child: pw.Text(
+              'No recorded standings for this quiz session.',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+          )
+        else
           pw.TableHelper.fromTextArray(
             headers: [
-              'Total Contestants',
-              'Active / Completed',
-              'Eliminated',
-              'Top Score',
-              'Average Score',
+              'Rank',
+              'Contestant Name',
+              'Team / School',
+              'Level 1',
+              'Level 2',
+              'Level 3',
+              'Total Score',
+              'Award / Status',
             ],
-            data: [
-              [
-                '$totalParticipants',
-                '$totalFinished',
-                '$totalEliminated',
-                '$topScore pts',
-                '$averageScore pts',
-              ]
-            ],
+            data: rankings.asMap().entries.map((entry) {
+              final rank = entry.key + 1;
+              final c = entry.value;
+              final schoolText = c.teamName.isNotEmpty
+                  ? (c.school.isNotEmpty ? '${c.teamName} (${c.school})' : c.teamName)
+                  : c.school;
+              final award = c.isEliminated
+                  ? 'Eliminated'
+                  : (rank == 1
+                      ? 'Champion'
+                      : (rank == 2
+                          ? '1st Runner-Up'
+                          : (rank == 3
+                              ? '2nd Runner-Up'
+                              : 'Finalist')));
+
+              final displayName = c.teamName.isNotEmpty ? c.teamName : c.name;
+
+              return [
+                '$rank',
+                displayName,
+                schoolText.isNotEmpty ? schoolText : '-',
+                '${c.level1Score}',
+                '${c.level2Score}',
+                '${c.level3Score}',
+                '${c.totalScore} pts',
+                award,
+              ];
+            }).toList(),
             headerStyle: pw.TextStyle(
-              fontSize: 9,
+              fontSize: 8.5,
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
             ),
             headerDecoration: const pw.BoxDecoration(
               color: PdfColors.deepPurple700,
             ),
-            cellAlignment: pw.Alignment.center,
-            cellStyle: pw.TextStyle(
-              fontSize: 9.5,
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignment: pw.Alignment.centerLeft,
+            headerAlignment: pw.Alignment.centerLeft,
+            cellPadding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+          ),
+      ];
+    }
+
+    List<pw.Widget> buildTable3Widgets() {
+      return [
+        pw.Text(
+          '3. PARTICIPANT RECORDS DIRECTORY',
+          style: pw.TextStyle(
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.deepPurple800,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        if (participants.isEmpty)
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(12),
+            child: pw.Text(
+              'No participant records found for this quiz.',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+          )
+        else
+          pw.TableHelper.fromTextArray(
+            headers: ['#', 'Contestant / Team', 'Members', 'School Name', 'Status'],
+            data: participants.asMap().entries.map((entry) {
+              final p = entry.value;
+              final isTeam = p.teamName.isNotEmpty;
+              final displayName = isTeam ? p.teamName : p.name;
+              final memberList = p.members.isNotEmpty
+                  ? p.members
+                  : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
+              return [
+                '${entry.key + 1}',
+                displayName,
+                memberList.isNotEmpty ? memberList.join(', ') : '-',
+                p.school.isNotEmpty ? p.school : '-',
+                p.isEliminated ? 'ELIMINATED' : p.status.toUpperCase(),
+              ];
+            }).toList(),
+            headerStyle: pw.TextStyle(
+              fontSize: 8.5,
               fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
             ),
-            cellPadding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            headerDecoration: const pw.BoxDecoration(
+              color: PdfColors.grey800,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellPadding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6),
           ),
-          pw.SizedBox(height: 18),
+      ];
+    }
 
-          // Section 3: Final Rankings Table
-          pw.Text(
-            '2. FINAL STANDINGS & RANKINGS',
-            style: pw.TextStyle(
-              fontSize: 11,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.deepPurple800,
-            ),
-          ),
-          pw.SizedBox(height: 6),
-          if (rankings.isEmpty)
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(12),
-              child: pw.Text(
-                'No recorded standings for this quiz session.',
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
-              ),
-            )
-          else
-            pw.TableHelper.fromTextArray(
-              headers: [
-                'Rank',
-                'Contestant Name',
-                'Team / School',
-                'Level 1',
-                'Level 2',
-                'Level 3',
-                'Total Score',
-                'Award / Status',
-              ],
-              data: rankings.asMap().entries.map((entry) {
-                final rank = entry.key + 1;
-                final c = entry.value;
-                final schoolText = c.teamName.isNotEmpty
-                    ? (c.school.isNotEmpty ? '${c.teamName} (${c.school})' : c.teamName)
-                    : c.school;
-                final award = c.isEliminated
-                    ? 'Eliminated'
-                    : (rank == 1
-                        ? 'Champion'
-                        : (rank == 2
-                            ? '1st Runner-Up'
-                            : (rank == 3
-                                ? '2nd Runner-Up'
-                                : 'Finalist')));
+    if (section == ReportPrintSection.allSeparatePages) {
+      // Table 1 Page (Score Summary & Statistics)
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Score Summary & Statistics'),
+          footer: buildPdfFooter,
+          build: (context) => [
+            buildPdfEventInfoBox(),
+            pw.SizedBox(height: 16),
+            ...buildTable1Widgets(),
+            pw.SizedBox(height: 24),
+            buildPdfSignatures(),
+          ],
+        ),
+      );
 
-                final displayName = c.teamName.isNotEmpty ? c.teamName : c.name;
+      // Table 2 Page (Final Standings & Rankings)
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Final Standings & Rankings'),
+          footer: buildPdfFooter,
+          build: (context) => [
+            buildPdfEventInfoBox(),
+            pw.SizedBox(height: 16),
+            ...buildTable2Widgets(),
+            pw.SizedBox(height: 24),
+            buildPdfSignatures(),
+          ],
+        ),
+      );
 
-                return [
-                  '$rank',
-                  displayName,
-                  schoolText.isNotEmpty ? schoolText : '-',
-                  '${c.level1Score}',
-                  '${c.level2Score}',
-                  '${c.level3Score}',
-                  '${c.totalScore} pts',
-                  award,
-                ];
-              }).toList(),
-              headerStyle: pw.TextStyle(
-                fontSize: 8.5,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-              ),
-              headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.deepPurple700,
-              ),
-              cellStyle: const pw.TextStyle(fontSize: 8),
-              cellAlignment: pw.Alignment.centerLeft,
-              headerAlignment: pw.Alignment.centerLeft,
-              cellPadding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-            ),
-          pw.SizedBox(height: 18),
+      // Table 3 Page (Participant Records Directory)
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Participant Records Directory'),
+          footer: buildPdfFooter,
+          build: (context) => [
+            buildPdfEventInfoBox(),
+            pw.SizedBox(height: 16),
+            ...buildTable3Widgets(),
+            pw.SizedBox(height: 24),
+            buildPdfSignatures(),
+          ],
+        ),
+      );
+    } else if (section == ReportPrintSection.scoreSummaryOnly) {
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Score Summary & Statistics'),
+          footer: buildPdfFooter,
+          build: (context) => [
+            buildPdfEventInfoBox(),
+            pw.SizedBox(height: 16),
+            ...buildTable1Widgets(),
+            pw.SizedBox(height: 24),
+            buildPdfSignatures(),
+          ],
+        ),
+      );
+    } else if (section == ReportPrintSection.finalRankingsOnly) {
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Final Standings & Rankings'),
+          footer: buildPdfFooter,
+          build: (context) => [
+            buildPdfEventInfoBox(),
+            pw.SizedBox(height: 16),
+            ...buildTable2Widgets(),
+            pw.SizedBox(height: 24),
+            buildPdfSignatures(),
+          ],
+        ),
+      );
+    } else if (section == ReportPrintSection.participantRecordsOnly) {
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Participant Records Directory'),
+          footer: buildPdfFooter,
+          build: (context) => [
+            buildPdfEventInfoBox(),
+            pw.SizedBox(height: 16),
+            ...buildTable3Widgets(),
+            pw.SizedBox(height: 24),
+            buildPdfSignatures(),
+          ],
+        ),
+      );
+    }
 
-          // Section 4: Participant Records Directory
-          pw.Text(
-            '3. PARTICIPANT RECORDS DIRECTORY',
-            style: pw.TextStyle(
-              fontSize: 11,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.deepPurple800,
-            ),
-          ),
-          pw.SizedBox(height: 6),
-          if (participants.isEmpty)
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(12),
-              child: pw.Text(
-                'No participant records found for this quiz.',
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
-              ),
-            )
-          else
-            pw.TableHelper.fromTextArray(
-              headers: ['#', 'Contestant / Team', 'Members', 'School Name', 'Status'],
-              data: participants.asMap().entries.map((entry) {
-                final p = entry.value;
-                final isTeam = p.teamName.isNotEmpty;
-                final displayName = isTeam ? p.teamName : p.name;
-                final memberList = p.members.isNotEmpty
-                    ? p.members
-                    : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
-                return [
-                  '${entry.key + 1}',
-                  displayName,
-                  memberList.isNotEmpty ? memberList.join(', ') : '-',
-                  p.school.isNotEmpty ? p.school : '-',
-                  p.isEliminated ? 'ELIMINATED' : p.status.toUpperCase(),
-                ];
-              }).toList(),
-              headerStyle: pw.TextStyle(
-                fontSize: 8.5,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-              ),
-              headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.grey800,
-              ),
-              cellStyle: const pw.TextStyle(fontSize: 8),
-              cellPadding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-            ),
-          pw.SizedBox(height: 30),
-
-          // Section 5: Official Signatures
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Container(width: 170, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    'Prepared By: Administrator',
-                    style: pw.TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Text('TechNoWiz Admin', style: const pw.TextStyle(fontSize: 8)),
-                ],
-              ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Container(width: 170, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    'Verified By: Quiz Master',
-                    style: pw.TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Text(
-                    'Event Head / Coordinator',
-                    style: const pw.TextStyle(fontSize: 8),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    final docName = switch (section) {
+      ReportPrintSection.allSeparatePages => 'TechNoWiz_Official_Report_$quizCode.pdf',
+      ReportPrintSection.scoreSummaryOnly => 'TechNoWiz_Score_Summary_$quizCode.pdf',
+      ReportPrintSection.finalRankingsOnly => 'TechNoWiz_Final_Rankings_$quizCode.pdf',
+      ReportPrintSection.participantRecordsOnly => 'TechNoWiz_Participant_Records_$quizCode.pdf',
+    };
 
     await Printing.layoutPdf(
       onLayout: (format) async => pdf.save(),
-      name: 'TechNoWiz_Official_Report_$quizCode.pdf',
+      name: docName,
     );
   }
 
@@ -1997,6 +2345,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             if (newCode != null) {
               setState(() => selectedQuizCode = newCode);
               _loadCertificateConfig(newCode);
+              _loadReportConfig(newCode);
               _savePage();
             }
           },
@@ -2166,11 +2515,35 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
                     // Active Tab View Content
                     if (_selectedReportTab == 'rankings') ...[
-                      _buildFinalRankingsSection(contestants, quizTitle, quizCode),
+                      _buildFinalRankingsSection(
+                        contestants: contestants,
+                        quizTitle: quizTitle,
+                        quizCode: quizCode,
+                        quizStatus: status,
+                        quizDate: quizDate,
+                        location: location,
+                        participants: participants,
+                      ),
                     ] else if (_selectedReportTab == 'scores') ...[
-                      _buildScoreSummariesSection(contestants),
+                      _buildScoreSummariesSection(
+                        contestants: contestants,
+                        quizTitle: quizTitle,
+                        quizCode: quizCode,
+                        quizStatus: status,
+                        quizDate: quizDate,
+                        location: location,
+                        participants: participants,
+                      ),
                     ] else ...[
-                      _buildParticipantRecordsSection(participants),
+                      _buildParticipantRecordsSection(
+                        participants: participants,
+                        quizTitle: quizTitle,
+                        quizCode: quizCode,
+                        quizStatus: status,
+                        quizDate: quizDate,
+                        location: location,
+                        contestants: contestants,
+                      ),
                     ],
                   ],
                 );
@@ -2293,7 +2666,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               runSpacing: 8,
               children: [
                 FilledButton.icon(
-                  onPressed: () => _generateOfficialReportPdf(
+                  onPressed: () => _openExportReportOptionsDialog(
                     quizTitle: quizTitle,
                     quizCode: quizCode,
                     quizStatus: status,
@@ -2331,6 +2704,18 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   onPressed: _openManageCertificateDialog,
                   icon: const Icon(Icons.draw_rounded, size: 16),
                   label: const Text('Manage Certificate'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _openManageReportSignaturesDialog,
+                  icon: const Icon(Icons.edit_note_rounded, size: 16),
+                  label: const Text('Report Signatures'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
@@ -2431,11 +2816,15 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   // TAB 1: FINAL RANKINGS (OFFICIAL STANDINGS)
   // =========================================================
 
-  Widget _buildFinalRankingsSection(
-    List<ReportContestant> contestants,
-    String quizTitle,
-    String quizCode,
-  ) {
+  Widget _buildFinalRankingsSection({
+    required List<ReportContestant> contestants,
+    required String quizTitle,
+    required String quizCode,
+    required String quizStatus,
+    required String quizDate,
+    required String location,
+    required List<ReportContestant> participants,
+  }) {
     if (contestants.isEmpty) {
       return _buildEmptySection(
         icon: Icons.emoji_events_outlined,
@@ -2523,6 +2912,27 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 color: AdminThemeColors.textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () => _generateOfficialReportPdf(
+                quizTitle: quizTitle,
+                quizCode: quizCode,
+                quizStatus: quizStatus,
+                quizDate: quizDate,
+                location: location,
+                rankings: contestants,
+                participants: participants,
+                section: ReportPrintSection.finalRankingsOnly,
+              ),
+              icon: const Icon(Icons.print_rounded, size: 14),
+              label: const Text('Print Standings (Table 2)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AdminThemeColors.primary,
+                side: const BorderSide(color: AdminThemeColors.primary, width: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
@@ -2915,7 +3325,15 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   // TAB 2: SCORE SUMMARIES (STATISTICS & ANALYSIS)
   // =========================================================
 
-  Widget _buildScoreSummariesSection(List<ReportContestant> contestants) {
+  Widget _buildScoreSummariesSection({
+    required List<ReportContestant> contestants,
+    required String quizTitle,
+    required String quizCode,
+    required String quizStatus,
+    required String quizDate,
+    required String location,
+    required List<ReportContestant> participants,
+  }) {
     if (contestants.isEmpty) {
       return _buildEmptySection(
         icon: Icons.bar_chart_rounded,
@@ -2943,6 +3361,50 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header with Print Table 1 action
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                color: AdminThemeColors.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Performance Statistics & Score Summary',
+              style: TextStyle(
+                color: AdminThemeColors.textPrimary,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const Spacer(),
+            OutlinedButton.icon(
+              onPressed: () => _generateOfficialReportPdf(
+                quizTitle: quizTitle,
+                quizCode: quizCode,
+                quizStatus: quizStatus,
+                quizDate: quizDate,
+                location: location,
+                rankings: contestants,
+                participants: participants,
+                section: ReportPrintSection.scoreSummaryOnly,
+              ),
+              icon: const Icon(Icons.print_rounded, size: 14),
+              label: const Text('Print Score Summary (Table 1)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AdminThemeColors.primary,
+                side: const BorderSide(color: AdminThemeColors.primary, width: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         // 4 KPI Summary Cards
         Row(
           children: [
@@ -3205,7 +3667,15 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   // TAB 3: PARTICIPANT RECORDS (REGISTRATION DIRECTORY)
   // =========================================================
 
-  Widget _buildParticipantRecordsSection(List<ReportContestant> participants) {
+  Widget _buildParticipantRecordsSection({
+    required List<ReportContestant> participants,
+    required String quizTitle,
+    required String quizCode,
+    required String quizStatus,
+    required String quizDate,
+    required String location,
+    required List<ReportContestant> contestants,
+  }) {
     final filtered = participants.where((p) {
       if (_participantSearchQuery.isEmpty) return true;
       final q = _participantSearchQuery.toLowerCase();
@@ -3277,6 +3747,27 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   fontWeight: FontWeight.w800,
                   color: AdminThemeColors.primary,
                 ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () => _generateOfficialReportPdf(
+                quizTitle: quizTitle,
+                quizCode: quizCode,
+                quizStatus: quizStatus,
+                quizDate: quizDate,
+                location: location,
+                rankings: contestants,
+                participants: participants,
+                section: ReportPrintSection.participantRecordsOnly,
+              ),
+              icon: const Icon(Icons.print_rounded, size: 14),
+              label: const Text('Print Records (Table 3)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AdminThemeColors.primary,
+                side: const BorderSide(color: AdminThemeColors.primary, width: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ],
@@ -4250,6 +4741,1032 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
             style: const TextStyle(fontSize: 12.5),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// REPORT PRINT & EXPORT CONFIGURATION MODELS
+// ============================================================================
+
+enum ReportPrintSection {
+  allSeparatePages,
+  scoreSummaryOnly,
+  finalRankingsOnly,
+  participantRecordsOnly,
+}
+
+class ReportSignatory {
+  String label;
+  String name;
+  String title;
+  bool showLine;
+
+  ReportSignatory({
+    required this.label,
+    required this.name,
+    required this.title,
+    this.showLine = true,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'label': label,
+        'name': name,
+        'title': title,
+        'showLine': showLine,
+      };
+
+  factory ReportSignatory.fromMap(Map<String, dynamic> map) => ReportSignatory(
+        label: (map['label'] ?? '').toString(),
+        name: (map['name'] ?? '').toString(),
+        title: (map['title'] ?? '').toString(),
+        showLine: map['showLine'] != false,
+      );
+}
+
+class ReportConfig {
+  String institutionTitle;
+  String documentSubtitle;
+  List<ReportSignatory> signatories;
+
+  ReportConfig({
+    this.institutionTitle = 'TECHNOWIZ COMPETITION SYSTEM',
+    this.documentSubtitle = 'Official Session Report & Documentation',
+    required this.signatories,
+  });
+
+  static ReportConfig defaultTemplate() => ReportConfig(
+        institutionTitle: 'TECHNOWIZ COMPETITION SYSTEM',
+        documentSubtitle: 'Official Session Report & Documentation',
+        signatories: [
+          ReportSignatory(
+            label: 'Prepared By:',
+            name: 'Administrator',
+            title: 'TechNoWiz Admin',
+            showLine: true,
+          ),
+          ReportSignatory(
+            label: 'Verified By:',
+            name: 'Quiz Master',
+            title: 'Event Head / Coordinator',
+            showLine: true,
+          ),
+        ],
+      );
+
+  Map<String, dynamic> toMap() => {
+        'institutionTitle': institutionTitle,
+        'documentSubtitle': documentSubtitle,
+        'signatories': signatories.map((s) => s.toMap()).toList(),
+      };
+
+  factory ReportConfig.fromMap(Map<String, dynamic> map) {
+    final rawSigs = map['signatories'];
+    final sigs = <ReportSignatory>[];
+    if (rawSigs is List && rawSigs.isNotEmpty) {
+      for (final s in rawSigs) {
+        if (s is Map<String, dynamic>) {
+          sigs.add(ReportSignatory.fromMap(s));
+        } else if (s is Map) {
+          sigs.add(ReportSignatory.fromMap(Map<String, dynamic>.from(s)));
+        }
+      }
+    }
+    if (sigs.isEmpty) {
+      sigs.addAll(defaultTemplate().signatories);
+    }
+
+    return ReportConfig(
+      institutionTitle:
+          (map['institutionTitle'] ?? 'TECHNOWIZ COMPETITION SYSTEM').toString(),
+      documentSubtitle:
+          (map['documentSubtitle'] ?? 'Official Session Report & Documentation')
+              .toString(),
+      signatories: sigs,
+    );
+  }
+}
+
+// ============================================================================
+// MANAGE REPORT SIGNATURES DIALOG
+// ============================================================================
+
+class _ManageReportSignaturesDialog extends StatefulWidget {
+  final ReportConfig initialConfig;
+  final String quizCode;
+  final Future<void> Function(ReportConfig) onSave;
+  final Future<void> Function(ReportConfig) onPreview;
+
+  const _ManageReportSignaturesDialog({
+    required this.initialConfig,
+    required this.quizCode,
+    required this.onSave,
+    required this.onPreview,
+  });
+
+  @override
+  State<_ManageReportSignaturesDialog> createState() =>
+      _ManageReportSignaturesDialogState();
+}
+
+class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDialog> {
+  int _signatoryCount = 2;
+  late final List<TextEditingController> _labelControllers;
+  late final List<TextEditingController> _nameControllers;
+  late final List<TextEditingController> _titleControllers;
+  late final List<bool> _showLines;
+  bool _isSaving = false;
+  bool _isPreviewing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _signatoryCount = widget.initialConfig.signatories.length.clamp(1, 3);
+
+    _labelControllers = List.generate(3, (i) {
+      if (i < widget.initialConfig.signatories.length) {
+        return TextEditingController(text: widget.initialConfig.signatories[i].label);
+      }
+      return TextEditingController(
+        text: i == 0 ? 'Prepared By:' : (i == 1 ? 'Verified By:' : 'Approved By:'),
+      );
+    });
+
+    _nameControllers = List.generate(3, (i) {
+      if (i < widget.initialConfig.signatories.length) {
+        return TextEditingController(text: widget.initialConfig.signatories[i].name);
+      }
+      return TextEditingController(text: '');
+    });
+
+    _titleControllers = List.generate(3, (i) {
+      if (i < widget.initialConfig.signatories.length) {
+        return TextEditingController(text: widget.initialConfig.signatories[i].title);
+      }
+      return TextEditingController(
+        text: i == 0 ? 'TechNoWiz Admin' : (i == 1 ? 'Event Head / Coordinator' : 'Dean / Department Chair'),
+      );
+    });
+
+    _showLines = List.generate(3, (i) {
+      if (i < widget.initialConfig.signatories.length) {
+        return widget.initialConfig.signatories[i].showLine;
+      }
+      return true;
+    });
+
+    for (int i = 0; i < 3; i++) {
+      _labelControllers[i].addListener(_onFieldChanged);
+      _nameControllers[i].addListener(_onFieldChanged);
+      _titleControllers[i].addListener(_onFieldChanged);
+    }
+  }
+
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    for (int i = 0; i < 3; i++) {
+      _labelControllers[i].dispose();
+      _nameControllers[i].dispose();
+      _titleControllers[i].dispose();
+    }
+    super.dispose();
+  }
+
+  ReportConfig _buildConfig() {
+    final sigs = <ReportSignatory>[];
+    for (int i = 0; i < _signatoryCount; i++) {
+      sigs.add(
+        ReportSignatory(
+          label: _labelControllers[i].text.trim(),
+          name: _nameControllers[i].text.trim(),
+          title: _titleControllers[i].text.trim(),
+          showLine: _showLines[i],
+        ),
+      );
+    }
+    return ReportConfig(signatories: sigs);
+  }
+
+  void _resetToDefault() {
+    final def = ReportConfig.defaultTemplate();
+    setState(() {
+      _signatoryCount = def.signatories.length;
+      for (int i = 0; i < 3; i++) {
+        if (i < def.signatories.length) {
+          _labelControllers[i].text = def.signatories[i].label;
+          _nameControllers[i].text = def.signatories[i].name;
+          _titleControllers[i].text = def.signatories[i].title;
+          _showLines[i] = def.signatories[i].showLine;
+        } else {
+          _labelControllers[i].text = '';
+          _nameControllers[i].text = '';
+          _titleControllers[i].text = '';
+          _showLines[i] = true;
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        width: 600,
+        constraints: const BoxConstraints(maxHeight: 760),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 28,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Modal Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AdminThemeColors.primaryDark, AdminThemeColors.primary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Manage Report Signatures',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Customize signatory names, designations, and lines for official reports',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Scrollable Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Signatory Count Selector
+                    Row(
+                      children: [
+                        const Icon(Icons.people_alt_rounded, size: 16, color: Color(0xFF4F46E5)),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Number of Signatories:',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        SegmentedButton<int>(
+                          segments: const [
+                            ButtonSegment(value: 1, label: Text('1 Sig')),
+                            ButtonSegment(value: 2, label: Text('2 Sigs')),
+                            ButtonSegment(value: 3, label: Text('3 Sigs')),
+                          ],
+                          selected: {_signatoryCount},
+                          onSelectionChanged: (newVal) {
+                            setState(() => _signatoryCount = newVal.first);
+                          },
+                          style: SegmentedButton.styleFrom(
+                            selectedBackgroundColor: const Color(0xFF4F46E5),
+                            selectedForegroundColor: Colors.white,
+                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Signatory Editor Cards
+                    for (int i = 0; i < _signatoryCount; i++) ...[
+                      _buildSignatoryEditorCard(i, isDark),
+                      if (i < _signatoryCount - 1) const SizedBox(height: 12),
+                    ],
+
+                    const SizedBox(height: 20),
+
+                    // Live Footer Preview Box
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.visibility_rounded, size: 14, color: Color(0xFF4F46E5)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'LIVE REPORT SIGNATURE PREVIEW',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            mainAxisAlignment: _signatoryCount == 1
+                                ? MainAxisAlignment.center
+                                : MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (int i = 0; i < _signatoryCount; i++) ...[
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: _signatoryCount == 1
+                                        ? CrossAxisAlignment.center
+                                        : CrossAxisAlignment.start,
+                                    children: [
+                                      if (_showLines[i])
+                                        Container(
+                                          width: 140,
+                                          height: 1.5,
+                                          color: isDark ? Colors.white70 : Colors.black87,
+                                        ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        _labelControllers[i].text.trim().isNotEmpty &&
+                                                _nameControllers[i].text.trim().isNotEmpty
+                                            ? '${_labelControllers[i].text.trim()} ${_nameControllers[i].text.trim()}'
+                                            : (_nameControllers[i].text.trim().isNotEmpty
+                                                ? _nameControllers[i].text.trim()
+                                                : (_labelControllers[i].text.trim().isNotEmpty
+                                                    ? _labelControllers[i].text.trim()
+                                                    : 'Signatory Name')),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                      Text(
+                                        _titleControllers[i].text.trim().isNotEmpty
+                                            ? _titleControllers[i].text.trim()
+                                            : 'Title / Designation',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: isDark ? Colors.white60 : Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (i < _signatoryCount - 1) const SizedBox(width: 12),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Modal Footer Actions
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: _resetToDefault,
+                    icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                    label: const Text('Reset', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600),
+                  ),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    onPressed: _isPreviewing
+                        ? null
+                        : () async {
+                            setState(() => _isPreviewing = true);
+                            try {
+                              await widget.onPreview(_buildConfig());
+                            } finally {
+                              if (mounted) setState(() => _isPreviewing = false);
+                            }
+                          },
+                    icon: _isPreviewing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.visibility_rounded, size: 16),
+                    label: const Text('Preview PDF', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            setState(() => _isSaving = true);
+                            try {
+                              await widget.onSave(_buildConfig());
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isSaving = false);
+                            }
+                          },
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Save & Apply', style: TextStyle(fontSize: 12)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignatoryEditorCard(int index, bool isDark) {
+    final positionLabel = index == 0
+        ? 'Signatory 1 (Left / Prepared By)'
+        : (index == 1
+            ? 'Signatory 2 (Right / Verified By)'
+            : 'Signatory 3 (Center / Approved By)');
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    color: Color(0xFF4F46E5),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  positionLabel,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AdminThemeColors.textPrimary,
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Line',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white70 : Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Switch.adaptive(
+                    value: _showLines[index],
+                    activeTrackColor: const Color(0xFF4F46E5),
+                    onChanged: (val) => setState(() => _showLines[index] = val),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              SizedBox(
+                width: 140,
+                child: TextField(
+                  controller: _labelControllers[index],
+                  decoration: InputDecoration(
+                    labelText: 'Prefix / Label',
+                    hintText: 'e.g. Prepared By:',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _nameControllers[index],
+                  decoration: InputDecoration(
+                    labelText: 'Signatory Name',
+                    hintText: 'e.g. Administrator or Prof. Dela Cruz',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _titleControllers[index],
+            decoration: InputDecoration(
+              labelText: 'Designation / Title',
+              hintText: 'e.g. TechNoWiz Admin, Event Head / Coordinator',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              isDense: true,
+            ),
+            style: const TextStyle(fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// EXPORT REPORT OPTIONS DIALOG
+// ============================================================================
+
+class _ExportReportOptionsDialog extends StatefulWidget {
+  final String quizTitle;
+  final String quizCode;
+  final ReportConfig reportConfig;
+  final VoidCallback onEditSignatures;
+  final Future<void> Function(ReportPrintSection) onExport;
+
+  const _ExportReportOptionsDialog({
+    required this.quizTitle,
+    required this.quizCode,
+    required this.reportConfig,
+    required this.onEditSignatures,
+    required this.onExport,
+  });
+
+  @override
+  State<_ExportReportOptionsDialog> createState() =>
+      _ExportReportOptionsDialogState();
+}
+
+class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> {
+  ReportPrintSection _selectedSection = ReportPrintSection.allSeparatePages;
+  bool _isExporting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final options = [
+      {
+        'section': ReportPrintSection.allSeparatePages,
+        'title': 'Complete Official Report (All Tables on Separate Pages)',
+        'subtitle': 'Prints Table 1 (Score Summary), Table 2 (Final Standings), and Table 3 (Participant Directory) each on its own clean, dedicated page with official header and signatures.',
+        'icon': Icons.auto_stories_rounded,
+        'badge': 'RECOMMENDED',
+        'badgeColor': const Color(0xFF10B981),
+      },
+      {
+        'section': ReportPrintSection.scoreSummaryOnly,
+        'title': 'Table 1: Score Summary & Statistics',
+        'subtitle': 'Prints overall competition statistics, active/eliminated counts, top score, average scores, and level difficulty breakdown on 1 dedicated page.',
+        'icon': Icons.bar_chart_rounded,
+        'badge': 'PAGE 1',
+        'badgeColor': const Color(0xFF4F46E5),
+      },
+      {
+        'section': ReportPrintSection.finalRankingsOnly,
+        'title': 'Table 2: Final Standings & Rankings',
+        'subtitle': 'Prints official contestant rankings, Level 1/2/3 breakdown, total score points, and Champion / Runner-up finalist honors.',
+        'icon': Icons.emoji_events_rounded,
+        'badge': 'PAGE 2',
+        'badgeColor': const Color(0xFFF59E0B),
+      },
+      {
+        'section': ReportPrintSection.participantRecordsOnly,
+        'title': 'Table 3: Participant Records Directory',
+        'subtitle': 'Prints full directory of registered participants and teams, student members, school names, and competition status.',
+        'icon': Icons.people_alt_rounded,
+        'badge': 'PAGE 3',
+        'badgeColor': const Color(0xFF0284C7),
+      },
+    ];
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        width: 580,
+        constraints: const BoxConstraints(maxHeight: 720),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 28,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Modal Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AdminThemeColors.primaryDark, AdminThemeColors.primary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Export & Print Official Report',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${widget.quizTitle} • Code: ${widget.quizCode}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Options List
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SELECT REPORT PRINT FORMAT:',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.7,
+                        color: isDark ? Colors.white70 : AdminThemeColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    for (final opt in options) ...[
+                      InkWell(
+                        onTap: () {
+                          setState(() => _selectedSection = opt['section'] as ReportPrintSection);
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: _selectedSection == opt['section']
+                                ? const Color(0xFF4F46E5).withValues(alpha: isDark ? 0.2 : 0.08)
+                                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: _selectedSection == opt['section']
+                                  ? const Color(0xFF4F46E5)
+                                  : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              width: _selectedSection == opt['section'] ? 1.8 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Radio<ReportPrintSection>(
+                                value: opt['section'] as ReportPrintSection,
+                                groupValue: _selectedSection,
+                                activeColor: const Color(0xFF4F46E5),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedSection = val);
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          opt['icon'] as IconData,
+                                          size: 16,
+                                          color: const Color(0xFF4F46E5),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            opt['title'] as String,
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? Colors.white : AdminThemeColors.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: (opt['badgeColor'] as Color).withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            opt['badge'] as String,
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                              color: opt['badgeColor'] as Color,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      opt['subtitle'] as String,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? Colors.white70 : Colors.grey.shade600,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                    const SizedBox(height: 8),
+
+                    // Signatures Preview & Edit Shortcut Card
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.draw_rounded, size: 18, color: Color(0xFF4F46E5)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Report Signatures:',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.reportConfig.signatories.map((s) {
+                                    final p = s.label.trim();
+                                    final n = s.name.trim();
+                                    return p.isNotEmpty && n.isNotEmpty
+                                        ? '$p $n'
+                                        : (n.isNotEmpty ? n : (p.isNotEmpty ? p : 'Signatory'));
+                                  }).join('  •  '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: widget.onEditSignatures,
+                            icon: const Icon(Icons.edit_rounded, size: 14),
+                            label: const Text('Edit', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF4F46E5),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Modal Footer Actions
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: _isExporting
+                        ? null
+                        : () async {
+                            setState(() => _isExporting = true);
+                            try {
+                              await widget.onExport(_selectedSection);
+                            } finally {
+                              if (mounted) setState(() => _isExporting = false);
+                            }
+                          },
+                    icon: _isExporting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.print_rounded, size: 16),
+                    label: Text(
+                      _selectedSection == ReportPrintSection.allSeparatePages
+                          ? 'Print All Pages'
+                          : 'Print Selected Table',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
