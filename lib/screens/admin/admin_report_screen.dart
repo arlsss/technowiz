@@ -797,26 +797,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
-                            // Left: BSIT Program Logo (Enlarged & Transparent)
+                            // Left: BSIT Program Logo (Prominent, Enlarged & Clean)
                             pw.Container(
-                              width: 92,
-                              child: pw.Column(
-                                mainAxisSize: pw.MainAxisSize.min,
-                                crossAxisAlignment: pw.CrossAxisAlignment.center,
-                                children: [
-                                  if (bsitLogoImage != null)
-                                    pw.Image(bsitLogoImage, width: 75, height: 75, fit: pw.BoxFit.contain)
-                                  else
-                                    pw.Container(width: 75, height: 75),
-                                  pw.SizedBox(height: 2),
-                                  pw.Text(
-                                    'BSIT Program Logo',
-                                    style: const pw.TextStyle(
-                                      fontSize: 7.5,
-                                      color: PdfColor.fromInt(0xFF475569),
-                                    ),
-                                  ),
-                                ],
+                              width: 95,
+                              child: pw.Center(
+                                child: bsitLogoImage != null
+                                    ? pw.Image(bsitLogoImage, width: 88, height: 88, fit: pw.BoxFit.contain)
+                                    : pw.Container(width: 88, height: 88),
                               ),
                             ),
 
@@ -4638,31 +4625,17 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      // Left: BSIT Program Logo
+                                      // Left: BSIT Program Logo (Enlarged & Clean)
                                       SizedBox(
-                                        width: 72,
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                          children: [
-                                            Image.asset(
-                                              'assets/images/bsit_logo.png',
-                                              width: 52,
-                                              height: 52,
-                                              fit: BoxFit.contain,
-                                              errorBuilder: (_, __, ___) => const SizedBox(width: 52, height: 52),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            const Text(
-                                              'BSIT Program Logo',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 7,
-                                                color: Color(0xFF475569),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
+                                        width: 78,
+                                        child: Center(
+                                          child: Image.asset(
+                                            'assets/images/bsit_logo.png',
+                                            width: 66,
+                                            height: 66,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) => const SizedBox(width: 66, height: 66),
+                                          ),
                                         ),
                                       ),
 
