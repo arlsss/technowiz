@@ -4875,9 +4875,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               }
             }
 
-            final contestantStatus = (contestant['status'] ?? 'approved')
-                .toString()
-                .toLowerCase();
             final responsesRef = quizRef
                 .collection('answers')
                 .doc(contestantDoc.id)
@@ -5699,13 +5696,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           ),
         ),
       ),
-    );
-  }
-              },
-            );
-          }).toList(),
-        );
-      },
     );
   }
 
