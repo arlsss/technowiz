@@ -4642,34 +4642,18 @@ class _QuizScreenState extends State<QuizScreen> {
     await FirebaseFirestore.instance.runTransaction((transaction) async {
       final scoreDoc = await transaction.get(scoreRef);
 
-      int oldScore = 0;
       int oldLevelScore = 0;
+      final scoreData = scoreDoc.data() ?? {};
 
       if (scoreDoc.exists) {
-        final data = scoreDoc.data();
-
-        if (data != null) {
-          if (data['score'] != null) {
-            oldScore = int.tryParse(data['score'].toString()) ?? 0;
-          }
-          final dynamic rawLvl = data[levelKey] ??
-              (data['levelScores'] is Map
-                  ? data['levelScores']['Level $targetLevel']
-                  : null);
-          if (rawLvl != null) {
-            oldLevelScore = int.tryParse(rawLvl.toString()) ?? 0;
-          }
+        final dynamic rawLvl = scoreData[levelKey] ??
+            scoreData['level_$targetLevel'] ??
+            (scoreData['levelScores'] is Map
+                ? scoreData['levelScores']['Level $targetLevel']
+                : null);
+        if (rawLvl != null) {
+          oldLevelScore = int.tryParse(rawLvl.toString()) ?? 0;
         }
-      }
-
-      final scoreData = scoreDoc.data() ?? {};
-      final dynamic rawLvl = scoreData[levelKey] ??
-          scoreData['level_$targetLevel'] ??
-          (scoreData['levelScores'] is Map
-              ? scoreData['levelScores']['Level $targetLevel']
-              : null);
-      if (rawLvl != null) {
-        oldLevelScore = int.tryParse(rawLvl.toString()) ?? 0;
       }
 
       final newLevelScore =
