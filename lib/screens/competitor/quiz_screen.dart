@@ -880,15 +880,11 @@ class _QuizScreenState extends State<QuizScreen> {
     return null;
   }
 
-  int getPointsForLevel(int level, {Map<String, dynamic>? question}) {
-    // 1. Check if the specific question has points explicitly set
-    if (question != null) {
-      final qPoints = _parsePoints(question);
-      if (qPoints != null && qPoints > 0) return qPoints;
-    }
+  int getPointsForLevel(int level,
+      {Map<String, dynamic>? question, Map<String, dynamic>? sessionData}) {
+    final quizData = sessionData ?? _latestQuizData;
 
-    // 2. Check quiz session levelSettings configured by Admin
-    final quizData = _latestQuizData;
+    // 1. Check quiz session levelSettings configured by Admin FIRST!
     final rawLevelSettings = quizData['levelSettings'] ?? quizData['levels'];
     if (rawLevelSettings is Map) {
       final target = 'level$level';
@@ -905,7 +901,7 @@ class _QuizScreenState extends State<QuizScreen> {
       }
     }
 
-    // 3. Check top-level session keys
+    // 2. Check top-level session keys configured by Admin
     for (final key in [
       'level${level}Points',
       'level${level}PointsPerCorrectAnswer',
@@ -916,6 +912,12 @@ class _QuizScreenState extends State<QuizScreen> {
       final v = quizData[key];
       final p = _parsePoints(v);
       if (p != null && p > 0) return p;
+    }
+
+    // 3. Check if the specific question has points explicitly set
+    if (question != null) {
+      final qPoints = _parsePoints(question);
+      if (qPoints != null && qPoints > 0) return qPoints;
     }
 
     // 4. Check questions in _sortedSessionQuestions for this level
@@ -5309,309 +5311,671 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseAuth.instance.currentUser != null
-                          ? _sessionRef
-                              .collection('answers')
-                              .doc(FirebaseAuth.instance.currentUser!.uid)
-                              .collection('responses')
-                              .snapshots()
-                          : null,
-                      builder: (context, responsesSnapshot) {
-                        int points = _localLevelPoints[currentLevel] ?? 0;
-
-                        if (responsesSnapshot.hasData &&
-                            responsesSnapshot.data != null) {
-                          int respPoints = 0;
-                          for (final doc in responsesSnapshot.data!.docs) {
-                            final data = doc.data();
-                            final rawLvl = data['level'];
-                            int? itemLevel;
-                            if (rawLvl is num) {
-                              itemLevel = rawLvl.toInt();
-                            } else if (rawLvl != null) {
-                              final match = RegExp(r'(\d+)').firstMatch(
-                                rawLvl.toString(),
-                              );
-                              if (match != null) {
-                                itemLevel = int.tryParse(match.group(1)!);
-                              }
-                            }
-                            if (itemLevel == currentLevel) {
-                              final val = data['points'];
-                              if (val is num) respPoints += val.toInt();
-                            }
-                          }
-                          if (respPoints > points) {
-                            points = respPoints;
-                            _localLevelPoints[currentLevel] = points;
-                          }
-                        }
-
-                        return StreamBuilder<
-                            DocumentSnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseAuth.instance.currentUser != null
-                              ? _sessionRef
-                                  .collection('scores')
-                                  .doc(FirebaseAuth.instance.currentUser!.uid)
-                                  .snapshots()
-                              : null,
-                          builder: (context, scoreSnapshot) {
-                            int finalPoints = points;
-                            final sData = scoreSnapshot.data?.data();
-                            if (sData != null) {
-                              final String levelKey = 'level${currentLevel}Score';
-                              final dynamic rawLvl = sData[levelKey] ??
-                                  (sData['levelScores'] is Map
-                                      ? sData['levelScores']['Level $currentLevel']
-                                      : null);
-                              if (rawLvl != null) {
-                                final parsed = int.tryParse(rawLvl.toString());
-                                if (parsed != null && parsed > finalPoints) {
-                                  finalPoints = parsed;
-                                  _localLevelPoints[currentLevel] = finalPoints;
-                                }
-                              } else if (currentLevel == 1 &&
-                                  sData['score'] != null) {
-                                final parsed = int.tryParse(
-                                  sData['score'].toString(),
-                                );
-                                if (parsed != null && parsed > finalPoints) {
-                                  finalPoints = parsed;
-                                  _localLevelPoints[currentLevel] = finalPoints;
-                                }
-                              }
-                            }
-
-                            if (finalPoints > 0 && FirebaseAuth.instance.currentUser != null) {
-                              final currentUid = FirebaseAuth.instance.currentUser!.uid;
-                              final scoreRef = _sessionRef.collection('scores').doc(currentUid);
-                              final levelKey = 'level${currentLevel}Score';
-                              final int existingLvlScore = int.tryParse(sData?[levelKey]?.toString() ?? '') ?? 0;
-                              if (finalPoints > existingLvlScore) {
-                                final int diff = finalPoints - existingLvlScore;
-                                final int currentTotal = int.tryParse(sData?['score']?.toString() ?? '') ?? 0;
-                                scoreRef.set({
-                                  levelKey: finalPoints,
-                                  'levelScores': {
-                                    'Level $currentLevel': finalPoints,
-                                  },
-                                  'score': currentTotal + diff,
-                                  'totalScore': currentTotal + diff,
-                                  'updatedAt': FieldValue.serverTimestamp(),
-                                }, SetOptions(merge: true)).catchError((_) {});
-                              }
-                            }
-
-                            return Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 22,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(
-                                  color: const Color(0xFFBBF7D0),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF16A34A,
-                                    ).withValues(alpha: 0.08),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.stars_rounded,
-                                        size: 16,
-                                        color: Colors.amber.shade600,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        "YOUR LEVEL SCORE",
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    "$finalPoints ${finalPoints == 1 ? 'POINT' : 'POINTS'}",
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: primaryGreen,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 18),
                     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                       stream: _sessionRef.snapshots(),
-                      builder: (context, snapshot) {
-                        final sessionData = snapshot.data?.data() ?? _latestQuizData;
-                        final sessionStatus =
-                            sessionData['status']?.toString().toLowerCase().trim() ?? '';
-                        final bool isQuizFinished = sessionStatus == 'finished' ||
-                            sessionStatus == 'completed' ||
-                            sessionStatus == 'ended' ||
-                            sessionData['isFinished'] == true;
+                      builder: (context, sessionSnapshot) {
+                        final sessionData =
+                            sessionSnapshot.data?.data() ?? _latestQuizData;
+                        final int ptsPerQ = getPointsForLevel(
+                          currentLevel,
+                          sessionData: sessionData,
+                        );
 
-                        if (isQuizFinished) {
-                          return Column(
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFF86EFAC),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_rounded,
-                                      color: primaryGreen,
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        "Quiz finished! You can view the final ranking now.",
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Color(0xFF14532D),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton.icon(
-                                  icon: const Icon(Icons.emoji_events_rounded, size: 24),
-                                  label: const Text(
-                                    "FINAL RESULTS",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryGreen,
-                                    foregroundColor: Colors.white,
-                                    elevation: 4,
-                                    shadowColor: primaryGreen.withValues(alpha: 0.4),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  onPressed: () async {
-                                    await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => PartialRankingScreen(
-                                          quizCode: widget.quizCode,
-                                          isFinal: true,
-                                        ),
-                                      ),
-                                    );
-                                    if (mounted) {
-                                      await _rememberQuizScreen();
-                                    }
-                                  },
-                                ),
-                              ),
-                            ],
-                          );
+                        int totalQuestionsInLevel = 0;
+                        int levelTotalPossiblePoints = 0;
+
+                        // 1. Count questions in this level from _sortedSessionQuestions
+                        if (_sortedSessionQuestions.isNotEmpty) {
+                          int count = 0;
+                          int calculatedPoints = 0;
+                          for (var i = 0;
+                              i < _sortedSessionQuestions.length;
+                              i++) {
+                            final qData = _sortedSessionQuestions[i].data()
+                                as Map<String, dynamic>?;
+                            if (qData == null) continue;
+                            final qLvl = getLevelFromSessionQuestion(
+                              qData,
+                              fallbackQuestionNumber: i + 1,
+                            );
+                            if (qLvl == currentLevel) {
+                              count++;
+                              final qPts = getPointsForLevel(
+                                currentLevel,
+                                question: qData,
+                                sessionData: sessionData,
+                              );
+                              calculatedPoints += qPts;
+                            }
+                          }
+                          if (count > 0) {
+                            totalQuestionsInLevel = count;
+                            levelTotalPossiblePoints = calculatedPoints;
+                          }
                         }
 
-                        return Column(
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFD1FAE5),
-                                  width: 1.3,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF16A34A).withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.2,
-                                      color: primaryGreen,
-                                    ),
-                                  ),
-                                  SizedBox(width: 12),
-                                  Flexible(
-                                    child: Text(
-                                      "Waiting for Quiz Master to start next round...",
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Color(0xFF14532D),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
+                        // 2. Fallback to session levelQuestions mapping
+                        if (totalQuestionsInLevel == 0) {
+                          final rawLevelQuestions =
+                              sessionData['levelQuestions'] ??
+                                  _latestQuizData['levelQuestions'];
+                          if (rawLevelQuestions is Map) {
+                            final target = 'level$currentLevel';
+                            for (final entry in rawLevelQuestions.entries) {
+                              final norm = entry.key
+                                  .toString()
+                                  .toLowerCase()
+                                  .replaceAll(RegExp(r'[^a-z0-9]'), '');
+                              if ((norm == target ||
+                                      norm == '$currentLevel') &&
+                                  entry.value is List) {
+                                totalQuestionsInLevel =
+                                    (entry.value as List).length;
+                                break;
+                              }
+                            }
+                          }
+                        }
+
+                        if (levelTotalPossiblePoints == 0 &&
+                            totalQuestionsInLevel > 0) {
+                          levelTotalPossiblePoints =
+                              totalQuestionsInLevel * ptsPerQ;
+                        }
+
+                        final sessionStatus = sessionData['status']
+                                ?.toString()
+                                .toLowerCase()
+                                .trim() ??
+                            '';
+                        final bool isQuizFinished =
+                            sessionStatus == 'finished' ||
+                                sessionStatus == 'completed' ||
+                                sessionStatus == 'ended' ||
+                                sessionData['isFinished'] == true;
+
+                        return StreamBuilder<
+                            QuerySnapshot<Map<String, dynamic>>>(
+                          stream: FirebaseAuth.instance.currentUser != null
+                              ? _sessionRef
+                                  .collection('answers')
+                                  .doc(FirebaseAuth.instance.currentUser!.uid)
+                                  .collection('responses')
+                                  .snapshots()
+                              : null,
+                          builder: (context, responsesSnapshot) {
+                            int points = _localLevelPoints[currentLevel] ?? 0;
+                            int correctCount = 0;
+                            int respPoints = 0;
+                            int answeredCount = 0;
+
+                            if (responsesSnapshot.hasData &&
+                                responsesSnapshot.data != null) {
+                              for (final doc in responsesSnapshot.data!.docs) {
+                                final data = doc.data();
+                                final rawLvl = data['level'];
+                                int? itemLevel;
+                                if (rawLvl is num) {
+                                  itemLevel = rawLvl.toInt();
+                                } else if (rawLvl != null) {
+                                  final match = RegExp(r'(\d+)').firstMatch(
+                                    rawLvl.toString(),
+                                  );
+                                  if (match != null) {
+                                    itemLevel = int.tryParse(match.group(1)!);
+                                  }
+                                }
+                                if (itemLevel == currentLevel) {
+                                  answeredCount++;
+                                  final bool isCorrect =
+                                      data['isCorrect'] == true ||
+                                          data['answerStatus'] == 'correct' ||
+                                          data['contestStatus'] == 'approved';
+                                  if (isCorrect) {
+                                    correctCount++;
+                                  }
+                                  final val = data['points'];
+                                  if (val is num) {
+                                    respPoints += val.toInt();
+                                  }
+                                }
+                              }
+                            }
+
+                            // Contestant points strictly based on Admin-configured points per question
+                            final int scoreFromCorrect =
+                                correctCount * ptsPerQ;
+                            if (scoreFromCorrect > respPoints) {
+                              respPoints = scoreFromCorrect;
+                            }
+                            if (respPoints > points) {
+                              points = respPoints;
+                              _localLevelPoints[currentLevel] = points;
+                            }
+
+                            return StreamBuilder<
+                                DocumentSnapshot<Map<String, dynamic>>>(
+                              stream: FirebaseAuth.instance.currentUser != null
+                                  ? _sessionRef
+                                      .collection('scores')
+                                      .doc(FirebaseAuth.instance.currentUser!.uid)
+                                      .snapshots()
+                                  : null,
+                              builder: (context, scoreSnapshot) {
+                                int finalPoints = points;
+                                final sData = scoreSnapshot.data?.data();
+                                if (sData != null) {
+                                  final String levelKey =
+                                      'level${currentLevel}Score';
+                                  final dynamic rawLvl = sData[levelKey] ??
+                                      (sData['levelScores'] is Map
+                                          ? sData['levelScores']
+                                              ['Level $currentLevel']
+                                          : null);
+                                  if (rawLvl != null) {
+                                    final parsed =
+                                        int.tryParse(rawLvl.toString());
+                                    if (parsed != null &&
+                                        parsed > finalPoints) {
+                                      finalPoints = parsed;
+                                      _localLevelPoints[currentLevel] =
+                                          finalPoints;
+                                    }
+                                  } else if (currentLevel == 1 &&
+                                      sData['score'] != null) {
+                                    final parsed = int.tryParse(
+                                      sData['score'].toString(),
+                                    );
+                                    if (parsed != null &&
+                                        parsed > finalPoints) {
+                                      finalPoints = parsed;
+                                      _localLevelPoints[currentLevel] =
+                                          finalPoints;
+                                    }
+                                  }
+                                }
+
+                                if (finalPoints > 0 &&
+                                    FirebaseAuth.instance.currentUser != null) {
+                                  final currentUid =
+                                      FirebaseAuth.instance.currentUser!.uid;
+                                  final scoreRef = _sessionRef
+                                      .collection('scores')
+                                      .doc(currentUid);
+                                  final levelKey = 'level${currentLevel}Score';
+                                  final int existingLvlScore = int.tryParse(
+                                          sData?[levelKey]?.toString() ?? '') ??
+                                      0;
+                                  if (finalPoints > existingLvlScore) {
+                                    final int diff =
+                                        finalPoints - existingLvlScore;
+                                    final int currentTotal = int.tryParse(
+                                            sData?['score']?.toString() ?? '') ??
+                                        0;
+                                    scoreRef.set({
+                                      levelKey: finalPoints,
+                                      'levelScores': {
+                                        'Level $currentLevel': finalPoints,
+                                      },
+                                      'score': currentTotal + diff,
+                                      'totalScore': currentTotal + diff,
+                                      'updatedAt': FieldValue.serverTimestamp(),
+                                    }, SetOptions(merge: true)).catchError((_) {});
+                                  }
+                                }
+
+                                if (correctCount == 0 &&
+                                    finalPoints > 0 &&
+                                    ptsPerQ > 0) {
+                                  correctCount =
+                                      (finalPoints / ptsPerQ).round();
+                                }
+                                if (totalQuestionsInLevel == 0) {
+                                  totalQuestionsInLevel = answeredCount > 0
+                                      ? answeredCount
+                                      : (correctCount > 0 ? correctCount : 5);
+                                }
+                                if (levelTotalPossiblePoints == 0) {
+                                  levelTotalPossiblePoints =
+                                      totalQuestionsInLevel * ptsPerQ;
+                                }
+                                if (levelTotalPossiblePoints < finalPoints) {
+                                  levelTotalPossiblePoints = finalPoints;
+                                }
+
+                                return Column(
+                                  children: [
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 22,
+                                        vertical: 22,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(22),
+                                        border: Border.all(
+                                          color: const Color(0xFFBBF7D0),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFF16A34A,
+                                            ).withValues(alpha: 0.08),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.stars_rounded,
+                                                size: 17,
+                                                color: Colors.amber.shade600,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                "YOUR LEVEL SCORE",
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 1.2,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.baseline,
+                                            textBaseline:
+                                                TextBaseline.alphabetic,
+                                            children: [
+                                              Text(
+                                                "$finalPoints",
+                                                style: const TextStyle(
+                                                  color: primaryGreen,
+                                                  fontSize: 38,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: -0.5,
+                                                ),
+                                              ),
+                                              Text(
+                                                " / $levelTotalPossiblePoints",
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade400,
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                levelTotalPossiblePoints == 1
+                                                    ? "POINT"
+                                                    : "POINTS",
+                                                style: TextStyle(
+                                                  color: primaryGreen
+                                                      .withValues(alpha: 0.85),
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 0.6,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF0FDF4),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: const Color(0xFFDCFCE7),
+                                                width: 1.2,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceEvenly,
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons
+                                                                .check_circle_rounded,
+                                                            size: 13,
+                                                            color:
+                                                                primaryGreen,
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 4),
+                                                          Text(
+                                                            "CORRECT",
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .grey.shade600,
+                                                              fontSize: 10.5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              letterSpacing:
+                                                                  0.4,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        "$correctCount / $totalQuestionsInLevel",
+                                                        style: const TextStyle(
+                                                          color:
+                                                              Color(0xFF14532D),
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  height: 24,
+                                                  width: 1,
+                                                  color:
+                                                      const Color(0xFFBBF7D0),
+                                                ),
+                                                Expanded(
+                                                  child: Column(
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.bolt_rounded,
+                                                            size: 14,
+                                                            color: Colors
+                                                                .amber.shade700,
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 3),
+                                                          Text(
+                                                            "PER QUESTION",
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .grey.shade600,
+                                                              fontSize: 10.5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              letterSpacing:
+                                                                  0.4,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        "$ptsPerQ ${ptsPerQ == 1 ? 'pt' : 'pts'}",
+                                                        style: TextStyle(
+                                                          color: Colors
+                                                              .amber.shade900,
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  height: 24,
+                                                  width: 1,
+                                                  color:
+                                                      const Color(0xFFBBF7D0),
+                                                ),
+                                                Expanded(
+                                                  child: Column(
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons
+                                                                .military_tech_rounded,
+                                                            size: 14,
+                                                            color: Color(
+                                                                0xFF2563EB),
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 3),
+                                                          Text(
+                                                            "TOTAL POOL",
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .grey.shade600,
+                                                              fontSize: 10.5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              letterSpacing:
+                                                                  0.4,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        "$levelTotalPossiblePoints ${levelTotalPossiblePoints == 1 ? 'pt' : 'pts'}",
+                                                        style:
+                                                            const TextStyle(
+                                                          color:
+                                                              Color(0xFF1D4ED8),
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                    const SizedBox(height: 18),
+                                    if (isQuizFinished)
+                                      Column(
+                                        children: [
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFDCFCE7),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color:
+                                                    const Color(0xFF86EFAC),
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.check_circle_rounded,
+                                                  color: primaryGreen,
+                                                  size: 20,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Flexible(
+                                                  child: Text(
+                                                    "Quiz finished! You can view the final ranking now.",
+                                                    textAlign:
+                                                        TextAlign.center,
+                                                    style: TextStyle(
+                                                      color:
+                                                          Color(0xFF14532D),
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 56,
+                                            child: ElevatedButton.icon(
+                                              icon: const Icon(
+                                                Icons.emoji_events_rounded,
+                                                size: 24,
+                                              ),
+                                              label: const Text(
+                                                "FINAL RESULTS",
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: 0.8,
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: primaryGreen,
+                                                foregroundColor: Colors.white,
+                                                elevation: 4,
+                                                shadowColor: primaryGreen
+                                                    .withValues(alpha: 0.4),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        PartialRankingScreen(
+                                                      quizCode: widget.quizCode,
+                                                      isFinal: true,
+                                                    ),
+                                                  ),
+                                                );
+                                                if (mounted) {
+                                                  await _rememberQuizScreen();
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      Column(
+                                        children: [
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 18,
+                                              vertical: 14,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.85),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color:
+                                                    const Color(0xFFD1FAE5),
+                                                width: 1.3,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(
+                                                    0xFF16A34A,
+                                                  ).withValues(alpha: 0.05),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2.2,
+                                                    color: primaryGreen,
+                                                  ),
+                                                ),
+                                                SizedBox(width: 12),
+                                                Flexible(
+                                                  child: Text(
+                                                    "Waiting for Quiz Master to start next round...",
+                                                    textAlign:
+                                                        TextAlign.center,
+                                                    style: TextStyle(
+                                                      color:
+                                                          Color(0xFF14532D),
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
                         );
                       },
                     ),
