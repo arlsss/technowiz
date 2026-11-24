@@ -1601,7 +1601,7 @@ class _ContestantBadgesViewState extends State<ContestantBadgesView> {
                   pw.Column(
                     children: [
                       if (certLogoImage != null)
-                        pw.Image(certLogoImage, height: 42)
+                        pw.Image(certLogoImage, height: 80)
                       else
                         pw.Container(height: 10),
                       pw.SizedBox(height: 5),
