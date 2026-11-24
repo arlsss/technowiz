@@ -739,7 +739,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
             ElevatedButton.icon(
               onPressed: () async {
                 Navigator.pop(ctx);
-                await _handleQuizAgain();
+                await _handleQuizAgain(tiedEntries);
               },
               icon: const Icon(Icons.replay_rounded, size: 18),
               label: const Text('QUIZ AGAIN'),
@@ -799,30 +799,67 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     }
   }
 
-  Future<void> _handleQuizAgain() async {
+  Future<void> _handleQuizAgain([
+    List<MapEntry<int, List<ContestantTally>>>? tiedEntries,
+  ]) async {
+    final List<String> tiedUids = [];
+    final List<String> tiedNames = [];
+
+    if (tiedEntries != null && tiedEntries.isNotEmpty) {
+      for (final entry in tiedEntries) {
+        for (final c in entry.value) {
+          if (!tiedUids.contains(c.uid)) {
+            tiedUids.add(c.uid);
+            tiedNames.add(c.effectiveName);
+          }
+        }
+      }
+    }
+
     try {
-      await _sessionRef.set({
+      final batch = FirebaseFirestore.instance.batch();
+      final updateData = <String, dynamic>{
         'tieBreakerActive': true,
-        'status': 'waiting',
+        'tieBreakerResolved': false,
+        'status': 'tie_breaker_invite',
+        'questionState': 'waiting',
         'isFinished': false,
+        'finished': false,
         'currentQuestion': 0,
+        'tieBreakerQuestionIndex': 0,
+        'tieBreakerReadyUids': <String>[],
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      if (tiedUids.isNotEmpty) {
+        updateData['tieBreakerContestantUids'] = tiedUids;
+        updateData['tieBreakerContestantNames'] = tiedNames;
+      }
+      batch.set(_sessionRef, updateData, SetOptions(merge: true));
+
+      for (final uid in tiedUids) {
+        final reqRef = _sessionRef.collection('join_requests').doc(uid);
+        batch.set(reqRef, {
+          'tieBreakerReady': false,
+          'ready': false,
+          'nextQuestionReady': false,
+        }, SetOptions(merge: true));
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error activating tie breaker: $e');
     }
 
     if (!mounted) return;
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => QuizControlScreen(quizCode: widget.quizCode),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuizControlScreen(
+          quizCode: widget.quizCode,
+          isTieBreaker: true,
         ),
-      );
-    }
+      ),
+    );
   }
 
   // ============================================================

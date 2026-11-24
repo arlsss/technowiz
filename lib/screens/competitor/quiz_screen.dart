@@ -786,6 +786,7 @@ class _QuizScreenState extends State<QuizScreen> {
   // ("YOU ARE READY?" card). CANCEL sets it back to false.
   bool nextReadyConfirmed = false;
   int confirmedQuestionIndex = -1;
+  bool _tieBreakerInviteConfirmed = false;
 
   // Prevent the 30-second question timer from starting while
   // the Quiz Master is still running the ready check/countdown.
@@ -2561,6 +2562,623 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   // ==========================================================
+  // TIE BREAKER SCREENS & HELPERS
+  // ==========================================================
+
+  String _getTieBreakerOpponentName(
+    Map<String, dynamic> quizData,
+    String myUid,
+  ) {
+    final rawUids = quizData['tieBreakerContestantUids'];
+    final rawNames = quizData['tieBreakerContestantNames'];
+    final uids = rawUids is List
+        ? rawUids.map((e) => e.toString()).toList()
+        : <String>[];
+    final names = rawNames is List
+        ? rawNames.map((e) => e.toString()).toList()
+        : <String>[];
+
+    final opponents = <String>[];
+    for (int i = 0; i < uids.length; i++) {
+      if (uids[i] != myUid) {
+        if (i < names.length) {
+          opponents.add(names[i]);
+        } else {
+          opponents.add('Opponent');
+        }
+      }
+    }
+    return opponents.isNotEmpty ? opponents.join(', ') : 'Opponent';
+  }
+
+  Widget _buildTieBreakerInvitationScreen(
+    BuildContext context,
+    Map<String, dynamic> quizData,
+    String opponentName,
+  ) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return TechCircuitBackground(
+      baseColor: lightGreen,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 580),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: const Color(0xFFF59E0B),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.bolt_rounded,
+                            color: Color(0xFFD97706),
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'TIE BREAKER SHOWDOWN',
+                            style: TextStyle(
+                              color: Color(0xFF92400E),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.orange.withValues(alpha: 0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.balance_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      "You'll be having a tie breaker with\n$opponentName!",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1E293B),
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFFDE68A),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(
+                                Icons.rule_rounded,
+                                color: Color(0xFFD97706),
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Tie Breaker Rules & Scoring:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '• 1 Point per question.\n\n'
+                            '• Sudden-Death Rule: If example ang isa ka contestant sa tie breaker '
+                            'wala maka answer (o sayop) unya ang usa kay nakatubag ug sakto, '
+                            'automatic na nga maoy daog!\n\n'
+                            '• If pareha kamo nga sakto (o pareha walay nakatubag/sayop), '
+                            'magpadayon sa sunod nga question hangtod madeterminar ang winner.\n\n'
+                            '• Palihug siguroha nga andam ka sa dili pa mo-confirm.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF334155),
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Are you ready?',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF64748B),
+                              side: const BorderSide(
+                                color: Color(0xFFCBD5E1),
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () {
+                              showDialog<void>(
+                                context: context,
+                                builder: (dlgCtx) => AlertDialog(
+                                  title: const Text('Cancel Tie Breaker?'),
+                                  content: const Text(
+                                    'If you cancel, you will forfeit the tie breaker and share the tied rank with your opponent.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(dlgCtx),
+                                      child: const Text('STAY'),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      onPressed: () async {
+                                        Navigator.pop(dlgCtx);
+                                        await CompetitorNavPersistence.savePage(
+                                          'dashboard',
+                                          clearQuiz: true,
+                                        );
+                                        if (!context.mounted) return;
+                                        Navigator.of(context).pushAndRemoveUntil(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const CompetitorDashboard(
+                                                  initialPage: 'dashboard',
+                                                ),
+                                          ),
+                                          (route) => false,
+                                        );
+                                      },
+                                      child: const Text('FORFEIT & EXIT'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'CANCEL',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryGreen,
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.check_circle_rounded,
+                              size: 22,
+                            ),
+                            label: const Text(
+                              'CONFIRM',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            onPressed: () async {
+                              setState(() {
+                                _tieBreakerInviteConfirmed = true;
+                              });
+                              try {
+                                if (myUid.isNotEmpty) {
+                                  await _sessionRef
+                                      .collection('join_requests')
+                                      .doc(myUid)
+                                      .set({
+                                    'tieBreakerReady': true,
+                                    'ready': true,
+                                    'updatedAt': FieldValue.serverTimestamp(),
+                                  }, SetOptions(merge: true));
+
+                                  await _sessionRef.update({
+                                    'tieBreakerReadyUids':
+                                        FieldValue.arrayUnion([myUid]),
+                                  });
+                                }
+                              } catch (e) {
+                                debugPrint('Error confirming tie breaker: $e');
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTieBreakerPreparationScreen(
+    BuildContext context,
+    Map<String, dynamic> quizData, [
+    String? opponentName,
+  ]) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final oppName = opponentName ??
+        _getTieBreakerOpponentName(quizData, myUid);
+
+    return TechCircuitBackground(
+      baseColor: lightGreen,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: softGreen,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: borderGreen, width: 1.5),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.bolt_rounded,
+                            color: primaryGreen,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'TIE BREAKER • PREPARATION',
+                            style: TextStyle(
+                              color: darkGreen,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: primaryGreen.withValues(alpha: 0.4),
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryGreen.withValues(alpha: 0.2),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.hourglass_top_rounded,
+                          color: primaryGreen,
+                          size: 46,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    const Text(
+                      'Please be ready for the tie breaker',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Waiting for the Quiz Master to start the question...',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: borderGreen, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: primaryGreen,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'YOU',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'READY',
+                                  style: TextStyle(
+                                    color: primaryGreen,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.sports_score_rounded,
+                                color: Color(0xFFEA580C),
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  oppName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'OPPONENT',
+                                  style: TextStyle(
+                                    color: Color(0xFFD97706),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: primaryGreen,
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          'Get ready: Countdown will begin shortly',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTieBreakerSpectatorScreen(
+    BuildContext context,
+    Map<String, dynamic> quizData,
+  ) {
+    final rawNames = quizData['tieBreakerContestantNames'];
+    final names = rawNames is List
+        ? rawNames.map((e) => e.toString()).join(' vs ')
+        : 'Tied Contestants';
+
+    return TechCircuitBackground(
+      baseColor: lightGreen,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.balance_rounded,
+                        color: Colors.amber.shade900,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Tie Breaker Round In Progress',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'A sudden-death tie breaker is currently being played between:\n\n$names\n\n'
+                      'Please stand by. Final rankings will be updated once the tie breaker concludes.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF475569),
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const CircularProgressIndicator(color: primaryGreen),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==========================================================
   // RESULT SCREEN
   // ==========================================================
 
@@ -2575,6 +3193,18 @@ class _QuizScreenState extends State<QuizScreen> {
 
     final bool isThisQuestionConfirmed =
         nextReadyConfirmed && (confirmedQuestionIndex == currentQuestion);
+
+    final isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
+    if (isTieBreakerActive && isThisQuestionConfirmed) {
+      return _buildTieBreakerPreparationScreen(
+        context,
+        _latestQuizData,
+        _getTieBreakerOpponentName(
+          _latestQuizData,
+          FirebaseAuth.instance.currentUser?.uid ?? '',
+        ),
+      );
+    }
 
     if (isLastQuestionInLevel && isThisQuestionConfirmed) {
       return levelPauseScreen(currentLevel);
@@ -3139,6 +3769,17 @@ class _QuizScreenState extends State<QuizScreen> {
                         });
                       } else {
                         setNextQuestionReady(true);
+                        final myUid =
+                            FirebaseAuth.instance.currentUser?.uid ?? '';
+                        if (_latestQuizData['tieBreakerActive'] == true &&
+                            myUid.isNotEmpty) {
+                          _sessionRef
+                              .collection('join_requests')
+                              .doc(myUid)
+                              .set({
+                            'tieBreakerReady': true,
+                          }, SetOptions(merge: true));
+                        }
                       }
                     },
               icon: Icon(
@@ -5845,11 +6486,22 @@ class _QuizScreenState extends State<QuizScreen> {
               quizData['completed'] == true ||
               quizData['isCompleted'] == true;
 
-          if (isQuizFinished || _quizFinishedForContestant) {
+          final isTieBreakerActive = quizData['tieBreakerActive'] == true;
+
+          if ((isQuizFinished || _quizFinishedForContestant) &&
+              !isTieBreakerActive) {
             timer?.cancel();
             final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
+
+          final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+          final rawTieUids = quizData['tieBreakerContestantUids'];
+          final List<String> tieBreakerContestantUids = rawTieUids is List
+              ? rawTieUids.map((e) => e.toString()).toList()
+              : <String>[];
+          final bool isTiedContestant =
+              tieBreakerContestantUids.contains(currentUid);
 
           final status = quizData['status']?.toString() ?? 'waiting';
 
@@ -5862,6 +6514,33 @@ class _QuizScreenState extends State<QuizScreen> {
               quizData['readyCheckId']?.toString().trim() ?? '';
 
           final countdownActive = quizData['countdownActive'] == true;
+
+          if (isTieBreakerActive) {
+            if (!isTiedContestant) {
+              return _buildTieBreakerSpectatorScreen(context, quizData);
+            }
+
+            final oppName = _getTieBreakerOpponentName(quizData, currentUid);
+
+            if (!countdownActive &&
+                status != 'countdown' &&
+                status != 'active' &&
+                !(answered && resultRevealed)) {
+              if (!_tieBreakerInviteConfirmed) {
+                return _buildTieBreakerInvitationScreen(
+                  context,
+                  quizData,
+                  oppName,
+                );
+              } else {
+                return _buildTieBreakerPreparationScreen(
+                  context,
+                  quizData,
+                  oppName,
+                );
+              }
+            }
+          }
 
           final countdown =
               int.tryParse(quizData['countdown']?.toString() ?? '0') ?? 0;
@@ -7617,6 +8296,19 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
             }
 
             final sessionData = sessSnap.data?.data();
+            if (sessionData != null && sessionData['tieBreakerActive'] == true) {
+              final rawUids = sessionData['tieBreakerContestantUids'];
+              final isTiedContestant =
+                  rawUids is List && rawUids.contains(myUid);
+              if (isTiedContestant) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                });
+              }
+            }
+
             final sessionStatus =
                 sessionData?['status']?.toString().toLowerCase().trim() ?? '';
             final bool isActuallyFinal = isFinal ||

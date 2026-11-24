@@ -19,11 +19,13 @@ import '../../navigation_persistence.dart';
 class QuizControlScreen extends StatefulWidget {
   final String quizCode;
   final bool startImmediately;
+  final bool isTieBreaker;
 
   const QuizControlScreen({
     super.key,
     required this.quizCode,
     this.startImmediately = false,
+    this.isTieBreaker = false,
   });
 
   @override
@@ -82,6 +84,14 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   bool _isAdvancingQuestion = false;
   bool _isFinishingQuiz = false;
 
+  bool get _isTieBreakerActive =>
+      widget.isTieBreaker || _quizData?['tieBreakerActive'] == true;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _scoresSubscription;
+  bool _tieBreakerBroken = false;
+  String? _tieBreakerLeadingName;
+  int _tieBreakerLeadingScore = -1;
+
   Map<String, dynamic>? _quizData;
 
   List<QueryDocumentSnapshot> _questions = [];
@@ -110,7 +120,147 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     RefreshBlocker.block();
     _rememberQuizControlPage();
     _listenForSessionDeletion();
+    _listenForScores();
     _loadQuiz();
+  }
+
+  void _listenForScores() {
+    _scoresSubscription = FirebaseFirestore.instance
+        .collection('quiz_sessions')
+        .doc(widget.quizCode)
+        .collection('scores')
+        .snapshots()
+        .listen((snap) {
+          if (!mounted) return;
+          _updateTieBreakerScoreState(snap.docs);
+        });
+  }
+
+  void _updateTieBreakerScoreState(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs,
+  ) {
+    if (!_isTieBreakerActive) return;
+    final tiedUids = List<String>.from(
+      _quizData?['tieBreakerContestantUids'] ?? [],
+    );
+    if (tiedUids.length < 2) return;
+
+    final scoresMap = <String, int>{};
+    final namesMap = <String, String>{};
+
+    for (final doc in scoreDocs) {
+      if (tiedUids.contains(doc.id)) {
+        final data = doc.data();
+        final s = int.tryParse(data['score']?.toString() ?? '0') ?? 0;
+        final n = (data['teamName'] ?? data['name'] ?? doc.id).toString();
+        scoresMap[doc.id] = s;
+        namesMap[doc.id] = n;
+      }
+    }
+
+    if (scoresMap.length >= 2) {
+      final values = scoresMap.values.toList();
+      final firstVal = values.first;
+      final allEqual = values.every((v) => v == firstVal);
+
+      String? leadName;
+      int leadScore = -1;
+      if (!allEqual) {
+        String? leadUid;
+        for (final entry in scoresMap.entries) {
+          if (entry.value > leadScore) {
+            leadScore = entry.value;
+            leadUid = entry.key;
+          }
+        }
+        if (leadUid != null) {
+          leadName = namesMap[leadUid];
+        }
+      }
+
+      setState(() {
+        _tieBreakerBroken = !allEqual;
+        _tieBreakerLeadingName = leadName;
+        _tieBreakerLeadingScore = leadScore;
+      });
+    }
+  }
+
+  Future<void> _endTieBreakerAndOpenFinalTally() async {
+    if (_isFinishingQuiz) return;
+    _isFinishingQuiz = true;
+
+    try {
+      final quizDoc = await _getQuizSession();
+      if (quizDoc != null) {
+        final scoresSnap = await quizDoc.reference.collection('scores').get();
+        final tiedUids = List<String>.from(
+          _quizData?['tieBreakerContestantUids'] ?? [],
+        );
+        String? winnerUid;
+        int highestScore = -1;
+        bool isBroken = false;
+
+        for (final doc in scoresSnap.docs) {
+          if (tiedUids.contains(doc.id)) {
+            final s =
+                int.tryParse(doc.data()['score']?.toString() ?? '0') ?? 0;
+            if (s > highestScore) {
+              highestScore = s;
+              winnerUid = doc.id;
+              isBroken = true;
+            } else if (s == highestScore) {
+              isBroken = false;
+            }
+          }
+        }
+
+        final batch = FirebaseFirestore.instance.batch();
+        batch.update(quizDoc.reference, {
+          'tieBreakerActive': false,
+          'tieBreakerResolved': true,
+          'status': 'finished',
+          'eventStatus': 'finished',
+          'isFinished': true,
+          'finished': true,
+          'timer': 0,
+          'countdownActive': false,
+          'readyCheckActive': false,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        if (winnerUid != null && isBroken) {
+          final winnerScoreRef =
+              quizDoc.reference.collection('scores').doc(winnerUid);
+          batch.set(winnerScoreRef, {
+            'tieBreakerWon': true,
+            'tieBreakerResolved': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+
+        await batch.commit();
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FinalTallyScreen(
+            quizCode: widget.quizCode,
+            level: _currentLevel,
+            isFinal: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error ending tie breaker: $e');
+      if (mounted) {
+        _showMessage('Error ending tie breaker: $e');
+      }
+    } finally {
+      _isFinishingQuiz = false;
+    }
   }
 
   void _listenForSessionDeletion() {
@@ -172,6 +322,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   void dispose() {
     RefreshBlocker.unblock();
     _sessionDeletionSubscription?.cancel();
+    _scoresSubscription?.cancel();
     _timer?.cancel();
     _readyCheckTimer?.cancel();
     super.dispose();
@@ -292,7 +443,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   List<QueryDocumentSnapshot> _sortSelectedQuestions(
     List<QueryDocumentSnapshot> docs,
   ) {
-    final isTieBreakerActive = _quizData?['tieBreakerActive'] == true;
+    final isTieBreakerActive = _isTieBreakerActive;
     final filtered = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final isTB = data['isTieBreaker'] == true;
@@ -412,9 +563,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           .collection('questions')
           .get();
 
-      final sortedQuestions = _sortSelectedQuestions(questionsSnapshot.docs);
-
       final quizData = quizDoc.data() ?? {};
+      _quizData = quizData;
+
+      final sortedQuestions = _sortSelectedQuestions(questionsSnapshot.docs);
 
       final status = quizData['status']?.toString().toLowerCase() ?? 'waiting';
 
@@ -583,6 +735,18 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     _startingFromMainButton = true;
     try {
+      if (_isTieBreakerActive) {
+        if (_questions.isEmpty) {
+          _showMessage('No tie breaker questions available.');
+          return;
+        }
+        await _startQuestionCountdown(
+          questionIndex: 0,
+          level: _getLevel(0),
+        );
+        return;
+      }
+
       // If a readiness dialog was closed before starting, reuse the pending
       // question instead of accidentally returning to Question 1.
       final targetQuestion =
@@ -3870,6 +4034,228 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         .collection('quiz_sessions')
         .doc(widget.quizCode);
 
+    if (_isTieBreakerActive) {
+      final rawTiedUids = _quizData?['tieBreakerContestantUids'];
+      final tiedUids = rawTiedUids is List
+          ? rawTiedUids.map((e) => e.toString()).toList()
+          : <String>[];
+      final rawTiedNames = _quizData?['tieBreakerContestantNames'];
+      final tiedNames = rawTiedNames is List
+          ? rawTiedNames.map((e) => e.toString()).toList()
+          : <String>[];
+
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: sessionRef.collection('join_requests').snapshots(),
+        builder: (context, requestsSnapshot) {
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: sessionRef.collection('scores').snapshots(),
+            builder: (context, scoresSnapshot) {
+              final reqDocs = requestsSnapshot.data?.docs ?? [];
+              final scoreDocs = scoresSnapshot.data?.docs ?? [];
+
+              final tiedData = <Map<String, dynamic>>[];
+              for (int i = 0; i < tiedUids.length; i++) {
+                final uid = tiedUids[i];
+                final fallbackName =
+                    i < tiedNames.length ? tiedNames[i] : 'Contestant ${i + 1}';
+                final req = reqDocs.where((d) => d.id == uid).firstOrNull?.data() ?? {};
+                final sc = scoreDocs.where((d) => d.id == uid).firstOrNull?.data() ?? {};
+                final name = (req['teamName'] ??
+                        req['name'] ??
+                        sc['teamName'] ??
+                        sc['name'] ??
+                        fallbackName)
+                    .toString();
+                final score =
+                    int.tryParse(sc['score']?.toString() ?? '0') ?? 0;
+                final isReady =
+                    req['tieBreakerReady'] == true || _isConfirmed(req);
+                tiedData.add({
+                  'uid': uid,
+                  'name': name,
+                  'score': score,
+                  'isReady': isReady,
+                });
+              }
+
+              final scores =
+                  tiedData.map((t) => t['score'] as int).toList();
+              final isBroken =
+                  scores.length >= 2 && scores.toSet().length > 1;
+              final maxScore = scores.isNotEmpty
+                  ? scores.reduce((a, b) => a > b ? a : b)
+                  : 0;
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isBroken
+                        ? Colors.green.shade400
+                        : Colors.amber.shade400,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isBroken ? Colors.green : Colors.amber)
+                          .withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: (isBroken ? Colors.green : Colors.amber)
+                                .shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isBroken
+                                ? Icons.emoji_events_rounded
+                                : Icons.balance_rounded,
+                            color: isBroken
+                                ? Colors.green.shade800
+                                : Colors.amber.shade900,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isBroken
+                                    ? 'TIE BROKEN — WINNER FOUND!'
+                                    : 'TIE BREAKER SHOWDOWN IN PROGRESS',
+                                style: TextStyle(
+                                  color: isBroken
+                                      ? Colors.green.shade900
+                                      : Colors.amber.shade900,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13.5,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              Text(
+                                isBroken
+                                    ? 'A contestant has broken the tie! Tap END QUESTION to finalize results.'
+                                    : 'Sudden-Death Rule: Higher point wins immediately.',
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...tiedData.map((item) {
+                      final name = item['name'] as String;
+                      final score = item['score'] as int;
+                      final isReady = item['isReady'] as bool;
+                      final isLeading = isBroken && score == maxScore;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isLeading
+                              ? const Color(0xFFF0FDF4)
+                              : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isLeading
+                                ? Colors.green.shade300
+                                : const Color(0xFFE2E8F0),
+                            width: isLeading ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isReady
+                                  ? Icons.check_circle_rounded
+                                  : Icons.hourglass_empty_rounded,
+                              color:
+                                  isReady ? Colors.green : Colors.orange,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  fontWeight: isLeading
+                                      ? FontWeight.w900
+                                      : FontWeight.w600,
+                                  color: isLeading
+                                      ? Colors.green.shade900
+                                      : darkBlue,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isLeading
+                                    ? Colors.green
+                                    : primaryBlue,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$score PTS',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isReady ? 'CONFIRMED' : 'WAITING',
+                              style: TextStyle(
+                                color: isReady
+                                    ? Colors.green
+                                    : Colors.orange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: sessionRef.collection('join_requests').snapshots(),
       builder: (context, requestsSnapshot) {
@@ -5313,6 +5699,77 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (_isTieBreakerActive) ...[
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF9A3412), Color(0xFFEA580C)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.bolt_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        '⚡ TIE BREAKER SHOWDOWN ACTIVE',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _tieBreakerBroken &&
+                                                _tieBreakerLeadingName != null
+                                            ? 'Leader: $_tieBreakerLeadingName ($_tieBreakerLeadingScore PTS) • Tie broken!'
+                                            : 'Sudden-Death Round: ${(_quizData?['tieBreakerContestantNames'] as List?)?.join(' vs ') ?? 'Tied Contestants'}',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.9,
+                                          ),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         // ==================================================
                         // MANUAL PAUSE MESSAGE
                         // ==================================================
@@ -5644,66 +6101,116 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 SizedBox(
                                   width: buttonWidth,
                                   child: _compactControlButton(
-                                    icon:
-                                        (_currentQuestion == 0 &&
-                                            isWaiting &&
-                                            _quizData?['startedAt'] == null)
-                                        ? Icons.play_arrow_rounded
-                                        : Icons.skip_next_rounded,
-                                    label: _levelPreparedForStart
-                                        ? 'START LEVEL $_currentLevel'
+                                    icon: _isTieBreakerActive
+                                        ? ((_currentQuestion == 0 &&
+                                                (isWaiting ||
+                                                    _status ==
+                                                        'tie_breaker_invite'))
+                                            ? Icons.play_arrow_rounded
+                                            : (_tieBreakerBroken ||
+                                                    isLastQuestionOrLevelDone)
+                                                ? Icons.check_circle_rounded
+                                                : Icons.skip_next_rounded)
                                         : (_currentQuestion == 0 &&
-                                              isWaiting &&
-                                              _quizData?['startedAt'] == null)
-                                        ? 'START'
-                                        : 'NEXT QUESTION',
-                                    color:
-                                        _levelPreparedForStart ||
-                                            (_currentQuestion == 0 &&
                                                 isWaiting &&
-                                                _quizData?['startedAt'] ==
-                                                    null)
-                                        ? Colors.green
-                                        : isLastQuestionOrLevelDone
-                                        ? Colors.grey
-                                        : primaryBlue,
-                                    enabled:
-                                        !_isFinished &&
-                                        !_isAdvancingQuestion &&
-                                        !_startingFromMainButton &&
-                                        (_levelPreparedForStart ||
-                                            ((_currentQuestion == 0 &&
+                                                _quizData?['startedAt'] == null)
+                                            ? Icons.play_arrow_rounded
+                                            : Icons.skip_next_rounded,
+                                    label: _isTieBreakerActive
+                                        ? ((_currentQuestion == 0 &&
+                                                (isWaiting ||
+                                                    _status ==
+                                                        'tie_breaker_invite'))
+                                            ? 'START TIE BREAKER'
+                                            : (_tieBreakerBroken ||
+                                                    isLastQuestionOrLevelDone)
+                                                ? 'END QUESTION'
+                                                : 'NEXT QUESTION')
+                                        : _levelPreparedForStart
+                                            ? 'START LEVEL $_currentLevel'
+                                            : (_currentQuestion == 0 &&
                                                     isWaiting &&
                                                     _quizData?['startedAt'] ==
                                                         null)
-                                                ? isWaiting
-                                                : (!isLastQuestionOrLevelDone &&
-                                                    !isWaiting &&
+                                                ? 'START'
+                                                : 'NEXT QUESTION',
+                                    color: _isTieBreakerActive
+                                        ? ((_currentQuestion == 0 &&
+                                                (isWaiting ||
+                                                    _status ==
+                                                        'tie_breaker_invite'))
+                                            ? Colors.green
+                                            : (_tieBreakerBroken ||
+                                                    isLastQuestionOrLevelDone)
+                                                ? Colors.green
+                                                : primaryBlue)
+                                        : _levelPreparedForStart ||
+                                                (_currentQuestion == 0 &&
+                                                    isWaiting &&
+                                                    _quizData?['startedAt'] ==
+                                                        null)
+                                            ? Colors.green
+                                            : isLastQuestionOrLevelDone
+                                                ? Colors.grey
+                                                : primaryBlue,
+                                    enabled: !_isFinished &&
+                                        !_isAdvancingQuestion &&
+                                        !_startingFromMainButton &&
+                                        (_isTieBreakerActive
+                                            ? ((_currentQuestion == 0 &&
+                                                    (isWaiting ||
+                                                        _status ==
+                                                            'tie_breaker_invite'))
+                                                ? true
+                                                : (!isWaiting &&
                                                     !isCountdown &&
                                                     !_contestReviewActive &&
-                                                    !_isManuallyPaused))),
+                                                    !_isManuallyPaused))
+                                            : (_levelPreparedForStart ||
+                                                ((_currentQuestion == 0 &&
+                                                        isWaiting &&
+                                                        _quizData?['startedAt'] ==
+                                                            null)
+                                                    ? isWaiting
+                                                    : (!isLastQuestionOrLevelDone &&
+                                                        !isWaiting &&
+                                                        !isCountdown &&
+                                                        !_contestReviewActive &&
+                                                        !_isManuallyPaused)))),
                                     // One primary control starts the next question or level.
-                                    onTap: _levelPreparedForStart
-                                        ? () async {
-                                            final targetQuestion =
-                                                _pendingQuestionIndex ??
-                                                _currentQuestion;
-                                            final targetLevel =
-                                                _pendingLevel ?? _currentLevel;
-                                            setState(
-                                              () => _levelPreparedForStart =
-                                                  false,
-                                            );
-                                            await _startQuestionCountdown(
-                                              questionIndex: targetQuestion,
-                                              level: targetLevel,
-                                            );
-                                          }
-                                        : (_currentQuestion == 0 &&
-                                              isWaiting &&
-                                              _quizData?['startedAt'] == null)
-                                        ? _startInitialCountdownFromButton
-                                        : _confirmNextQuestion,
+                                    onTap: _isTieBreakerActive
+                                        ? ((_currentQuestion == 0 &&
+                                                (isWaiting ||
+                                                    _status ==
+                                                        'tie_breaker_invite'))
+                                            ? _startInitialCountdownFromButton
+                                            : (_tieBreakerBroken ||
+                                                    isLastQuestionOrLevelDone)
+                                                ? _endTieBreakerAndOpenFinalTally
+                                                : _confirmNextQuestion)
+                                        : _levelPreparedForStart
+                                            ? () async {
+                                                final targetQuestion =
+                                                    _pendingQuestionIndex ??
+                                                        _currentQuestion;
+                                                final targetLevel =
+                                                    _pendingLevel ??
+                                                        _currentLevel;
+                                                setState(
+                                                  () => _levelPreparedForStart =
+                                                      false,
+                                                );
+                                                await _startQuestionCountdown(
+                                                  questionIndex: targetQuestion,
+                                                  level: targetLevel,
+                                                );
+                                              }
+                                            : (_currentQuestion == 0 &&
+                                                    isWaiting &&
+                                                    _quizData?['startedAt'] ==
+                                                        null)
+                                                ? _startInitialCountdownFromButton
+                                                : _confirmNextQuestion,
                                   ),
                                 ),
                                 SizedBox(
@@ -5744,10 +6251,14 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   width: buttonWidth,
                                   child: _compactControlButton(
                                     icon: Icons.flag_rounded,
-                                    label: 'END LEVEL',
+                                    label: _isTieBreakerActive
+                                        ? 'END TIE BREAKER'
+                                        : 'END LEVEL',
                                     color: Colors.red,
                                     enabled: !_isFinished && !_isFinishingQuiz,
-                                    onTap: _confirmFinishQuiz,
+                                    onTap: _isTieBreakerActive
+                                        ? _endTieBreakerAndOpenFinalTally
+                                        : _confirmFinishQuiz,
                                   ),
                                 ),
                               ],
