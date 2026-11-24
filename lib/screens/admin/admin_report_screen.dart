@@ -56,6 +56,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   final Map<String, Map<int, int>> _levelScoresCache = {};
   final Set<String> _syncingUids = {};
   final Set<String> _checkedUids = {};
+  final Map<String, String> _userSchoolCache = {};
+  final Map<String, String> _userNameSchoolCache = {};
+  final Set<String> _syncingSchoolUids = {};
+  final Set<String> _checkedSchoolUids = {};
   String? _lastSyncedQuizCode;
 
   @override
@@ -1479,7 +1483,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     List<pw.Widget> buildTable3Widgets() {
       return [
         pw.Text(
-          '3. CONTESTANT RECORDS DIRECTORY',
+          'CONTESTANT RECORDS DIRECTORY',
           style: pw.TextStyle(
             fontSize: 11,
             fontWeight: pw.FontWeight.bold,
@@ -1497,7 +1501,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           )
         else
           pw.TableHelper.fromTextArray(
-            headers: ['#', 'Contestant / Team', 'Members', 'School Name', 'Status'],
+            headers: ['#', 'Contestant / Team', 'Members', 'School Name'],
             data: participants.asMap().entries.map((entry) {
               final p = entry.value;
               final isTeam = p.teamName.isNotEmpty;
@@ -1505,12 +1509,16 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               final memberList = p.members.isNotEmpty
                   ? p.members
                   : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
+              final effectiveSchool = p.school.isNotEmpty
+                  ? p.school
+                  : (_userSchoolCache[p.id]?.isNotEmpty == true
+                      ? _userSchoolCache[p.id]!
+                      : (_userNameSchoolCache[displayName.toLowerCase()] ?? '-'));
               return [
                 '${entry.key + 1}',
                 displayName,
                 memberList.isNotEmpty ? memberList.join(', ') : '-',
-                p.school.isNotEmpty ? p.school : '-',
-                p.isEliminated ? 'ELIMINATED' : p.status.toUpperCase(),
+                effectiveSchool.isNotEmpty ? effectiveSchool : '-',
               ];
             }).toList(),
             headerStyle: pw.TextStyle(
@@ -1522,6 +1530,12 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               color: PdfColors.grey800,
             ),
             cellStyle: const pw.TextStyle(fontSize: 8),
+            columnWidths: const {
+              0: pw.FixedColumnWidth(26),
+              1: pw.FlexColumnWidth(3.2),
+              2: pw.FlexColumnWidth(4.5),
+              3: pw.FlexColumnWidth(3.5),
+            },
             cellPadding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6),
           ),
       ];
@@ -1769,6 +1783,58 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   // =========================================================
+  // SYNC & FETCH USER SCHOOLS FROM USER PROFILES
+  // =========================================================
+
+  void _syncOrFetchUserSchools(List<String> uids) {
+    if (uids.isEmpty) return;
+
+    for (final uid in uids) {
+      if (uid.isEmpty || _checkedSchoolUids.contains(uid) || _syncingSchoolUids.contains(uid)) continue;
+      _syncingSchoolUids.add(uid);
+      _checkedSchoolUids.add(uid);
+
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get()
+          .then((userSnap) {
+        if (!mounted) return;
+        if (userSnap.exists) {
+          final uData = userSnap.data() ?? {};
+          final school = (uData['schoolName'] ??
+                  uData['school'] ??
+                  uData['address'] ??
+                  uData['institution'] ??
+                  uData['campus'] ??
+                  uData['collegeDepartment'] ??
+                  '')
+              .toString()
+              .trim();
+          final name = (uData['displayName'] ??
+                  uData['name'] ??
+                  uData['fullName'] ??
+                  '')
+              .toString()
+              .trim();
+
+          if (name.isNotEmpty && school.isNotEmpty && school.toLowerCase() != 'not yet set') {
+            _userNameSchoolCache[name.toLowerCase()] = school;
+          }
+
+          if (school.isNotEmpty && school.toLowerCase() != 'not yet set') {
+            setState(() {
+              _userSchoolCache[uid] = school;
+            });
+          }
+        }
+      }).catchError((_) {}).whenComplete(() {
+        _syncingSchoolUids.remove(uid);
+      });
+    }
+  }
+
+  // =========================================================
   // DATA PARSER FOR PARTICIPANTS, SCORES & RANKINGS
   // =========================================================
 
@@ -1790,7 +1856,20 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           .trim();
       final team = (d['teamName'] ?? '').toString().trim();
       final members = _teamMembers(d['teamMembers'] ?? d['members']);
-      final school = (d['school'] ?? d['schoolName'] ?? '').toString().trim();
+      final uid = (d['uid'] ?? doc.id).toString().trim();
+      final school = (d['school'] ??
+              d['schoolName'] ??
+              d['address'] ??
+              d['institution'] ??
+              d['campus'] ??
+              d['collegeDepartment'] ??
+              _userSchoolCache[uid] ??
+              _userSchoolCache[doc.id] ??
+              _userNameSchoolCache[name.toLowerCase()] ??
+              _userNameSchoolCache[team.toLowerCase()] ??
+              '')
+          .toString()
+          .trim();
       final isElim = status == 'eliminated' || d['isEliminated'] == true;
 
       DateTime? regTime;
@@ -1819,18 +1898,40 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           .trim();
       final team = (d['teamName'] ?? '').toString().trim();
       final members = _teamMembers(d['teamMembers'] ?? d['members']);
-      final school = (d['school'] ?? d['schoolName'] ?? '').toString().trim();
+      final uid = (d['uid'] ?? doc.id).toString().trim();
+      final school = (d['school'] ??
+              d['schoolName'] ??
+              d['address'] ??
+              d['institution'] ??
+              d['campus'] ??
+              d['collegeDepartment'] ??
+              _userSchoolCache[uid] ??
+              _userSchoolCache[doc.id] ??
+              _userNameSchoolCache[name.toLowerCase()] ??
+              _userNameSchoolCache[team.toLowerCase()] ??
+              '')
+          .toString()
+          .trim();
       final isElim = (d['status'] ?? '').toString().toLowerCase() == 'eliminated' ||
           d['isEliminated'] == true;
 
       final existing = map[doc.id];
       final mergedMembers = {...existing?.members ?? <String>[], ...members}.toList();
+      final effectiveSchool = school.isNotEmpty
+          ? school
+          : ((existing?.school.isNotEmpty ?? false)
+              ? existing!.school
+              : (_userSchoolCache[uid] ??
+                  _userSchoolCache[doc.id] ??
+                  _userNameSchoolCache[name.toLowerCase()] ??
+                  _userNameSchoolCache[team.toLowerCase()] ??
+                  ''));
       map[doc.id] = ReportContestant(
         id: doc.id,
         name: name.isNotEmpty ? name : (existing?.name ?? 'Contestant'),
         teamName: team.isNotEmpty ? team : (existing?.teamName ?? ''),
         members: mergedMembers,
-        school: school.isNotEmpty ? school : (existing?.school ?? ''),
+        school: effectiveSchool,
         totalScore: existing?.totalScore ?? 0,
         isEliminated: isElim || (existing?.isEliminated ?? false),
         status: (d['status'] ?? existing?.status ?? 'active').toString(),
@@ -1847,7 +1948,19 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           .trim();
       final team = (d['teamName'] ?? '').toString().trim();
       final members = _teamMembers(d['teamMembers'] ?? d['members']);
-      final school = (d['school'] ?? d['schoolName'] ?? '').toString().trim();
+      final school = (d['school'] ??
+              d['schoolName'] ??
+              d['address'] ??
+              d['institution'] ??
+              d['campus'] ??
+              d['collegeDepartment'] ??
+              _userSchoolCache[uid] ??
+              _userSchoolCache[doc.id] ??
+              _userNameSchoolCache[name.toLowerCase()] ??
+              _userNameSchoolCache[team.toLowerCase()] ??
+              '')
+          .toString()
+          .trim();
       final isElim = (d['status'] ?? '').toString().toLowerCase() == 'eliminated' ||
           d['isEliminated'] == true ||
           d['eliminated'] == true;
@@ -1907,12 +2020,21 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
       final existing = map[uid];
       final mergedMembers = {...existing?.members ?? <String>[], ...members}.toList();
+      final effectiveSchool = school.isNotEmpty
+          ? school
+          : ((existing?.school.isNotEmpty ?? false)
+              ? existing!.school
+              : (_userSchoolCache[uid] ??
+                  _userSchoolCache[doc.id] ??
+                  _userNameSchoolCache[name.toLowerCase()] ??
+                  _userNameSchoolCache[team.toLowerCase()] ??
+                  ''));
       map[uid] = ReportContestant(
         id: uid,
         name: name.isNotEmpty ? name : (existing?.name ?? 'Contestant'),
         teamName: team.isNotEmpty ? team : (existing?.teamName ?? ''),
         members: mergedMembers,
-        school: school.isNotEmpty ? school : (existing?.school ?? ''),
+        school: effectiveSchool,
         totalScore: finalTotal,
         level1Score: l1,
         level2Score: l2,
@@ -2401,6 +2523,16 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 final partDocs = participantSnap.data?.docs ?? [];
 
                 _syncOrFetchLevelScores(quizCode, scoreDocs);
+
+                final allContestantUids = <String>{
+                  ...reqDocs.map((d) => d.id),
+                  ...reqDocs.map((d) => (d.data()['uid'] ?? '').toString()),
+                  ...partDocs.map((d) => d.id),
+                  ...partDocs.map((d) => (d.data()['uid'] ?? '').toString()),
+                  ...scoreDocs.map((d) => d.id),
+                  ...scoreDocs.map((d) => (d.data()['uid'] ?? '').toString()),
+                }.where((id) => id.isNotEmpty).toList();
+                _syncOrFetchUserSchools(allContestantUids);
 
                 // Accurate extraction
                 final contestants = _computeContestants(
@@ -3584,20 +3716,25 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             itemCount: filtered.length,
             itemBuilder: (context, index) {
               final p = filtered[index];
-              return _buildParticipantRecordCard(index + 1, p);
+              return _buildParticipantRecordCard(index + 1, p, quizCode);
             },
           ),
       ],
     );
   }
 
-  Widget _buildParticipantRecordCard(int index, ReportContestant p) {
+  Widget _buildParticipantRecordCard(int index, ReportContestant p, String quizCode) {
     final isTeam = p.teamName.isNotEmpty;
     final displayName = isTeam ? p.teamName : p.name;
     final memberList = p.members.isNotEmpty
         ? p.members
         : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
     final membersText = memberList.isNotEmpty ? 'Members: ${memberList.join(', ')}' : '';
+    final effectiveSchool = p.school.isNotEmpty
+        ? p.school
+        : (_userSchoolCache[p.id]?.isNotEmpty == true
+            ? _userSchoolCache[p.id]!
+            : (_userNameSchoolCache[displayName.toLowerCase()] ?? ''));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -3636,9 +3773,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                if (membersText.isNotEmpty)
+                if (membersText.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    p.school.isNotEmpty ? '$membersText • ${p.school}' : membersText,
+                    membersText,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -3646,18 +3784,38 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                     ),
-                  )
-                else if (p.school.isNotEmpty)
-                  Text(
-                    p.school,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AdminThemeColors.textMuted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
+                ],
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.school_outlined, size: 12, color: AdminThemeColors.primary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        effectiveSchool.isNotEmpty ? effectiveSchool : 'School not set',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: effectiveSchool.isNotEmpty ? AdminThemeColors.textPrimary : AdminThemeColors.textMuted,
+                          fontSize: 10,
+                          fontWeight: effectiveSchool.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                          fontStyle: effectiveSchool.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(4),
+                      onTap: () => _showEditContestantSchoolDialog(p, quizCode, currentSchool: effectiveSchool),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2),
+                        child: Icon(Icons.edit_outlined, size: 12, color: AdminThemeColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -3678,6 +3836,123 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 fontWeight: FontWeight.w800,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditContestantSchoolDialog(
+    ReportContestant p,
+    String quizCode, {
+    String currentSchool = '',
+  }) {
+    final controller = TextEditingController(text: currentSchool);
+    final displayName = p.teamName.isNotEmpty ? p.teamName : p.name;
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E8FF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.school_rounded, color: AdminThemeColors.primary, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Set School Name',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Set or update school name for $displayName:',
+              style: const TextStyle(fontSize: 12, color: AdminThemeColors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'School / Institution Name',
+                hintText: 'e.g. Cebu Technological University - Tuburan Campus',
+                prefixIcon: const Icon(Icons.account_balance_rounded, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminThemeColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final newSchool = controller.text.trim();
+              Navigator.of(dialogCtx).pop();
+
+              if (newSchool.isNotEmpty) {
+                setState(() {
+                  _userSchoolCache[p.id] = newSchool;
+                  if (displayName.isNotEmpty) {
+                    _userNameSchoolCache[displayName.toLowerCase()] = newSchool;
+                  }
+                });
+
+                final batch = FirebaseFirestore.instance.batch();
+                if (quizCode.isNotEmpty) {
+                  final partRef = FirebaseFirestore.instance
+                      .collection('quiz_sessions')
+                      .doc(quizCode)
+                      .collection('participants')
+                      .doc(p.id);
+                  batch.set(partRef, {'school': newSchool, 'schoolName': newSchool}, SetOptions(merge: true));
+
+                  final reqRef = FirebaseFirestore.instance
+                      .collection('quiz_sessions')
+                      .doc(quizCode)
+                      .collection('join_requests')
+                      .doc(p.id);
+                  batch.set(reqRef, {'school': newSchool, 'schoolName': newSchool}, SetOptions(merge: true));
+                }
+
+                final userRef = FirebaseFirestore.instance.collection('users').doc(p.id);
+                batch.set(userRef, {'schoolName': newSchool, 'school': newSchool, 'address': newSchool}, SetOptions(merge: true));
+
+                await batch.commit().catchError((e) {
+                  debugPrint('Error updating school: $e');
+                });
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('School updated to "$newSchool"'),
+                      backgroundColor: AdminThemeColors.primary,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Save School'),
           ),
         ],
       ),
@@ -6078,8 +6353,8 @@ class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> 
       },
       {
         'section': ReportPrintSection.participantRecordsOnly,
-        'title': 'Table 3: Contestant Records Directory',
-        'subtitle': 'Prints full directory of registered contestants and teams, student members, school names, and competition status.',
+        'title': 'Contestant Records Directory',
+        'subtitle': 'Prints full directory of registered contestants and teams, student members, and school names.',
         'icon': Icons.people_alt_rounded,
         'badge': 'PAGE 3',
         'badgeColor': const Color(0xFF0284C7),

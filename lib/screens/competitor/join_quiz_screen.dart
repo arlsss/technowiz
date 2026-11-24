@@ -286,6 +286,7 @@ class _JoinQuizScreenState extends State<JoinQuizScreen> {
           isTeam && reqTeamName.isNotEmpty ? reqTeamName : realName;
 
       final participantRef = quizRef.collection('participants').doc(uid);
+      final reqSchool = (requestData['school'] ?? requestData['schoolName'] ?? '').toString().trim();
       await participantRef.set({
         'uid': uid,
         'name': effectiveName,
@@ -298,6 +299,8 @@ class _JoinQuizScreenState extends State<JoinQuizScreen> {
         'teamName': isTeam ? reqTeamName : '',
         'teamMembers': isTeam ? teamMembers : <String>[],
         'members': isTeam ? teamMembers : <String>[],
+        if (reqSchool.isNotEmpty) 'school': reqSchool,
+        if (reqSchool.isNotEmpty) 'schoolName': reqSchool,
         'joinedAt': FieldValue.serverTimestamp(),
         'status': 'joined',
         'quizCode': code,

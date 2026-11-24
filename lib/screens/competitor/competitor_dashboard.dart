@@ -888,6 +888,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ? teamName
           : personalName;
 
+      final currentSchool = getSchoolName();
       await requestRef.set({
         'uid': uid,
         'email': user.email ?? '',
@@ -899,6 +900,8 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
         'teamName': isTeam ? teamName : '',
         'teamMembers': teamMembers,
         'members': teamMembers,
+        if (currentSchool.isNotEmpty && currentSchool != 'Not yet set') 'school': currentSchool,
+        if (currentSchool.isNotEmpty && currentSchool != 'Not yet set') 'schoolName': currentSchool,
         'quizCode': quizCode,
         'quizTitle': quizTitle,
         'status': 'pending',
