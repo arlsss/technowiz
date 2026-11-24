@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -49,6 +50,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   final TextEditingController _participantSearchController =
       TextEditingController();
 
+  CertificateConfig _certificateConfig = CertificateConfig.defaultTemplate();
+
   final Map<String, Map<int, int>> _levelScoresCache = {};
   final Set<String> _syncingUids = {};
   final Set<String> _checkedUids = {};
@@ -86,6 +89,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         }
       }
     } catch (_) {}
+    await _loadCertificateConfig(selectedQuizCode);
     if (mounted) setState(() {});
     await _savePage();
   }
@@ -95,6 +99,120 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       'reports',
       reportTab: _selectedReportTab,
       reportQuizCode: selectedQuizCode,
+    );
+  }
+
+  // =========================================================
+  // CERTIFICATE CONFIG PERSISTENCE & MANAGEMENT
+  // =========================================================
+
+  Future<void> _loadCertificateConfig([String? quizCode]) async {
+    final code = quizCode ?? selectedQuizCode;
+    try {
+      // 1. Check if the specific quiz session has custom certificate config in Firestore
+      if (code != null && code.trim().isNotEmpty) {
+        final doc = await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(code.trim())
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['certificateConfig'] is Map) {
+            final config = CertificateConfig.fromMap(
+              Map<String, dynamic>.from(data['certificateConfig'] as Map),
+            );
+            if (mounted) {
+              setState(() => _certificateConfig = config);
+            }
+            return;
+          }
+        }
+      }
+
+      // 2. Check global template in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final savedStr = prefs.getString('global_certificate_config');
+      if (savedStr != null && savedStr.trim().isNotEmpty) {
+        final decoded = jsonDecode(savedStr);
+        if (decoded is Map) {
+          final config = CertificateConfig.fromMap(
+            Map<String, dynamic>.from(decoded),
+          );
+          if (mounted) {
+            setState(() => _certificateConfig = config);
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading certificate config: $e');
+    }
+
+    if (mounted) {
+      setState(() => _certificateConfig = CertificateConfig.defaultTemplate());
+    }
+  }
+
+  Future<void> _saveCertificateConfig(CertificateConfig config) async {
+    setState(() => _certificateConfig = config);
+
+    try {
+      // 1. Save globally in SharedPreferences as default template
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'global_certificate_config',
+        jsonEncode(config.toMap()),
+      );
+
+      // 2. Save specifically to Firestore quiz session if selected
+      if (selectedQuizCode != null && selectedQuizCode!.trim().isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(selectedQuizCode!.trim())
+            .set({
+          'certificateConfig': config.toMap(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('Error saving certificate config: $e');
+    }
+  }
+
+  void _openManageCertificateDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return _ManageCertificateDialog(
+          initialConfig: _certificateConfig,
+          quizCode: selectedQuizCode ?? '',
+          onSave: (newConfig) async {
+            await _saveCertificateConfig(newConfig);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Certificate signatures and layout updated successfully!'),
+                  backgroundColor: Color(0xFF16A34A),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onPreview: (previewConfig) async {
+            await _printCertificate(
+              contestantName: 'JUAN DELA CRUZ',
+              quizTitle: 'TechNoWiz Championship',
+              rank: 1,
+              teamName: 'TECHNOWIZ CHAMPIONS',
+              school: 'College of Computer Studies',
+              totalScore: 98,
+              quizCode: selectedQuizCode ?? 'SAMPLE',
+              quizDate: _dateText(),
+              customConfig: previewConfig,
+            );
+          },
+        );
+      },
     );
   }
 
@@ -179,6 +297,129 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   // Others: APPRECIATION (Emerald Green Theme with Star & Laurels)
   // =========================================================
 
+  pw.Widget _buildPdfSignaturesRow(CertificateConfig config) {
+    final signatories = config.signatories;
+    if (signatories.isEmpty) {
+      return pw.SizedBox.shrink();
+    }
+
+    if (signatories.length == 1) {
+      final sig = signatories[0];
+      return pw.Center(
+        child: pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            if (sig.name.trim().isNotEmpty) ...[
+              pw.Text(
+                sig.name.trim().toUpperCase(),
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                  color: const PdfColor.fromInt(0xFF0F172A),
+                ),
+              ),
+              pw.SizedBox(height: 3),
+            ] else ...[
+              pw.SizedBox(height: 14),
+            ],
+            if (sig.showLine)
+              pw.Container(width: 200, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A))
+            else
+              pw.SizedBox(width: 200, height: 1.5),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              sig.title.trim().isNotEmpty ? sig.title.trim() : 'Authorized Signatory',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: const PdfColor.fromInt(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (signatories.length == 2) {
+      return pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          for (final sig in signatories)
+            pw.Column(
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                if (sig.name.trim().isNotEmpty) ...[
+                  pw.Text(
+                    sig.name.trim().toUpperCase(),
+                    style: pw.TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: pw.FontWeight.bold,
+                      color: const PdfColor.fromInt(0xFF0F172A),
+                    ),
+                  ),
+                  pw.SizedBox(height: 3),
+                ] else ...[
+                  pw.SizedBox(height: 14),
+                ],
+                if (sig.showLine)
+                  pw.Container(width: 175, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A))
+                else
+                  pw.SizedBox(width: 175, height: 1.5),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  sig.title.trim().isNotEmpty ? sig.title.trim() : 'Authorized Signatory',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: const PdfColor.fromInt(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      );
+    }
+
+    // 3 signatories
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        for (final sig in signatories.take(3))
+          pw.Column(
+            mainAxisSize: pw.MainAxisSize.min,
+            children: [
+              if (sig.name.trim().isNotEmpty) ...[
+                pw.Text(
+                  sig.name.trim().toUpperCase(),
+                  style: pw.TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: pw.FontWeight.bold,
+                    color: const PdfColor.fromInt(0xFF0F172A),
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+              ] else ...[
+                pw.SizedBox(height: 13),
+              ],
+              if (sig.showLine)
+                pw.Container(width: 140, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A))
+              else
+                pw.SizedBox(width: 140, height: 1.5),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                sig.title.trim().isNotEmpty ? sig.title.trim() : 'Authorized Signatory',
+                style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: const PdfColor.fromInt(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
   Future<void> _printCertificate({
     required String contestantName,
     required String quizTitle,
@@ -195,8 +436,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     int? eliminatedLevel,
     pw.Document? document,
     bool printAfter = true,
+    CertificateConfig? customConfig,
   }) async {
     final pdf = document ?? pw.Document();
+    final config = customConfig ?? _certificateConfig;
 
     final effectiveName = teamName.trim().isNotEmpty
         ? teamName.trim()
@@ -583,7 +826,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       pw.Column(
                         children: [
                           pw.Text(
-                            'CERTIFICATE OF ACHIEVEMENT',
+                            config.certificateTitle.trim().isNotEmpty
+                                ? config.certificateTitle.trim()
+                                : 'CERTIFICATE OF ACHIEVEMENT',
                             style: pw.TextStyle(
                               fontSize: 14,
                               fontWeight: pw.FontWeight.bold,
@@ -593,7 +838,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                           ),
                           pw.SizedBox(height: 5),
                           pw.Text(
-                            'This certificate is proudly awarded to',
+                            config.certificateSubtitle.trim().isNotEmpty
+                                ? config.certificateSubtitle.trim()
+                                : 'This certificate is proudly awarded to',
                             style: const pw.TextStyle(
                               fontSize: 11.5,
                               fontWeight: pw.FontWeight.bold,
@@ -681,42 +928,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                         ),
                       ),
 
-                      // Signatures: Event Organizer & TechNoWiz Host
+                      // Signatures: Configured by Admin via Manage Certificate
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(horizontal: 40),
-                        child: pw.Row(
-                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [
-                            pw.Column(
-                              children: [
-                                pw.Container(width: 170, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A)),
-                                pw.SizedBox(height: 4),
-                                pw.Text(
-                                  'Event Organizer',
-                                  style: pw.TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: const PdfColor.fromInt(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            pw.Column(
-                              children: [
-                                pw.Container(width: 170, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A)),
-                                pw.SizedBox(height: 4),
-                                pw.Text(
-                                  'TechNoWiz Host',
-                                  style: pw.TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: const PdfColor.fromInt(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                        child: _buildPdfSignaturesRow(config),
                       ),
                     ],
                   ),
@@ -1781,6 +1996,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           onChanged: (newCode) {
             if (newCode != null) {
               setState(() => selectedQuizCode = newCode);
+              _loadCertificateConfig(newCode);
               _savePage();
             }
           },
@@ -2103,6 +2319,18 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   ),
                   icon: const Icon(Icons.workspace_premium_rounded, size: 16),
                   label: const Text('Print Top 3 Certificates'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _openManageCertificateDialog,
+                  icon: const Icon(Icons.draw_rounded, size: 16),
+                  label: const Text('Manage Certificate'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
@@ -3287,5 +3515,743 @@ class ReportContestant {
     this.submissionTimeMs = 0,
     this.registeredAt,
   });
+}
+
+// ============================================================================
+// CERTIFICATE CONFIGURATION & SIGNATORY MODELS
+// ============================================================================
+
+class CertificateSignatory {
+  String name;
+  String title;
+  bool showLine;
+
+  CertificateSignatory({
+    required this.name,
+    required this.title,
+    this.showLine = true,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'title': title,
+        'showLine': showLine,
+      };
+
+  factory CertificateSignatory.fromMap(Map<String, dynamic> map) =>
+      CertificateSignatory(
+        name: (map['name'] ?? '').toString(),
+        title: (map['title'] ?? '').toString(),
+        showLine: map['showLine'] != false,
+      );
+}
+
+class CertificateConfig {
+  String certificateTitle;
+  String certificateSubtitle;
+  List<CertificateSignatory> signatories;
+
+  CertificateConfig({
+    this.certificateTitle = 'CERTIFICATE OF ACHIEVEMENT',
+    this.certificateSubtitle = 'This certificate is proudly awarded to',
+    required this.signatories,
+  });
+
+  static CertificateConfig defaultTemplate() => CertificateConfig(
+        certificateTitle: 'CERTIFICATE OF ACHIEVEMENT',
+        certificateSubtitle: 'This certificate is proudly awarded to',
+        signatories: [
+          CertificateSignatory(
+            name: '',
+            title: 'Event Organizer',
+            showLine: true,
+          ),
+          CertificateSignatory(
+            name: '',
+            title: 'TechNoWiz Host',
+            showLine: true,
+          ),
+        ],
+      );
+
+  Map<String, dynamic> toMap() => {
+        'certificateTitle': certificateTitle,
+        'certificateSubtitle': certificateSubtitle,
+        'signatories': signatories.map((s) => s.toMap()).toList(),
+      };
+
+  factory CertificateConfig.fromMap(Map<String, dynamic> map) {
+    final rawSigs = map['signatories'];
+    final sigs = <CertificateSignatory>[];
+    if (rawSigs is List && rawSigs.isNotEmpty) {
+      for (final s in rawSigs) {
+        if (s is Map<String, dynamic>) {
+          sigs.add(CertificateSignatory.fromMap(s));
+        } else if (s is Map) {
+          sigs.add(CertificateSignatory.fromMap(Map<String, dynamic>.from(s)));
+        }
+      }
+    }
+    if (sigs.isEmpty) {
+      sigs.addAll(defaultTemplate().signatories);
+    }
+
+    return CertificateConfig(
+      certificateTitle:
+          (map['certificateTitle'] ?? 'CERTIFICATE OF ACHIEVEMENT').toString(),
+      certificateSubtitle:
+          (map['certificateSubtitle'] ?? 'This certificate is proudly awarded to')
+              .toString(),
+      signatories: sigs,
+    );
+  }
+}
+
+// ============================================================================
+// MANAGE CERTIFICATE DIALOG
+// ============================================================================
+
+class _ManageCertificateDialog extends StatefulWidget {
+  final CertificateConfig initialConfig;
+  final String quizCode;
+  final Future<void> Function(CertificateConfig) onSave;
+  final Future<void> Function(CertificateConfig) onPreview;
+
+  const _ManageCertificateDialog({
+    required this.initialConfig,
+    required this.quizCode,
+    required this.onSave,
+    required this.onPreview,
+  });
+
+  @override
+  State<_ManageCertificateDialog> createState() =>
+      _ManageCertificateDialogState();
+}
+
+class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _subtitleController;
+
+  int _signatoryCount = 2;
+  late final List<TextEditingController> _nameControllers;
+  late final List<TextEditingController> _titleControllers;
+  late final List<bool> _showLines;
+  bool _isSaving = false;
+  bool _isPreviewing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController =
+        TextEditingController(text: widget.initialConfig.certificateTitle);
+    _subtitleController =
+        TextEditingController(text: widget.initialConfig.certificateSubtitle);
+
+    final sigs = widget.initialConfig.signatories;
+    _signatoryCount = sigs.length.clamp(1, 3);
+
+    _nameControllers = List.generate(3, (i) {
+      final text = i < sigs.length ? sigs[i].name : '';
+      return TextEditingController(text: text);
+    });
+
+    _titleControllers = List.generate(3, (i) {
+      if (i < sigs.length) return TextEditingController(text: sigs[i].title);
+      if (i == 0) return TextEditingController(text: 'Event Organizer');
+      if (i == 1) return TextEditingController(text: 'TechNoWiz Host');
+      return TextEditingController(text: 'Campus Director');
+    });
+
+    _showLines = List.generate(3, (i) {
+      if (i < sigs.length) return sigs[i].showLine;
+      return true;
+    });
+
+    // Listen to updates for live preview
+    _titleController.addListener(_refresh);
+    _subtitleController.addListener(_refresh);
+    for (final c in _nameControllers) {
+      c.addListener(_refresh);
+    }
+    for (final c in _titleControllers) {
+      c.addListener(_refresh);
+    }
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _subtitleController.dispose();
+    for (final c in _nameControllers) {
+      c.dispose();
+    }
+    for (final c in _titleControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  CertificateConfig _buildConfig() {
+    final activeSignatories = <CertificateSignatory>[];
+    for (int i = 0; i < _signatoryCount; i++) {
+      activeSignatories.add(
+        CertificateSignatory(
+          name: _nameControllers[i].text.trim(),
+          title: _titleControllers[i].text.trim().isNotEmpty
+              ? _titleControllers[i].text.trim()
+              : (i == 0
+                  ? 'Event Organizer'
+                  : (i == 1 ? 'TechNoWiz Host' : 'Campus Director')),
+          showLine: _showLines[i],
+        ),
+      );
+    }
+
+    return CertificateConfig(
+      certificateTitle: _titleController.text.trim().isNotEmpty
+          ? _titleController.text.trim()
+          : 'CERTIFICATE OF ACHIEVEMENT',
+      certificateSubtitle: _subtitleController.text.trim().isNotEmpty
+          ? _subtitleController.text.trim()
+          : 'This certificate is proudly awarded to',
+      signatories: activeSignatories,
+    );
+  }
+
+  void _resetToDefault() {
+    final def = CertificateConfig.defaultTemplate();
+    _titleController.text = def.certificateTitle;
+    _subtitleController.text = def.certificateSubtitle;
+    _signatoryCount = 2;
+
+    _nameControllers[0].text = def.signatories[0].name;
+    _titleControllers[0].text = def.signatories[0].title;
+    _showLines[0] = def.signatories[0].showLine;
+
+    _nameControllers[1].text = def.signatories[1].name;
+    _titleControllers[1].text = def.signatories[1].title;
+    _showLines[1] = def.signatories[1].showLine;
+
+    _nameControllers[2].text = '';
+    _titleControllers[2].text = 'Campus Director';
+    _showLines[2] = true;
+
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Modal Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.20),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Manage Certificate Signatures',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Edit signatory names, lines, and certificate titles',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Scrollable Settings Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section 1: Number of Signatories
+                    Text(
+                      'NUMBER OF SIGNATORIES',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? Colors.white12 : Colors.grey.shade300,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          for (int count = 1; count <= 3; count++)
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _signatoryCount = count),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: _signatoryCount == count
+                                        ? const Color(0xFF4F46E5)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: _signatoryCount == count
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFF4F46E5)
+                                                  .withValues(alpha: 0.35),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    count == 1
+                                        ? '1 Signatory'
+                                        : (count == 2
+                                            ? '2 Signatories'
+                                            : '3 Signatories'),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: _signatoryCount == count
+                                          ? Colors.white
+                                          : (isDark ? Colors.white70 : Colors.black87),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section 2: Signatory Details Cards
+                    for (int i = 0; i < _signatoryCount; i++) ...[
+                      _buildSignatoryEditorCard(i, isDark),
+                      const SizedBox(height: 14),
+                    ],
+
+                    const SizedBox(height: 6),
+
+                    // Section 3: Certificate Title & Award Statement
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        initiallyExpanded: false,
+                        tilePadding: EdgeInsets.zero,
+                        title: Text(
+                          'CERTIFICATE TITLES & WORDING (OPTIONAL)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
+                          ),
+                        ),
+                        children: [
+                          TextField(
+                            controller: _titleController,
+                            decoration: InputDecoration(
+                              labelText: 'Certificate Title',
+                              hintText: 'e.g. CERTIFICATE OF ACHIEVEMENT',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _subtitleController,
+                            decoration: InputDecoration(
+                              labelText: 'Award Statement / Subtitle',
+                              hintText: 'e.g. This certificate is proudly awarded to',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Section 4: Real-time In-App Visual Preview
+                    Text(
+                      'REAL-TIME SIGNATURE PREVIEW',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            _titleController.text.trim().isNotEmpty
+                                ? _titleController.text.trim().toUpperCase()
+                                : 'CERTIFICATE OF ACHIEVEMENT',
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _subtitleController.text.trim().isNotEmpty
+                                ? _subtitleController.text.trim()
+                                : 'This certificate is proudly awarded to',
+                            style: const TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Live Signatures Row Preview
+                          Row(
+                            mainAxisAlignment: _signatoryCount == 1
+                                ? MainAxisAlignment.center
+                                : MainAxisAlignment.spaceBetween,
+                            children: [
+                              for (int i = 0; i < _signatoryCount; i++) ...[
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _nameControllers[i].text.trim().isNotEmpty
+                                            ? _nameControllers[i].text.trim().toUpperCase()
+                                            : '(Manual Signature)',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: _nameControllers[i].text.trim().isNotEmpty
+                                              ? const Color(0xFF0F172A)
+                                              : Colors.grey.shade500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      if (_showLines[i])
+                                        Container(
+                                          height: 1.5,
+                                          color: const Color(0xFF0F172A),
+                                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                                        )
+                                      else
+                                        const SizedBox(height: 1.5),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        _titleControllers[i].text.trim().isNotEmpty
+                                            ? _titleControllers[i].text.trim()
+                                            : 'Authorized Signatory',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (i < _signatoryCount - 1)
+                                  const SizedBox(width: 12),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Modal Footer Actions
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: _resetToDefault,
+                    icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                    label: const Text('Reset', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600),
+                  ),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    onPressed: _isPreviewing
+                        ? null
+                        : () async {
+                            setState(() => _isPreviewing = true);
+                            try {
+                              await widget.onPreview(_buildConfig());
+                            } finally {
+                              if (mounted) setState(() => _isPreviewing = false);
+                            }
+                          },
+                    icon: _isPreviewing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.visibility_rounded, size: 16),
+                    label: const Text('Preview PDF', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            setState(() => _isSaving = true);
+                            try {
+                              await widget.onSave(_buildConfig());
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isSaving = false);
+                            }
+                          },
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Save & Apply', style: TextStyle(fontSize: 12)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignatoryEditorCard(int index, bool isDark) {
+    final positionLabel = index == 0
+        ? 'Signatory 1 (Left / Organizer)'
+        : (index == 1
+            ? 'Signatory 2 (Right / Quiz Master)'
+            : 'Signatory 3 (Center / Approver)');
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    color: Color(0xFF4F46E5),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  positionLabel,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AdminThemeColors.textPrimary,
+                  ),
+                ),
+              ),
+              // Show Line Toggle
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Line',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white70 : Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Switch.adaptive(
+                    value: _showLines[index],
+                    activeTrackColor: const Color(0xFF4F46E5),
+                    onChanged: (val) => setState(() => _showLines[index] = val),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _nameControllers[index],
+            decoration: InputDecoration(
+              labelText: 'Signatory Name',
+              hintText: 'e.g. Dr. Arnel Tipdas (Leave empty for blank line)',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              isDense: true,
+            ),
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _titleControllers[index],
+            decoration: InputDecoration(
+              labelText: 'Designation / Title',
+              hintText: 'e.g. Event Organizer, Dean, Quiz Master',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              isDense: true,
+            ),
+            style: const TextStyle(fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
