@@ -1558,7 +1558,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     List<pw.Widget> buildTable3Widgets() {
       return [
         pw.Text(
-          '3. PARTICIPANT RECORDS DIRECTORY',
+          '3. CONTESTANT RECORDS DIRECTORY',
           style: pw.TextStyle(
             fontSize: 11,
             fontWeight: pw.FontWeight.bold,
@@ -1570,7 +1570,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           pw.Padding(
             padding: const pw.EdgeInsets.all(12),
             child: pw.Text(
-              'No participant records found for this quiz.',
+              'No contestant records found for this quiz.',
               style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
           )
@@ -1641,12 +1641,12 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         ),
       );
 
-      // Table 3 Page (Participant Records Directory)
+      // Table 3 Page (Contestant Records Directory)
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
-          header: (context) => buildPdfHeader(context, sectionTitle: 'Participant Records Directory'),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Contestant Records Directory'),
           footer: buildPdfFooter,
           build: (context) => [
             buildPdfEventInfoBox(),
@@ -1694,7 +1694,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
-          header: (context) => buildPdfHeader(context, sectionTitle: 'Participant Records Directory'),
+          header: (context) => buildPdfHeader(context, sectionTitle: 'Contestant Records Directory'),
           footer: buildPdfFooter,
           build: (context) => [
             buildPdfEventInfoBox(),
@@ -1711,7 +1711,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       ReportPrintSection.allSeparatePages => 'TechNoWiz_Official_Report_$quizCode.pdf',
       ReportPrintSection.scoreSummaryOnly => 'TechNoWiz_Score_Summary_$quizCode.pdf',
       ReportPrintSection.finalRankingsOnly => 'TechNoWiz_Final_Rankings_$quizCode.pdf',
-      ReportPrintSection.participantRecordsOnly => 'TechNoWiz_Participant_Records_$quizCode.pdf',
+      ReportPrintSection.participantRecordsOnly => 'TechNoWiz_Contestant_Records_$quizCode.pdf',
     };
 
     await Printing.layoutPdf(
@@ -2126,7 +2126,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Participant records, score summaries & final rankings.',
+                    'Contestant records, score summaries & final rankings.',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -2739,7 +2739,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final tabs = [
       {'key': 'rankings', 'label': 'Final Rankings', 'icon': Icons.emoji_events_rounded, 'count': rankingCount},
       {'key': 'scores', 'label': 'Score Summaries', 'icon': Icons.bar_chart_rounded, 'count': null},
-      {'key': 'participants', 'label': 'Participant Records', 'icon': Icons.people_alt_rounded, 'count': participantCount},
+      {'key': 'participants', 'label': 'Contestant Records', 'icon': Icons.people_alt_rounded, 'count': participantCount},
     ];
 
     return Container(
@@ -2911,27 +2911,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 color: AdminThemeColors.textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () => _generateOfficialReportPdf(
-                quizTitle: quizTitle,
-                quizCode: quizCode,
-                quizStatus: quizStatus,
-                quizDate: quizDate,
-                location: location,
-                rankings: contestants,
-                participants: participants,
-                section: ReportPrintSection.finalRankingsOnly,
-              ),
-              icon: const Icon(Icons.print_rounded, size: 14),
-              label: const Text('Print Standings (Table 2)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AdminThemeColors.primary,
-                side: const BorderSide(color: AdminThemeColors.primary, width: 1),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
@@ -3332,27 +3311,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: () => _generateOfficialReportPdf(
-                quizTitle: quizTitle,
-                quizCode: quizCode,
-                quizStatus: quizStatus,
-                quizDate: quizDate,
-                location: location,
-                rankings: contestants,
-                participants: participants,
-                section: ReportPrintSection.scoreSummaryOnly,
-              ),
-              icon: const Icon(Icons.print_rounded, size: 14),
-              label: const Text('Print Score Summary (Table 1)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AdminThemeColors.primary,
-                side: const BorderSide(color: AdminThemeColors.primary, width: 1),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -3655,7 +3613,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   onChanged: (val) => setState(() => _participantSearchQuery = val.trim()),
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                    hintText: 'Search participant by name or school...',
+                    hintText: 'Search contestant by name or school...',
                     hintStyle: const TextStyle(
                       fontSize: 12,
                       color: AdminThemeColors.textMuted,
@@ -3700,27 +3658,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () => _generateOfficialReportPdf(
-                quizTitle: quizTitle,
-                quizCode: quizCode,
-                quizStatus: quizStatus,
-                quizDate: quizDate,
-                location: location,
-                rankings: contestants,
-                participants: participants,
-                section: ReportPrintSection.participantRecordsOnly,
-              ),
-              icon: const Icon(Icons.print_rounded, size: 14),
-              label: const Text('Print Records (Table 3)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AdminThemeColors.primary,
-                side: const BorderSide(color: AdminThemeColors.primary, width: 1),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -3728,8 +3665,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         if (filtered.isEmpty)
           _buildEmptySection(
             icon: Icons.person_search_rounded,
-            title: 'No Participant Records Found',
-            subtitle: 'No participants match the search query.',
+            title: 'No Contestant Records Found',
+            subtitle: 'No contestants match the search query.',
           )
         else
           ListView.builder(
@@ -3912,7 +3849,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           ),
           SizedBox(height: 6),
           Text(
-            'Please pick a quiz competition session above to inspect participant records, score summaries, and final rankings.',
+            'Please pick a quiz competition session above to inspect contestant records, score summaries, and final rankings.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AdminThemeColors.textMuted),
           ),
@@ -5672,7 +5609,7 @@ class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> 
       {
         'section': ReportPrintSection.allSeparatePages,
         'title': 'Complete Official Report (All Tables on Separate Pages)',
-        'subtitle': 'Prints Table 1 (Score Summary), Table 2 (Final Standings), and Table 3 (Participant Directory) each on its own clean, dedicated page with official header and signatures.',
+        'subtitle': 'Prints Table 1 (Score Summary), Table 2 (Final Standings), and Table 3 (Contestant Directory) each on its own clean, dedicated page with official header and signatures.',
         'icon': Icons.auto_stories_rounded,
         'badge': 'RECOMMENDED',
         'badgeColor': const Color(0xFF10B981),
@@ -5695,8 +5632,8 @@ class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> 
       },
       {
         'section': ReportPrintSection.participantRecordsOnly,
-        'title': 'Table 3: Participant Records Directory',
-        'subtitle': 'Prints full directory of registered participants and teams, student members, school names, and competition status.',
+        'title': 'Table 3: Contestant Records Directory',
+        'subtitle': 'Prints full directory of registered contestants and teams, student members, school names, and competition status.',
         'icon': Icons.people_alt_rounded,
         'badge': 'PAGE 3',
         'badgeColor': const Color(0xFF0284C7),
