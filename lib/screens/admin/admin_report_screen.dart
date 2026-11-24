@@ -651,7 +651,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final String rosetteRibbonHex;
     final PdfColor navyPdfColor;
     final PdfColor primaryPdfColor;
-    final PdfColor watermarkPdfColor;
+    final PdfColor topTitlePdfColor;
     final String rankBadgeText;
     final String rankCitationText;
 
@@ -664,7 +664,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       rosetteRibbonHex = '#D97706';
       navyPdfColor = const PdfColor.fromInt(0xFF0B192C);
       primaryPdfColor = const PdfColor.fromInt(0xFFB45309);
-      watermarkPdfColor = const PdfColor(0.83, 0.69, 0.22, 0.25);
+      topTitlePdfColor = const PdfColor.fromInt(0xFFC59B27);
       rankBadgeText = 'CHAMPION';
       rankCitationText = 'CHAMPION';
     } else if (rank == 2 && !eliminated) {
@@ -676,7 +676,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       rosetteRibbonHex = '#64748B';
       navyPdfColor = const PdfColor.fromInt(0xFF0F172A);
       primaryPdfColor = const PdfColor.fromInt(0xFF475569);
-      watermarkPdfColor = const PdfColor(0.58, 0.64, 0.72, 0.25);
+      topTitlePdfColor = const PdfColor.fromInt(0xFF64748B);
       rankBadgeText = '2ND PLACE';
       rankCitationText = '2ND PLACE';
     } else if (rank == 3 && !eliminated) {
@@ -688,7 +688,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       rosetteRibbonHex = '#C2410C';
       navyPdfColor = const PdfColor.fromInt(0xFF1E1B18);
       primaryPdfColor = const PdfColor.fromInt(0xFF9A3412);
-      watermarkPdfColor = const PdfColor(0.80, 0.50, 0.20, 0.25);
+      topTitlePdfColor = const PdfColor.fromInt(0xFFC2410C);
       rankBadgeText = '3RD PLACE';
       rankCitationText = '3RD PLACE';
     } else {
@@ -700,7 +700,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       rosetteRibbonHex = '#059669';
       navyPdfColor = const PdfColor.fromInt(0xFF064E3B);
       primaryPdfColor = const PdfColor.fromInt(0xFF047857);
-      watermarkPdfColor = const PdfColor(0.06, 0.73, 0.51, 0.25);
+      topTitlePdfColor = const PdfColor.fromInt(0xFF059669);
       rankBadgeText = rank > 0 ? 'RANK $rank' : 'FINALIST';
       rankCitationText = rank > 0 ? 'RANK $rank' : 'FINALIST';
     }
@@ -925,53 +925,43 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                           ],
                         ),
 
-                        // Title Section: Double Title (Watermark + Foreground) & Subtitle
+                        // Title Section: Top Yellow/Accent text + Bottom Black/Navy text + Subtitle (Separated vertically, no overlap)
                         pw.Column(
                           mainAxisSize: pw.MainAxisSize.min,
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
-                            pw.Container(
-                              height: 44,
-                              child: pw.Stack(
-                                alignment: pw.Alignment.center,
-                                children: [
-                                  pw.Positioned(
-                                    top: 0,
-                                    child: pw.Text(
-                                      config.certificateWatermark.trim().isNotEmpty
-                                          ? config.certificateWatermark.trim().toUpperCase()
-                                          : 'CERTIFICATE',
-                                      style: pw.TextStyle(
-                                        fontSize: 34,
-                                        fontWeight: pw.FontWeight.bold,
-                                        letterSpacing: 5.5,
-                                        color: watermarkPdfColor,
-                                      ),
-                                    ),
-                                  ),
-                                  pw.Positioned(
-                                    bottom: 0,
-                                    child: pw.Text(
-                                      config.certificateTitle.trim().isNotEmpty
-                                          ? config.certificateTitle.trim().toUpperCase()
-                                          : 'CERTIFICATE OF RECOGNITION',
-                                      style: pw.TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: pw.FontWeight.bold,
-                                        letterSpacing: 2,
-                                        color: navyPdfColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            pw.Text(
+                              config.certificateWatermark.trim().isNotEmpty
+                                  ? config.certificateWatermark.trim().toUpperCase()
+                                  : 'CERTIFICATE',
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                fontSize: 26,
+                                fontWeight: pw.FontWeight.bold,
+                                letterSpacing: 5.0,
+                                color: topTitlePdfColor,
                               ),
                             ),
-                            pw.SizedBox(height: 4),
+                            pw.SizedBox(height: 3),
+                            pw.Text(
+                              config.certificateTitle.trim().isNotEmpty
+                                  ? config.certificateTitle.trim().toUpperCase()
+                                  : 'CERTIFICATE OF RECOGNITION',
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                fontSize: 18,
+                                fontWeight: pw.FontWeight.bold,
+                                letterSpacing: 2.0,
+                                color: navyPdfColor,
+                              ),
+                            ),
+                            pw.SizedBox(height: 5),
                             pw.Text(
                               config.certificateSubtitle.trim().isNotEmpty
                                   ? config.certificateSubtitle.trim()
                                   : 'This certificate is proudly presented to',
                               style: const pw.TextStyle(
-                                fontSize: 11,
+                                fontSize: 10.5,
                                 fontStyle: pw.FontStyle.italic,
                                 color: PdfColor.fromInt(0xFF334155),
                               ),
@@ -4343,7 +4333,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                     TextField(
                       controller: _watermarkController,
                       decoration: InputDecoration(
-                        labelText: 'Background Watermark Text',
+                        labelText: 'Top Title Text (Yellow / Gold Accent)',
                         hintText: 'e.g. CERTIFICATE',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         filled: true,
@@ -4356,7 +4346,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                     TextField(
                       controller: _titleController,
                       decoration: InputDecoration(
-                        labelText: 'Foreground Certificate Title',
+                        labelText: 'Main Certificate Title (Black / Navy)',
                         hintText: 'e.g. CERTIFICATE OF RECOGNITION',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         filled: true,
@@ -4550,21 +4540,24 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Watermark & Title
-                          Stack(
-                            alignment: Alignment.center,
+                          // Watermark & Title: Top Yellow/Gold text + Bottom Black/Navy text (Separated vertically)
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
                                 _watermarkController.text.trim().isNotEmpty
                                     ? _watermarkController.text.trim().toUpperCase()
                                     : 'CERTIFICATE',
-                                style: TextStyle(
-                                  color: const Color(0xFFD4AF37).withValues(alpha: 0.30),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFFC59B27),
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 22,
-                                  letterSpacing: 4.0,
+                                  fontSize: 18,
+                                  letterSpacing: 3.5,
                                 ),
                               ),
+                              const SizedBox(height: 3),
                               Text(
                                 _titleController.text.trim().isNotEmpty
                                     ? _titleController.text.trim().toUpperCase()
