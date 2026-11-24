@@ -3970,6 +3970,130 @@ class CertificateConfig {
 }
 
 // ============================================================================
+// CERTIFICATE PREVIEW CUSTOM PAINTERS (CORNER ORNAMENTS & SIGNATURE SCRIBBLES)
+// ============================================================================
+
+class _CertificateCornerPainter extends CustomPainter {
+  final Color navy;
+  final Color gold;
+  const _CertificateCornerPainter({required this.navy, required this.gold});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final navyPaint = Paint()
+      ..color = navy
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+
+    final goldPaint = Paint()
+      ..color = gold
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    final goldFill = Paint()
+      ..color = gold
+      ..style = PaintingStyle.fill;
+
+    // Corner 1: Top-Left
+    _drawCorner(canvas, 0, 0, 1, 1, navyPaint, goldPaint, goldFill);
+    // Corner 2: Top-Right
+    _drawCorner(canvas, w, 0, -1, 1, navyPaint, goldPaint, goldFill);
+    // Corner 3: Bottom-Left
+    _drawCorner(canvas, 0, h, 1, -1, navyPaint, goldPaint, goldFill);
+    // Corner 4: Bottom-Right
+    _drawCorner(canvas, w, h, -1, -1, navyPaint, goldPaint, goldFill);
+  }
+
+  void _drawCorner(
+    Canvas canvas,
+    double x,
+    double y,
+    double sx,
+    double sy,
+    Paint navy,
+    Paint gold,
+    Paint goldFill,
+  ) {
+    // Outer Corner L-line
+    final p1 = Path()
+      ..moveTo(x + 3 * sx, y + 26 * sy)
+      ..lineTo(x + 3 * sx, y + 3 * sy)
+      ..lineTo(x + 26 * sx, y + 3 * sy);
+    canvas.drawPath(p1, navy);
+
+    // Inner Corner L-line
+    final p2 = Path()
+      ..moveTo(x + 7 * sx, y + 20 * sy)
+      ..lineTo(x + 7 * sx, y + 7 * sy)
+      ..lineTo(x + 20 * sx, y + 7 * sy);
+    canvas.drawPath(p2, gold);
+
+    // Diagonal geometric connector
+    final p3 = Path()
+      ..moveTo(x + 7 * sx, y + 7 * sy)
+      ..lineTo(x + 16 * sx, y + 16 * sy);
+    canvas.drawPath(p3, gold);
+
+    // Corner accent diamond
+    final diamond = Path()
+      ..moveTo(x + 12 * sx, y + 9 * sy)
+      ..lineTo(x + 15 * sx, y + 12 * sy)
+      ..lineTo(x + 12 * sx, y + 15 * sy)
+      ..lineTo(x + 9 * sx, y + 12 * sy)
+      ..close();
+    canvas.drawPath(diamond, goldFill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CertificateCornerPainter oldDelegate) => false;
+}
+
+class _SignatureScribblePainter extends CustomPainter {
+  final int index;
+  final Color color;
+  const _SignatureScribblePainter({required this.index, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    if (index == 0) {
+      path.moveTo(size.width * 0.1, size.height * 0.7);
+      path.cubicTo(size.width * 0.2, size.height * 0.2, size.width * 0.3, size.height * 0.1, size.width * 0.38, size.height * 0.3);
+      path.cubicTo(size.width * 0.45, size.height * 0.5, size.width * 0.35, size.height * 0.8, size.width * 0.28, size.height * 0.85);
+      path.cubicTo(size.width * 0.4, size.height * 0.5, size.width * 0.6, size.height * 0.4, size.width * 0.7, size.height * 0.6);
+      path.cubicTo(size.width * 0.8, size.height * 0.3, size.width * 0.9, size.height * 0.5, size.width * 0.95, size.height * 0.55);
+    } else if (index == 1) {
+      path.moveTo(size.width * 0.15, size.height * 0.8);
+      path.cubicTo(size.width * 0.2, size.height * 0.2, size.width * 0.35, size.height * 0.1, size.width * 0.45, size.height * 0.2);
+      path.cubicTo(size.width * 0.5, size.height * 0.3, size.width * 0.4, size.height * 0.8, size.width * 0.35, size.height * 0.8);
+      path.cubicTo(size.width * 0.5, size.height * 0.4, size.width * 0.65, size.height * 0.5, size.width * 0.8, size.height * 0.3);
+      path.cubicTo(size.width * 0.88, size.height * 0.6, size.width * 0.92, size.height * 0.4, size.width * 0.96, size.height * 0.6);
+    } else {
+      path.moveTo(size.width * 0.1, size.height * 0.6);
+      path.cubicTo(size.width * 0.25, size.height * 0.1, size.width * 0.35, size.height * 0.2, size.width * 0.4, size.height * 0.7);
+      path.cubicTo(size.width * 0.35, size.height * 0.9, size.width * 0.5, size.height * 0.5, size.width * 0.6, size.height * 0.4);
+      path.cubicTo(size.width * 0.7, size.height * 0.3, size.width * 0.75, size.height * 0.7, size.width * 0.85, size.height * 0.5);
+      path.cubicTo(size.width * 0.9, size.height * 0.4, size.width * 0.95, size.height * 0.6, size.width * 0.98, size.height * 0.5);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignatureScribblePainter oldDelegate) =>
+      oldDelegate.index != index || oldDelegate.color != color;
+}
+
+// ============================================================================
 // MANAGE CERTIFICATE DIALOG
 // ============================================================================
 
@@ -4439,212 +4563,350 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
 
                     const SizedBox(height: 10),
 
-                    // Section 5: Real-time In-App Visual Preview
-                    _buildSectionHeader('REAL-TIME CERTIFICATE PREVIEW', isDark),
-                    const SizedBox(height: 8),
+                    // Section 5: Real-time In-App Visual Preview (Exact replica of printed certificate)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildSectionHeader('REAL-TIME CERTIFICATE PREVIEW', isDark),
+                        ElevatedButton.icon(
+                          onPressed: _isPreviewing
+                              ? null
+                              : () async {
+                                  setState(() => _isPreviewing = true);
+                                  try {
+                                    await widget.onPreview(_buildConfig());
+                                  } finally {
+                                    if (mounted) setState(() => _isPreviewing = false);
+                                  }
+                                },
+                          icon: _isPreviewing
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.print_rounded, size: 15),
+                          label: const Text(
+                            'Open Full Print PDF',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Exact Certificate Replica Container with authentic triple border & corners
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFFDF5),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFD4AF37), width: 1.8),
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFF0B192C), width: 3.5),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
-                            blurRadius: 10,
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 14,
                             offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: Column(
-                        children: [
-                          // Header CTU & BSIT
-                          Text(
-                            _univController.text.trim().isNotEmpty
-                                ? _univController.text.trim().toUpperCase()
-                                : 'CEBU TECHNOLOGICAL UNIVERSITY',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11.5,
-                              letterSpacing: 1.2,
+                      child: Container(
+                        margin: const EdgeInsets.all(3.5),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
+                        ),
+                        child: Container(
+                          margin: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFF0B192C), width: 0.8),
+                          ),
+                          child: CustomPaint(
+                            foregroundPainter: const _CertificateCornerPainter(
+                              navy: Color(0xFF0B192C),
+                              gold: Color(0xFFD4AF37),
                             ),
-                          ),
-                          Text(
-                            _campusController.text.trim().isNotEmpty
-                                ? _campusController.text.trim().toUpperCase()
-                                : 'TUBURAN & TABUELAN CAMPUSES',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFF475569),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 8.5,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            _deptController.text.trim().isNotEmpty
-                                ? _deptController.text.trim().toUpperCase()
-                                : 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFFB45309),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 9,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Watermark & Title: Top Yellow/Gold text + Bottom Black/Navy text (Separated vertically)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                _watermarkController.text.trim().isNotEmpty
-                                    ? _watermarkController.text.trim().toUpperCase()
-                                    : 'CERTIFICATE',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Color(0xFFC59B27),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 18,
-                                  letterSpacing: 3.5,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _titleController.text.trim().isNotEmpty
-                                    ? _titleController.text.trim().toUpperCase()
-                                    : 'CERTIFICATE OF RECOGNITION',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 12.5,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _subtitleController.text.trim().isNotEmpty
-                                ? _subtitleController.text.trim()
-                                : 'This certificate is proudly presented to',
-                            style: const TextStyle(
-                              color: Color(0xFF475569),
-                              fontSize: 9.5,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Sample Contestant
-                          const Text(
-                            'CONTESTANT / TEAM MEMBER NAME',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Container(width: 220, height: 1.2, color: const Color(0xFF0F172A)),
-                          const SizedBox(height: 12),
-
-                          // Citation preview
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: RichText(
-                              textAlign: TextAlign.center,
-                              text: TextSpan(
-                                style: const TextStyle(
-                                  fontSize: 8.5,
-                                  color: Color(0xFF1E293B),
-                                  height: 1.35,
-                                ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+                              child: Column(
                                 children: [
-                                  const TextSpan(
-                                    text:
-                                        'in high recognition of their exemplary brilliance, intellectual competence, and outstanding competitive performance, having successfully emerged and won as ',
+                                  // Header Row: BSIT Logo + University Info + TechNoWiz Robot Mascot
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      // Left: BSIT Program Logo
+                                      SizedBox(
+                                        width: 72,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Image.asset(
+                                              'assets/images/bsit_logo.png',
+                                              width: 52,
+                                              height: 52,
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (_, __, ___) => const SizedBox(width: 52, height: 52),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            const Text(
+                                              'BSIT Program Logo',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 7,
+                                                color: Color(0xFF475569),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Center: University, Campus, Department
+                                      Expanded(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              _univController.text.trim().isNotEmpty
+                                                  ? _univController.text.trim().toUpperCase()
+                                                  : 'CEBU TECHNOLOGICAL UNIVERSITY',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Color(0xFF0B192C),
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 12.5,
+                                                letterSpacing: 1.3,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _campusController.text.trim().isNotEmpty
+                                                  ? _campusController.text.trim().toUpperCase()
+                                                  : 'TUBURAN & TABUELAN CAMPUSES',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Color(0xFF475569),
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 8,
+                                                letterSpacing: 1.0,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _deptController.text.trim().isNotEmpty
+                                                  ? _deptController.text.trim().toUpperCase()
+                                                  : 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Color(0xFFB45309),
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 8.8,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Right: TechNoWiz Mascot Robot
+                                      SizedBox(
+                                        width: 72,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Image.asset(
+                                              'assets/images/technowiz_cert_robot.png',
+                                              width: 55,
+                                              height: 52,
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (_, __, ___) => const SizedBox(width: 55, height: 52),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            const Text(
+                                              'TechNoWiz',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF0284C7),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const TextSpan(
-                                    text: 'RANK 1 (CHAMPION)',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF0F172A),
+                                  const SizedBox(height: 14),
+
+                                  // Title Section: Top Yellow/Gold text + Bottom Black/Navy text (Separated vertically)
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        _watermarkController.text.trim().isNotEmpty
+                                            ? _watermarkController.text.trim().toUpperCase()
+                                            : 'CERTIFICATE',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Color(0xFFC59B27),
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 19,
+                                          letterSpacing: 4.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        _titleController.text.trim().isNotEmpty
+                                            ? _titleController.text.trim().toUpperCase()
+                                            : 'CERTIFICATE OF RECOGNITION',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0B192C),
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 13.5,
+                                          letterSpacing: 1.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    _subtitleController.text.trim().isNotEmpty
+                                        ? _subtitleController.text.trim()
+                                        : 'This certificate is proudly presented to',
+                                    style: const TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 9.5,
+                                      fontStyle: FontStyle.italic,
                                     ),
                                   ),
-                                  TextSpan(
-                                    text:
-                                        ' in the ${_eventController.text.trim()} during the ${_occasionController.text.trim()}, held on [Date of Event], at ${_venueController.text.trim()}.',
+                                  const SizedBox(height: 12),
+
+                                  // Sample Contestant Name
+                                  const Text(
+                                    'CONTESTANT / TEAM MEMBER NAME',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0B192C),
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Container(width: 260, height: 1.2, color: const Color(0xFF0B192C)),
+                                  const SizedBox(height: 14),
+
+                                  // Citation preview (Full academic sentence with bold rank)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                                    child: RichText(
+                                      textAlign: TextAlign.center,
+                                      text: TextSpan(
+                                        style: const TextStyle(
+                                          fontSize: 9,
+                                          color: Color(0xFF1E293B),
+                                          height: 1.4,
+                                        ),
+                                        children: [
+                                          const TextSpan(
+                                            text:
+                                                'in high recognition of their exemplary brilliance, intellectual competence, and outstanding competitive performance, having successfully emerged and won as ',
+                                          ),
+                                          const TextSpan(
+                                            text: 'RANK 1 (CHAMPION)',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text:
+                                                ' in the ${_eventController.text.trim()} during the ${_occasionController.text.trim()}, held on [Date of Event], at ${_venueController.text.trim()}.',
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+
+                                  // Live Signatures Row Preview with Scribble Signatures
+                                  Row(
+                                    mainAxisAlignment: _signatoryCount == 1
+                                        ? MainAxisAlignment.center
+                                        : MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      for (int i = 0; i < _signatoryCount; i++) ...[
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Authentic signature cursive scribble
+                                                SizedBox(
+                                                  height: 22,
+                                                  width: 80,
+                                                  child: CustomPaint(
+                                                    painter: _SignatureScribblePainter(
+                                                      index: i,
+                                                      color: const Color(0xFF0B192C),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                if (_showLines[i])
+                                                  Container(
+                                                    height: 1.2,
+                                                    color: const Color(0xFF0B192C),
+                                                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                                                  )
+                                                else
+                                                  const SizedBox(height: 1.2),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  _nameControllers[i].text.trim().isNotEmpty
+                                                      ? _nameControllers[i].text.trim().toUpperCase()
+                                                      : 'AUTHORIZED SIGNATORY',
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 8.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFF0B192C),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 1),
+                                                Text(
+                                                  _titleControllers[i].text.trim().isNotEmpty
+                                                      ? _titleControllers[i].text.trim()
+                                                      : 'Designation',
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 7.5,
+                                                    color: Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          const SizedBox(height: 14),
-
-                          // Live Signatures Row Preview
-                          Row(
-                            mainAxisAlignment: _signatoryCount == 1
-                                ? MainAxisAlignment.center
-                                : MainAxisAlignment.spaceBetween,
-                            children: [
-                              for (int i = 0; i < _signatoryCount; i++) ...[
-                                Expanded(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _nameControllers[i].text.trim().isNotEmpty
-                                            ? _nameControllers[i].text.trim().toUpperCase()
-                                            : '(Manual Signature)',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: _nameControllers[i].text.trim().isNotEmpty
-                                              ? const Color(0xFF0F172A)
-                                              : Colors.grey.shade500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      if (_showLines[i])
-                                        Container(
-                                          height: 1.2,
-                                          color: const Color(0xFF0F172A),
-                                          margin: const EdgeInsets.symmetric(horizontal: 8),
-                                        )
-                                      else
-                                        const SizedBox(height: 1.2),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _titleControllers[i].text.trim().isNotEmpty
-                                            ? _titleControllers[i].text.trim()
-                                            : 'Authorized Signatory',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (i < _signatoryCount - 1)
-                                  const SizedBox(width: 8),
-                              ],
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
