@@ -855,27 +855,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                               ),
                             ),
 
-                            // Right: TechNoWiz Mascot Robot with Trophy (Enlarged & Transparent)
+                            // Right: TechNoWiz Mascot Robot with Trophy (Enlarged, White/Transparent Bg, Clean)
                             pw.Container(
-                              width: 92,
-                              child: pw.Column(
-                                mainAxisSize: pw.MainAxisSize.min,
-                                crossAxisAlignment: pw.CrossAxisAlignment.center,
-                                children: [
-                                  if (robotMascotImage != null)
-                                    pw.Image(robotMascotImage, width: 78, height: 75, fit: pw.BoxFit.contain)
-                                  else
-                                    pw.Container(width: 78, height: 75),
-                                  pw.SizedBox(height: 2),
-                                  pw.Text(
-                                    'TechNoWiz',
-                                    style: pw.TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: pw.FontWeight.bold,
-                                      color: const PdfColor.fromInt(0xFF0284C7),
-                                    ),
-                                  ),
-                                ],
+                              width: 95,
+                              child: pw.Center(
+                                child: robotMascotImage != null
+                                    ? pw.Image(robotMascotImage, width: 88, height: 88, fit: pw.BoxFit.contain)
+                                    : pw.Container(width: 88, height: 88),
                               ),
                             ),
                           ],
@@ -4687,31 +4673,17 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                                         ),
                                       ),
 
-                                      // Right: TechNoWiz Mascot Robot
+                                      // Right: TechNoWiz Mascot Robot (Enlarged & Clean)
                                       SizedBox(
-                                        width: 72,
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                          children: [
-                                            Image.asset(
-                                              'assets/images/technowiz_cert_robot.png',
-                                              width: 55,
-                                              height: 52,
-                                              fit: BoxFit.contain,
-                                              errorBuilder: (_, __, ___) => const SizedBox(width: 55, height: 52),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            const Text(
-                                              'TechNoWiz',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF0284C7),
-                                              ),
-                                            ),
-                                          ],
+                                        width: 78,
+                                        child: Center(
+                                          child: Image.asset(
+                                            'assets/images/technowiz_cert_robot.png',
+                                            width: 66,
+                                            height: 66,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) => const SizedBox(width: 66, height: 66),
+                                          ),
                                         ),
                                       ),
                                     ],
