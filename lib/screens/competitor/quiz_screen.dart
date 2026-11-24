@@ -5594,46 +5594,59 @@ class _QuizScreenState extends State<QuizScreen> {
                                             ],
                                           ),
                                           const SizedBox(height: 12),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.baseline,
-                                            textBaseline:
-                                                TextBaseline.alphabetic,
-                                            children: [
-                                              Text(
-                                                "$finalPoints",
-                                                style: const TextStyle(
-                                                  color: primaryGreen,
-                                                  fontSize: 38,
-                                                  fontWeight: FontWeight.w900,
-                                                  letterSpacing: -0.5,
-                                                ),
+                                          if (finalPoints == 0)
+                                            const Text(
+                                              "0",
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: primaryGreen,
+                                                fontSize: 44,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: -0.5,
                                               ),
-                                              Text(
-                                                " / $levelTotalPossiblePoints",
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade400,
-                                                  fontSize: 24,
-                                                  fontWeight: FontWeight.w800,
+                                            )
+                                          else
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.baseline,
+                                              textBaseline:
+                                                  TextBaseline.alphabetic,
+                                              children: [
+                                                Text(
+                                                  "$finalPoints",
+                                                  style: const TextStyle(
+                                                    color: primaryGreen,
+                                                    fontSize: 38,
+                                                    fontWeight: FontWeight.w900,
+                                                    letterSpacing: -0.5,
+                                                  ),
                                                 ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                levelTotalPossiblePoints == 1
-                                                    ? "POINT"
-                                                    : "POINTS",
-                                                style: TextStyle(
-                                                  color: primaryGreen
-                                                      .withValues(alpha: 0.85),
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: 0.6,
+                                                if (levelTotalPossiblePoints > 0)
+                                                  Text(
+                                                    " / $levelTotalPossiblePoints",
+                                                    style: TextStyle(
+                                                      color: Colors.grey.shade400,
+                                                      fontSize: 24,
+                                                      fontWeight: FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  finalPoints == 1
+                                                      ? "POINT"
+                                                      : "POINTS",
+                                                  style: TextStyle(
+                                                    color: primaryGreen
+                                                        .withValues(alpha: 0.85),
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.6,
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
+                                              ],
+                                            ),
                                           const SizedBox(height: 16),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
@@ -5742,7 +5755,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       ),
                                                       const SizedBox(height: 3),
                                                       Text(
-                                                        "$ptsPerQ ${ptsPerQ == 1 ? 'pt' : 'pts'}",
+                                                        ptsPerQ == 0
+                                                            ? "0"
+                                                            : "$ptsPerQ ${ptsPerQ == 1 ? 'pt' : 'pts'}",
                                                         style: TextStyle(
                                                           color: Colors
                                                               .amber.shade900,
@@ -5796,7 +5811,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       ),
                                                       const SizedBox(height: 3),
                                                       Text(
-                                                        "$levelTotalPossiblePoints ${levelTotalPossiblePoints == 1 ? 'pt' : 'pts'}",
+                                                        levelTotalPossiblePoints == 0
+                                                            ? "0"
+                                                            : "$levelTotalPossiblePoints ${levelTotalPossiblePoints == 1 ? 'pt' : 'pts'}",
                                                         style:
                                                             const TextStyle(
                                                           color:
@@ -6764,7 +6781,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                     final int scoreVal =
                                         (item['score'] as num?)?.toInt() ?? 0;
                                     return Text(
-                                      '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
+                                      scoreVal == 0
+                                          ? '0'
+                                          : '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
                                       style: const TextStyle(
                                         color: primaryGreen,
                                         fontWeight: FontWeight.w800,
@@ -8992,7 +9011,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                             ),
                                                           ),
                                                           child: Text(
-                                                            "Level $lvl: ${myLevelScores[lvl]} ${(myLevelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
+                                                            (myLevelScores[lvl] ?? 0) == 0
+                                                                ? "Level $lvl: 0"
+                                                                : "Level $lvl: ${myLevelScores[lvl]} ${(myLevelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
                                                             style:
                                                                 const TextStyle(
                                                               fontSize: 12,
@@ -9438,7 +9459,9 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         child: Text(
-                          "L$lvl: ${item.levelScores[lvl] ?? 0} ${(item.levelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
+                          (item.levelScores[lvl] ?? 0) == 0
+                              ? "L$lvl: 0"
+                              : "L$lvl: ${item.levelScores[lvl] ?? 0} ${(item.levelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
@@ -10057,7 +10080,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                   if (myRow != null) ...[
                                     const SizedBox(height: 8),
                                     Text(
-                                      "Final Score: ${myRow['score']} ${(myRow['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}",
+                                      "Final Score: ${(myRow['score'] as num?)?.toInt() == 0 ? '0' : "${myRow['score']} ${(myRow['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}"}",
                                       style: TextStyle(
                                         color: Colors.black.withValues(alpha: 0.7),
                                         fontSize: 13,
@@ -10348,7 +10371,9 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                     BorderRadius.circular(20),
                                               ),
                                               child: Text(
-                                                '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
+                                                (row['score'] as num?)?.toInt() == 0
+                                                    ? '0'
+                                                    : '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
                                                 style: TextStyle(
                                                   color: rank == 1
                                                       ? const Color(0xFF173426)
@@ -10569,7 +10594,9 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
+                                            (row['score'] as num?)?.toInt() == 0
+                                                    ? '0'
+                                                    : '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
                                             style: TextStyle(
                                               color: eliminated
                                                   ? Colors.red.shade700
