@@ -203,10 +203,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           onPreview: (previewConfig) async {
             await _printCertificate(
               contestantName: 'JUAN DELA CRUZ',
-              quizTitle: 'TechNoWiz Championship',
+              quizTitle: previewConfig.eventName,
               rank: 1,
               teamName: 'TECHNOWIZ CHAMPIONS',
-              school: 'College of Computer Studies',
+              members: ['Juan Dela Cruz', 'Maria Santos'],
+              school: previewConfig.departmentName,
               totalScore: 98,
               quizCode: selectedQuizCode ?? 'SAMPLE',
               quizDate: _dateText(),
@@ -445,125 +446,159 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   // Others: APPRECIATION (Emerald Green Theme with Star & Laurels)
   // =========================================================
 
-  pw.Widget _buildPdfSignaturesRow(CertificateConfig config) {
+  // =========================================================
+  // CERTIFICATE SVG ASSET & VECTOR GENERATORS
+  // =========================================================
+
+  String _getCertCornerTopLeftSvg(String navy, String accent) =>
+      '''<svg viewBox="0 0 80 80" width="70" height="70">
+  <polyline points="3,76 3,3 76,3" fill="none" stroke="$navy" stroke-width="2.5" />
+  <polyline points="9,76 9,9 76,9" fill="none" stroke="$accent" stroke-width="1.2" />
+  <polyline points="14,76 14,14 76,14" fill="none" stroke="$navy" stroke-width="0.8" />
+  <line x1="3" y1="26" x2="26" y2="3" stroke="$accent" stroke-width="1.2" />
+  <polygon points="21,13 29,21 21,29 13,21" fill="$accent" stroke="$navy" stroke-width="0.8" />
+  <circle cx="21" cy="21" r="2" fill="$navy" />
+  <rect x="1.5" y="1.5" width="4.5" height="4.5" fill="$accent" />
+</svg>''';
+
+  String _getCertCornerTopRightSvg(String navy, String accent) =>
+      '''<svg viewBox="0 0 80 80" width="70" height="70">
+  <polyline points="77,76 77,3 4,3" fill="none" stroke="$navy" stroke-width="2.5" />
+  <polyline points="71,76 71,9 4,9" fill="none" stroke="$accent" stroke-width="1.2" />
+  <polyline points="66,76 66,14 4,14" fill="none" stroke="$navy" stroke-width="0.8" />
+  <line x1="77" y1="26" x2="54" y2="3" stroke="$accent" stroke-width="1.2" />
+  <polygon points="59,13 67,21 59,29 51,21" fill="$accent" stroke="$navy" stroke-width="0.8" />
+  <circle cx="59" cy="21" r="2" fill="$navy" />
+  <rect x="74" y="1.5" width="4.5" height="4.5" fill="$accent" />
+</svg>''';
+
+  String _getCertCornerBottomLeftSvg(String navy, String accent) =>
+      '''<svg viewBox="0 0 80 80" width="70" height="70">
+  <polyline points="3,4 3,77 76,77" fill="none" stroke="$navy" stroke-width="2.5" />
+  <polyline points="9,4 9,71 76,71" fill="none" stroke="$accent" stroke-width="1.2" />
+  <polyline points="14,4 14,66 76,66" fill="none" stroke="$navy" stroke-width="0.8" />
+  <line x1="3" y1="54" x2="26" y2="77" stroke="$accent" stroke-width="1.2" />
+  <polygon points="21,51 29,59 21,67 13,59" fill="$accent" stroke="$navy" stroke-width="0.8" />
+  <circle cx="21" cy="59" r="2" fill="$navy" />
+  <rect x="1.5" y="74" width="4.5" height="4.5" fill="$accent" />
+</svg>''';
+
+  String _getCertCornerBottomRightSvg(String navy, String accent) =>
+      '''<svg viewBox="0 0 80 80" width="70" height="70">
+  <polyline points="77,4 77,77 4,77" fill="none" stroke="$navy" stroke-width="2.5" />
+  <polyline points="71,4 71,71 4,71" fill="none" stroke="$accent" stroke-width="1.2" />
+  <polyline points="66,4 66,66 4,66" fill="none" stroke="$navy" stroke-width="0.8" />
+  <line x1="77" y1="54" x2="54" y2="77" stroke="$accent" stroke-width="1.2" />
+  <polygon points="59,51 67,59 59,67 51,59" fill="$accent" stroke="$navy" stroke-width="0.8" />
+  <circle cx="59" cy="59" r="2" fill="$navy" />
+  <rect x="74" y="74" width="4.5" height="4.5" fill="$accent" />
+</svg>''';
+
+  String _getCertEdgeTopBottomSvg(String navy, String accent) =>
+      '''<svg viewBox="0 0 140 16" width="120" height="14">
+  <line x1="0" y1="8" x2="48" y2="8" stroke="$accent" stroke-width="1.2" />
+  <circle cx="52" cy="8" r="2" fill="$navy" />
+  <polygon points="70,1 78,8 70,15 62,8" fill="$accent" stroke="$navy" stroke-width="0.8" />
+  <circle cx="70" cy="8" r="1.5" fill="$navy" />
+  <circle cx="88" cy="8" r="2" fill="$navy" />
+  <line x1="92" y1="8" x2="140" y2="8" stroke="$accent" stroke-width="1.2" />
+</svg>''';
+
+  String _getCertEdgeLeftRightSvg(String navy, String accent) =>
+      '''<svg viewBox="0 0 16 140" width="14" height="120">
+  <line x1="8" y1="0" x2="8" y2="48" stroke="$accent" stroke-width="1.2" />
+  <circle cx="8" cy="52" r="2" fill="$navy" />
+  <polygon points="1,70 8,62 15,70 8,78" fill="$accent" stroke="$navy" stroke-width="0.8" />
+  <circle cx="8" cy="70" r="1.5" fill="$navy" />
+  <circle cx="8" cy="88" r="2" fill="$navy" />
+  <line x1="8" y1="92" x2="8" y2="140" stroke="$accent" stroke-width="1.2" />
+</svg>''';
+
+  String _getCertRosetteSvg({
+    required String rosetteMain,
+    required String rosetteDark,
+    required String rosetteRibbon,
+  }) =>
+      '''<svg viewBox="0 0 100 115" width="62" height="72">
+  <polygon points="32,48 18,105 32,94 44,105 42,48" fill="$rosetteRibbon" stroke="$rosetteDark" stroke-width="1.2" />
+  <polygon points="68,48 56,105 68,94 82,105 68,48" fill="$rosetteRibbon" stroke="$rosetteDark" stroke-width="1.2" />
+  <circle cx="50" cy="46" r="34" fill="$rosetteMain" stroke="$rosetteDark" stroke-width="1.8" />
+  <circle cx="50" cy="46" r="30" fill="none" stroke="#FFFFFF" stroke-dasharray="2,2" stroke-width="1.2" />
+  <circle cx="50" cy="46" r="25" fill="$rosetteDark" />
+</svg>''';
+
+  String _getSignatureScribbleSvg(int index, String colorHex) {
+    if (index == 0) {
+      return '''<svg viewBox="0 0 130 32" width="105" height="26">
+        <path d="M 8,24 C 14,10 24,4 30,7 C 36,10 28,26 22,28 C 16,30 32,18 42,16 C 52,14 48,24 58,20 C 68,16 75,10 82,15 C 90,20 98,14 110,18 C 114,20 124,14 126,17" stroke="$colorHex" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>''';
+    } else if (index == 1) {
+      return '''<svg viewBox="0 0 130 32" width="105" height="26">
+        <path d="M 16,26 C 18,10 26,5 34,5 C 42,5 38,22 30,24 C 22,26 40,16 52,14 C 64,12 60,26 74,20 C 84,15 82,7 94,12 C 104,17 112,13 124,18" stroke="$colorHex" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>''';
+    } else {
+      return '''<svg viewBox="0 0 130 32" width="105" height="26">
+        <path d="M 12,18 C 16,6 28,3 36,10 C 44,17 34,28 26,26 C 18,24 38,16 50,16 C 62,16 68,8 78,15 C 88,22 94,10 106,16 C 116,22 122,14 127,19" stroke="$colorHex" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>''';
+    }
+  }
+
+  pw.Widget _buildPdfSignaturesRow(CertificateConfig config, PdfColor navyColor, String colorHex) {
     final signatories = config.signatories;
     if (signatories.isEmpty) {
       return pw.SizedBox.shrink();
     }
 
-    if (signatories.length == 1) {
-      final sig = signatories[0];
-      return pw.Center(
-        child: pw.Column(
-          mainAxisSize: pw.MainAxisSize.min,
-          children: [
-            if (sig.name.trim().isNotEmpty) ...[
-              pw.Text(
-                sig.name.trim().toUpperCase(),
-                style: pw.TextStyle(
-                  fontSize: 11,
-                  fontWeight: pw.FontWeight.bold,
-                  color: const PdfColor.fromInt(0xFF0F172A),
-                ),
-              ),
-              pw.SizedBox(height: 3),
-            ] else ...[
-              pw.SizedBox(height: 14),
-            ],
-            if (sig.showLine)
-              pw.Container(width: 200, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A))
-            else
-              pw.SizedBox(width: 200, height: 1.5),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              sig.title.trim().isNotEmpty ? sig.title.trim() : 'Authorized Signatory',
-              style: pw.TextStyle(
-                fontSize: 10,
-                fontWeight: pw.FontWeight.bold,
-                color: const PdfColor.fromInt(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final int count = signatories.length.clamp(1, 3);
+    final double lineWidth = count == 1 ? 220 : (count == 2 ? 180 : 145);
 
-    if (signatories.length == 2) {
-      return pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          for (final sig in signatories)
-            pw.Column(
-              mainAxisSize: pw.MainAxisSize.min,
-              children: [
-                if (sig.name.trim().isNotEmpty) ...[
-                  pw.Text(
-                    sig.name.trim().toUpperCase(),
-                    style: pw.TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: pw.FontWeight.bold,
-                      color: const PdfColor.fromInt(0xFF0F172A),
-                    ),
-                  ),
-                  pw.SizedBox(height: 3),
-                ] else ...[
-                  pw.SizedBox(height: 14),
-                ],
-                if (sig.showLine)
-                  pw.Container(width: 175, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A))
-                else
-                  pw.SizedBox(width: 175, height: 1.5),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  sig.title.trim().isNotEmpty ? sig.title.trim() : 'Authorized Signatory',
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    fontWeight: pw.FontWeight.bold,
-                    color: const PdfColor.fromInt(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-        ],
-      );
-    }
-
-    // 3 signatories
     return pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: count == 1 ? pw.MainAxisAlignment.center : pw.MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: pw.CrossAxisAlignment.end,
       children: [
-        for (final sig in signatories.take(3))
+        for (int i = 0; i < count; i++) ...[
           pw.Column(
             mainAxisSize: pw.MainAxisSize.min,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              if (sig.name.trim().isNotEmpty) ...[
+              pw.SvgImage(
+                svg: _getSignatureScribbleSvg(i, colorHex),
+                width: lineWidth * 0.72,
+                height: 22,
+              ),
+              pw.SizedBox(height: 2),
+              if (signatories[i].name.trim().isNotEmpty) ...[
                 pw.Text(
-                  sig.name.trim().toUpperCase(),
+                  signatories[i].name.trim().toUpperCase(),
                   style: pw.TextStyle(
-                    fontSize: 9.5,
+                    fontSize: count == 3 ? 9.5 : 10.5,
                     fontWeight: pw.FontWeight.bold,
-                    color: const PdfColor.fromInt(0xFF0F172A),
+                    color: navyColor,
                   ),
                 ),
-                pw.SizedBox(height: 3),
+                pw.SizedBox(height: 2),
               ] else ...[
-                pw.SizedBox(height: 13),
+                pw.SizedBox(height: 12),
               ],
-              if (sig.showLine)
-                pw.Container(width: 140, height: 1.5, color: const PdfColor.fromInt(0xFF0F172A))
+              if (signatories[i].showLine)
+                pw.Container(width: lineWidth, height: 1.2, color: navyColor)
               else
-                pw.SizedBox(width: 140, height: 1.5),
-              pw.SizedBox(height: 4),
+                pw.SizedBox(width: lineWidth, height: 1.2),
+              pw.SizedBox(height: 3),
               pw.Text(
-                sig.title.trim().isNotEmpty ? sig.title.trim() : 'Authorized Signatory',
+                signatories[i].title.trim().isNotEmpty
+                    ? signatories[i].title.trim()
+                    : 'Authorized Signatory',
+                textAlign: pw.TextAlign.center,
                 style: pw.TextStyle(
-                  fontSize: 9,
+                  fontSize: count == 3 ? 8.5 : 9.5,
                   fontWeight: pw.FontWeight.bold,
-                  color: const PdfColor.fromInt(0xFF0F172A),
+                  color: const PdfColor.fromInt(0xFF334155),
                 ),
               ),
             ],
           ),
+        ],
       ],
     );
   }
@@ -573,6 +608,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     required String quizTitle,
     required int rank,
     String teamName = '',
+    List<String> members = const [],
     String school = '',
     int totalScore = 0,
     int level1Score = 0,
@@ -589,510 +625,472 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final pdf = document ?? pw.Document();
     final config = customConfig ?? _certificateConfig;
 
-    final effectiveName = teamName.trim().isNotEmpty
-        ? teamName.trim()
-        : (contestantName.trim().isNotEmpty ? contestantName.trim() : 'Contestant');
-
-    final String fullQuizTitle = quizTitle.trim().isNotEmpty
-        ? quizTitle.trim()
-        : 'TechNoWiz Quiz Competition';
     final String dateString = quizDate.trim().isNotEmpty ? quizDate.trim() : _dateText();
 
-    pw.MemoryImage? certLogoImage;
+    pw.MemoryImage? bsitLogoImage;
     try {
-      final bytes = await rootBundle.load('assets/images/certificate_logo.jpg');
-      certLogoImage = pw.MemoryImage(bytes.buffer.asUint8List());
+      final bytes = await rootBundle.load('assets/images/bsit_logo.png');
+      bsitLogoImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (e) {
-      debugPrint('Error loading certificate logo asset: $e');
+      debugPrint('Error loading bsit_logo asset: $e');
     }
 
-    final String darkCorner;
-    final String midCorner;
-    final String lightCorner;
-    final PdfColor borderColor;
-    final String ribbonMain;
-    final String ribbonStroke;
-    final String ribbonTail;
-    final String ribbonFold;
-    final String ribbonTitle;
-    final PdfColor ribbonTextColor;
-    final double ribbonFontSize;
-    final String citation1;
-    final String citation2;
-    final String centerGraphicSvg;
+    pw.MemoryImage? robotMascotImage;
+    try {
+      final bytes = await rootBundle.load('assets/images/technowiz_cert_robot.png');
+      robotMascotImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (e) {
+      debugPrint('Error loading technowiz_cert_robot asset: $e');
+    }
+
+    // Rank-based color themes and titles
+    final String primaryColorHex;
+    final String frameNavyHex;
+    final String rosetteMainHex;
+    final String rosetteDarkHex;
+    final String rosetteRibbonHex;
+    final PdfColor navyPdfColor;
+    final PdfColor primaryPdfColor;
+    final PdfColor watermarkPdfColor;
+    final String rankBadgeText;
+    final String rankCitationText;
 
     if (rank == 1 && !eliminated) {
       // 1ST PLACE - GOLD EDITION
-      darkCorner = '#1E293B';
-      midCorner = '#D97706';
-      lightCorner = '#FBBF24';
-      borderColor = const PdfColor.fromInt(0xFFEAB308);
-      ribbonMain = '#FBBF24';
-      ribbonStroke = '#F59E0B';
-      ribbonTail = '#D97706';
-      ribbonFold = '#92400E';
-      ribbonTitle = '1ST PLACE';
-      ribbonTextColor = const PdfColor.fromInt(0xFF1E293B);
-      ribbonFontSize = 24;
-      citation1 = 'In highest recognition of exemplary mastery, critical thinking, and outstanding intellect for securing 1ST PLACE (CHAMPION) in the $fullQuizTitle${totalScore > 0 ? ' with an impressive score of $totalScore points' : ''}.';
-      citation2 = 'Awarded on $dateString in commendation of extraordinary competence, dedication, and academic excellence in technology.';
-      centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
-  <path d="M 54,55 C 42,44 42,22 54,6" stroke="#D97706" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="46,46 36,44 42,52" fill="#D97706" />
-  <polygon points="40,34 30,32 36,40" fill="#D97706" />
-  <polygon points="40,22 30,22 36,28" fill="#D97706" />
-  <polygon points="46,12 38,14 42,20" fill="#D97706" />
-  <polygon points="54,6 48,10 54,14" fill="#D97706" />
-  <polygon points="48,42 56,40 50,48" fill="#D97706" />
-  <polygon points="44,30 52,28 46,36" fill="#D97706" />
-  <polygon points="44,18 52,18 46,24" fill="#D97706" />
-  <path d="M 126,55 C 138,44 138,22 126,6" stroke="#D97706" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="134,46 144,44 138,52" fill="#D97706" />
-  <polygon points="140,34 150,32 144,40" fill="#D97706" />
-  <polygon points="140,22 150,22 144,28" fill="#D97706" />
-  <polygon points="134,12 142,14 138,20" fill="#D97706" />
-  <polygon points="126,6 132,10 126,14" fill="#D97706" />
-  <polygon points="132,42 124,40 130,48" fill="#D97706" />
-  <polygon points="136,30 128,28 134,36" fill="#D97706" />
-  <polygon points="136,18 128,18 134,24" fill="#D97706" />
-  <!-- Trophy Cup Body -->
-  <path d="M 68,8 C 68,40 112,40 112,8 Z" fill="#F59E0B" />
-  <!-- Rounded Top Rim -->
-  <rect x="64" y="6" width="52" height="6" rx="3" fill="#FDE047" stroke="#D97706" stroke-width="1" />
-  <!-- Ear Handles -->
-  <path d="M 68,14 C 48,14 48,34 68,36" stroke="#D97706" stroke-width="4.5" fill="none" stroke-linecap="round" />
-  <path d="M 68,14 C 48,14 48,34 68,36" stroke="#FDE047" stroke-width="2" fill="none" stroke-linecap="round" />
-  <path d="M 112,14 C 132,14 132,34 112,36" stroke="#D97706" stroke-width="4.5" fill="none" stroke-linecap="round" />
-  <path d="M 112,14 C 132,14 132,34 112,36" stroke="#FDE047" stroke-width="2" fill="none" stroke-linecap="round" />
-  <!-- Crown on Cup (NO number 6) -->
-  <path d="M 78,18 L 81,31 L 99,31 L 102,18 L 96,23 L 90,15 L 84,23 Z" fill="#FFFBEB" stroke="#FDE047" stroke-width="0.8" />
-  <circle cx="78" cy="18" r="2.2" fill="#FFFBEB" />
-  <circle cx="90" cy="15" r="2.5" fill="#FFFBEB" />
-  <circle cx="102" cy="18" r="2.2" fill="#FFFBEB" />
-  <!-- Pedestal Stem & Stepped Base -->
-  <rect x="86" y="38" width="8" height="12" fill="#B45309" />
-  <rect x="76" y="50" width="28" height="5" rx="2" fill="#F59E0B" />
-  <rect x="72" y="55" width="36" height="5" rx="2.5" fill="#B45309" stroke="#D97706" stroke-width="0.8" />
-</svg>''';
+      primaryColorHex = '#D4AF37';
+      frameNavyHex = '#0B192C';
+      rosetteMainHex = '#F59E0B';
+      rosetteDarkHex = '#B45309';
+      rosetteRibbonHex = '#D97706';
+      navyPdfColor = const PdfColor.fromInt(0xFF0B192C);
+      primaryPdfColor = const PdfColor.fromInt(0xFFB45309);
+      watermarkPdfColor = const PdfColor(0.83, 0.69, 0.22, 0.25);
+      rankBadgeText = 'CHAMPION';
+      rankCitationText = 'CHAMPION';
     } else if (rank == 2 && !eliminated) {
-      // 2ND PLACE - SILVER / BLUE EDITION
-      darkCorner = '#0F172A';
-      midCorner = '#1D4ED8';
-      lightCorner = '#38BDF8';
-      borderColor = const PdfColor.fromInt(0xFF0284C7);
-      ribbonMain = '#CBD5E1';
-      ribbonStroke = '#94A3B8';
-      ribbonTail = '#94A3B8';
-      ribbonFold = '#475569';
-      ribbonTitle = '2ND PLACE';
-      ribbonTextColor = const PdfColor.fromInt(0xFF0F172A);
-      ribbonFontSize = 24;
-      citation1 = 'In meritorious recognition of exemplary skill, teamwork, and superior performance for securing 2ND PLACE (1ST RUNNER-UP) in the $fullQuizTitle${totalScore > 0 ? ' with a total score of $totalScore points' : ''}.';
-      citation2 = 'Awarded on $dateString in commendation of outstanding competence, perseverance, and dedication to technical knowledge.';
-      centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
-  <path d="M 54,55 C 42,44 42,22 54,6" stroke="#94A3B8" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="46,46 36,44 42,52" fill="#94A3B8" />
-  <polygon points="40,34 30,32 36,40" fill="#94A3B8" />
-  <polygon points="40,22 30,22 36,28" fill="#94A3B8" />
-  <polygon points="46,12 38,14 42,20" fill="#94A3B8" />
-  <polygon points="54,6 48,10 54,14" fill="#94A3B8" />
-  <polygon points="48,42 56,40 50,48" fill="#94A3B8" />
-  <polygon points="44,30 52,28 46,36" fill="#94A3B8" />
-  <polygon points="44,18 52,18 46,24" fill="#94A3B8" />
-  <path d="M 126,55 C 138,44 138,22 126,6" stroke="#94A3B8" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="134,46 144,44 138,52" fill="#94A3B8" />
-  <polygon points="140,34 150,32 144,40" fill="#94A3B8" />
-  <polygon points="140,22 150,22 144,28" fill="#94A3B8" />
-  <polygon points="134,12 142,14 138,20" fill="#94A3B8" />
-  <polygon points="126,6 132,10 126,14" fill="#94A3B8" />
-  <polygon points="132,42 124,40 130,48" fill="#94A3B8" />
-  <polygon points="136,30 128,28 134,36" fill="#94A3B8" />
-  <polygon points="136,18 128,18 134,24" fill="#94A3B8" />
-  <!-- Trophy Cup Body -->
-  <path d="M 68,8 C 68,40 112,40 112,8 Z" fill="#94A3B8" />
-  <!-- Rounded Top Rim -->
-  <rect x="64" y="6" width="52" height="6" rx="3" fill="#E2E8F0" stroke="#64748B" stroke-width="1" />
-  <!-- Ear Handles -->
-  <path d="M 68,14 C 48,14 48,34 68,36" stroke="#64748B" stroke-width="4.5" fill="none" stroke-linecap="round" />
-  <path d="M 68,14 C 48,14 48,34 68,36" stroke="#E2E8F0" stroke-width="2" fill="none" stroke-linecap="round" />
-  <path d="M 112,14 C 132,14 132,34 112,36" stroke="#64748B" stroke-width="4.5" fill="none" stroke-linecap="round" />
-  <path d="M 112,14 C 132,14 132,34 112,36" stroke="#E2E8F0" stroke-width="2" fill="none" stroke-linecap="round" />
-  <!-- Crown on Cup (NO number 6) -->
-  <path d="M 78,18 L 81,31 L 99,31 L 102,18 L 96,23 L 90,15 L 84,23 Z" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8" />
-  <circle cx="78" cy="18" r="2.2" fill="#F8FAFC" />
-  <circle cx="90" cy="15" r="2.5" fill="#F8FAFC" />
-  <circle cx="102" cy="18" r="2.2" fill="#F8FAFC" />
-  <!-- Pedestal Stem & Stepped Base -->
-  <rect x="86" y="38" width="8" height="12" fill="#475569" />
-  <rect x="76" y="50" width="28" height="5" rx="2" fill="#94A3B8" />
-  <rect x="72" y="55" width="36" height="5" rx="2.5" fill="#475569" stroke="#64748B" stroke-width="0.8" />
-</svg>''';
+      // 2ND PLACE - SILVER EDITION
+      primaryColorHex = '#94A3B8';
+      frameNavyHex = '#0F172A';
+      rosetteMainHex = '#94A3B8';
+      rosetteDarkHex = '#475569';
+      rosetteRibbonHex = '#64748B';
+      navyPdfColor = const PdfColor.fromInt(0xFF0F172A);
+      primaryPdfColor = const PdfColor.fromInt(0xFF475569);
+      watermarkPdfColor = const PdfColor(0.58, 0.64, 0.72, 0.25);
+      rankBadgeText = '2ND PLACE';
+      rankCitationText = '2ND PLACE';
     } else if (rank == 3 && !eliminated) {
-      // 3RD PLACE - BRONZE / ORANGE EDITION
-      darkCorner = '#1E293B';
-      midCorner = '#C2410C';
-      lightCorner = '#FB923C';
-      borderColor = const PdfColor.fromInt(0xFFEA580C);
-      ribbonMain = '#FB923C';
-      ribbonStroke = '#EA580C';
-      ribbonTail = '#EA580C';
-      ribbonFold = '#7C2D12';
-      ribbonTitle = '3RD PLACE';
-      ribbonTextColor = const PdfColor.fromInt(0xFF1E293B);
-      ribbonFontSize = 24;
-      citation1 = 'In distinguished recognition of remarkable dedication, perseverance, and excellent performance for securing 3RD PLACE (2ND RUNNER-UP) in the $fullQuizTitle${totalScore > 0 ? ' with a total score of $totalScore points' : ''}.';
-      citation2 = 'Awarded on $dateString in recognition of commendable achievement, competitive spirit, and passion for excellence.';
-      centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
-  <path d="M 54,55 C 42,44 42,22 54,6" stroke="#C2410C" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="46,46 36,44 42,52" fill="#C2410C" />
-  <polygon points="40,34 30,32 36,40" fill="#C2410C" />
-  <polygon points="40,22 30,22 36,28" fill="#C2410C" />
-  <polygon points="46,12 38,14 42,20" fill="#C2410C" />
-  <polygon points="54,6 48,10 54,14" fill="#C2410C" />
-  <polygon points="48,42 56,40 50,48" fill="#C2410C" />
-  <polygon points="44,30 52,28 46,36" fill="#C2410C" />
-  <polygon points="44,18 52,18 46,24" fill="#C2410C" />
-  <path d="M 126,55 C 138,44 138,22 126,6" stroke="#C2410C" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="134,46 144,44 138,52" fill="#C2410C" />
-  <polygon points="140,34 150,32 144,40" fill="#C2410C" />
-  <polygon points="140,22 150,22 144,28" fill="#C2410C" />
-  <polygon points="134,12 142,14 138,20" fill="#C2410C" />
-  <polygon points="126,6 132,10 126,14" fill="#C2410C" />
-  <polygon points="132,42 124,40 130,48" fill="#C2410C" />
-  <polygon points="136,30 128,28 134,36" fill="#C2410C" />
-  <polygon points="136,18 128,18 134,24" fill="#C2410C" />
-  <!-- Trophy Cup Body -->
-  <path d="M 68,8 C 68,40 112,40 112,8 Z" fill="#EA580C" />
-  <!-- Rounded Top Rim -->
-  <rect x="64" y="6" width="52" height="6" rx="3" fill="#FED7AA" stroke="#C2410C" stroke-width="1" />
-  <!-- Ear Handles -->
-  <path d="M 68,14 C 48,14 48,34 68,36" stroke="#C2410C" stroke-width="4.5" fill="none" stroke-linecap="round" />
-  <path d="M 68,14 C 48,14 48,34 68,36" stroke="#FED7AA" stroke-width="2" fill="none" stroke-linecap="round" />
-  <path d="M 112,14 C 132,14 132,34 112,36" stroke="#C2410C" stroke-width="4.5" fill="none" stroke-linecap="round" />
-  <path d="M 112,14 C 132,14 132,34 112,36" stroke="#FED7AA" stroke-width="2" fill="none" stroke-linecap="round" />
-  <!-- Crown on Cup (NO number 6) -->
-  <path d="M 78,18 L 81,31 L 99,31 L 102,18 L 96,23 L 90,15 L 84,23 Z" fill="#FFF7ED" stroke="#FDBA74" stroke-width="0.8" />
-  <circle cx="78" cy="18" r="2.2" fill="#FFF7ED" />
-  <circle cx="90" cy="15" r="2.5" fill="#FFF7ED" />
-  <circle cx="102" cy="18" r="2.2" fill="#FFF7ED" />
-  <!-- Pedestal Stem & Stepped Base -->
-  <rect x="86" y="38" width="8" height="12" fill="#9A3412" />
-  <rect x="76" y="50" width="28" height="5" rx="2" fill="#EA580C" />
-  <rect x="72" y="55" width="36" height="5" rx="2.5" fill="#9A3412" stroke="#C2410C" stroke-width="0.8" />
-</svg>''';
+      // 3RD PLACE - BRONZE EDITION
+      primaryColorHex = '#CD7F32';
+      frameNavyHex = '#1E1B18';
+      rosetteMainHex = '#EA580C';
+      rosetteDarkHex = '#9A3412';
+      rosetteRibbonHex = '#C2410C';
+      navyPdfColor = const PdfColor.fromInt(0xFF1E1B18);
+      primaryPdfColor = const PdfColor.fromInt(0xFF9A3412);
+      watermarkPdfColor = const PdfColor(0.80, 0.50, 0.20, 0.25);
+      rankBadgeText = '3RD PLACE';
+      rankCitationText = '3RD PLACE';
     } else {
-      // APPRECIATION - GREEN EDITION (Finalists & Participants)
-      darkCorner = '#14532D';
-      midCorner = '#16A34A';
-      lightCorner = '#4ADE80';
-      borderColor = const PdfColor.fromInt(0xFF16A34A);
-      ribbonMain = '#16A34A';
-      ribbonStroke = '#15803D';
-      ribbonTail = '#15803D';
-      ribbonFold = '#14532D';
-      ribbonTitle = 'APPRECIATION';
-      ribbonTextColor = const PdfColor.fromInt(0xFFFFFFFF);
-      ribbonFontSize = 21;
-      citation1 = 'In sincere appreciation of enthusiastic participation, sportsmanship, and commendable effort in the $fullQuizTitle${totalScore > 0 ? ' with a total score of $totalScore points' : ''}.';
-      citation2 = 'Awarded on $dateString in recognition of dedication, active engagement, and passion for technology and continuous learning.';
-      centerGraphicSvg = '''<svg viewBox="0 0 180 65" width="180" height="65">
-  <path d="M 54,55 C 42,44 42,22 54,6" stroke="#16A34A" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="46,46 36,44 42,52" fill="#16A34A" />
-  <polygon points="40,34 30,32 36,40" fill="#16A34A" />
-  <polygon points="40,22 30,22 36,28" fill="#16A34A" />
-  <polygon points="46,12 38,14 42,20" fill="#16A34A" />
-  <polygon points="54,6 48,10 54,14" fill="#16A34A" />
-  <polygon points="48,42 56,40 50,48" fill="#16A34A" />
-  <polygon points="44,30 52,28 46,36" fill="#16A34A" />
-  <polygon points="44,18 52,18 46,24" fill="#16A34A" />
-  <path d="M 126,55 C 138,44 138,22 126,6" stroke="#16A34A" stroke-width="2.5" fill="none" stroke-linecap="round" />
-  <polygon points="134,46 144,44 138,52" fill="#16A34A" />
-  <polygon points="140,34 150,32 144,40" fill="#16A34A" />
-  <polygon points="140,22 150,22 144,28" fill="#16A34A" />
-  <polygon points="134,12 142,14 138,20" fill="#16A34A" />
-  <polygon points="126,6 132,10 126,14" fill="#16A34A" />
-  <polygon points="132,42 124,40 130,48" fill="#16A34A" />
-  <polygon points="136,30 128,28 134,36" fill="#16A34A" />
-  <polygon points="136,18 128,18 134,24" fill="#16A34A" />
-  <polygon points="90,8 96,24 113,24 99,35 104,51 90,40 76,51 81,35 67,24 84,24" fill="#F59E0B" />
-</svg>''';
+      // RANK 4+ & PARTICIPANTS - GREEN EDITION
+      primaryColorHex = '#10B981';
+      frameNavyHex = '#064E3B';
+      rosetteMainHex = '#10B981';
+      rosetteDarkHex = '#047857';
+      rosetteRibbonHex = '#059669';
+      navyPdfColor = const PdfColor.fromInt(0xFF064E3B);
+      primaryPdfColor = const PdfColor.fromInt(0xFF047857);
+      watermarkPdfColor = const PdfColor(0.06, 0.73, 0.51, 0.25);
+      rankBadgeText = rank > 0 ? 'RANK $rank' : 'FINALIST';
+      rankCitationText = rank > 0 ? 'RANK $rank' : 'FINALIST';
     }
 
-    final cornerTopLeftSvg = '''<svg viewBox="0 0 140 140" width="140" height="140">
-  <polygon points="0,0 35,0 0,35" fill="$darkCorner" />
-  <polygon points="15,0 80,0 0,80 0,15" fill="$midCorner" />
-  <polygon points="60,0 135,0 0,135 0,60" fill="$lightCorner" />
-</svg>''';
+    final cornerTopLeftSvg = _getCertCornerTopLeftSvg(frameNavyHex, primaryColorHex);
+    final cornerTopRightSvg = _getCertCornerTopRightSvg(frameNavyHex, primaryColorHex);
+    final cornerBottomLeftSvg = _getCertCornerBottomLeftSvg(frameNavyHex, primaryColorHex);
+    final cornerBottomRightSvg = _getCertCornerBottomRightSvg(frameNavyHex, primaryColorHex);
+    final edgeTopBottomSvg = _getCertEdgeTopBottomSvg(frameNavyHex, primaryColorHex);
+    final edgeLeftRightSvg = _getCertEdgeLeftRightSvg(frameNavyHex, primaryColorHex);
+    final rosetteSvg = _getCertRosetteSvg(
+      rosetteMain: rosetteMainHex,
+      rosetteDark: rosetteDarkHex,
+      rosetteRibbon: rosetteRibbonHex,
+    );
 
-    final cornerBottomRightSvg = '''<svg viewBox="0 0 140 140" width="140" height="140">
-  <polygon points="140,140 105,140 140,105" fill="$darkCorner" />
-  <polygon points="125,140 60,140 140,60 140,125" fill="$midCorner" />
-  <polygon points="80,140 5,140 140,5 140,80" fill="$lightCorner" />
-</svg>''';
+    // Build list of recipients:
+    // If team with members, each member receives their own personalized certificate with the team name!
+    final List<Map<String, String>> recipients = [];
+    if (members.isNotEmpty) {
+      for (final m in members) {
+        if (m.trim().isNotEmpty) {
+          recipients.add({
+            'name': m.trim(),
+            'team': teamName.trim().isNotEmpty ? teamName.trim() : '',
+          });
+        }
+      }
+    }
+    if (recipients.isEmpty) {
+      final effective = teamName.trim().isNotEmpty
+          ? teamName.trim()
+          : (contestantName.trim().isNotEmpty ? contestantName.trim() : 'Contestant');
+      recipients.add({
+        'name': effective,
+        'team': '',
+      });
+    }
 
-    final ribbonSvg = '''<svg viewBox="0 0 440 52" width="440" height="52">
-  <polygon points="45,42 45,50 58,42" fill="$ribbonFold" />
-  <polygon points="12,12 45,8 45,42 22,46 34,27" fill="$ribbonTail" />
-  <polygon points="395,42 395,50 382,42" fill="$ribbonFold" />
-  <polygon points="428,12 395,8 395,42 418,46 406,27" fill="$ribbonTail" />
-  <rect x="45" y="4" width="350" height="38" rx="3" fill="$ribbonMain" stroke="$ribbonStroke" stroke-width="1.5" />
-</svg>''';
+    for (final r in recipients) {
+      final recipientName = r['name']!;
+      final teamSubtitle = r['team']!.isNotEmpty ? 'Member of Team: ${r['team']!}' : '';
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(16),
-        build: (context) {
-          return pw.Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              border: pw.Border.all(color: borderColor, width: 2),
-            ),
-            child: pw.Stack(
-              children: [
-                // Top-Left Corner Geometric Stripes
-                pw.Positioned(
-                  top: 0,
-                  left: 0,
-                  child: pw.SvgImage(svg: cornerTopLeftSvg, width: 130, height: 130),
-                ),
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(16),
+          build: (context) {
+            return pw.Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: pw.BoxDecoration(
+                color: PdfColors.white,
+                border: pw.Border.all(color: navyPdfColor, width: 2.2),
+              ),
+              child: pw.Stack(
+                children: [
+                  // Inner decorative border
+                  pw.Positioned.fill(
+                    child: pw.Container(
+                      margin: const pw.EdgeInsets.all(6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: primaryPdfColor, width: 1.2),
+                      ),
+                    ),
+                  ),
 
-                // Bottom-Right Corner Geometric Stripes
-                pw.Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: pw.SvgImage(svg: cornerBottomRightSvg, width: 130, height: 130),
-                ),
+                  // 4 Corner Ornaments
+                  pw.Positioned(
+                    top: 0,
+                    left: 0,
+                    child: pw.SvgImage(svg: cornerTopLeftSvg, width: 70, height: 70),
+                  ),
+                  pw.Positioned(
+                    top: 0,
+                    right: 0,
+                    child: pw.SvgImage(svg: cornerTopRightSvg, width: 70, height: 70),
+                  ),
+                  pw.Positioned(
+                    bottom: 0,
+                    left: 0,
+                    child: pw.SvgImage(svg: cornerBottomLeftSvg, width: 70, height: 70),
+                  ),
+                  pw.Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: pw.SvgImage(svg: cornerBottomRightSvg, width: 70, height: 70),
+                  ),
 
-                // Center Content Body
-                pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(vertical: 22, horizontal: 30),
-                  child: pw.Column(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      // Header: TechNoWiz 3D Mascot & Brand Logo (Replaces plain text)
-                      if (certLogoImage != null)
-                        pw.Container(
-                          margin: const pw.EdgeInsets.only(bottom: 2),
-                          decoration: pw.BoxDecoration(
-                            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                            border: pw.Border.all(color: borderColor, width: 1.2),
-                          ),
-                          child: pw.ClipRRect(
-                            horizontalRadius: 7,
-                            verticalRadius: 7,
-                            child: pw.Image(
-                              certLogoImage,
-                              width: 110,
-                              height: 75,
-                              fit: pw.BoxFit.contain,
-                            ),
-                          ),
-                        )
-                      else
-                        pw.Column(
+                  // Center Edge Ornaments
+                  pw.Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: pw.Center(child: pw.SvgImage(svg: edgeTopBottomSvg, width: 120, height: 14)),
+                  ),
+                  pw.Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: pw.Center(child: pw.SvgImage(svg: edgeTopBottomSvg, width: 120, height: 14)),
+                  ),
+                  pw.Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: pw.Center(child: pw.SvgImage(svg: edgeLeftRightSvg, width: 14, height: 120)),
+                  ),
+                  pw.Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: pw.Center(child: pw.SvgImage(svg: edgeLeftRightSvg, width: 14, height: 120)),
+                  ),
+
+                  // Center Certificate Content Body
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 20, horizontal: 36),
+                    child: pw.Column(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        // Header Row: BSIT Logo + University Info + TechNoWiz Robot Mascot
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
-                            pw.Row(
-                              mainAxisAlignment: pw.MainAxisAlignment.center,
-                              children: [
-                                pw.Text(
-                                  'TechNo',
-                                  style: pw.TextStyle(
-                                    fontSize: 27,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: const PdfColor.fromInt(0xFF0F172A),
+                            // Left: BSIT Program Logo
+                            pw.Container(
+                              width: 80,
+                              child: pw.Column(
+                                mainAxisSize: pw.MainAxisSize.min,
+                                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                                children: [
+                                  if (bsitLogoImage != null)
+                                    pw.Image(bsitLogoImage, width: 56, height: 56, fit: pw.BoxFit.contain)
+                                  else
+                                    pw.Container(width: 56, height: 56),
+                                  pw.SizedBox(height: 2),
+                                  pw.Text(
+                                    'BSIT Program Logo',
+                                    style: const pw.TextStyle(
+                                      fontSize: 7.5,
+                                      color: PdfColor.fromInt(0xFF64748B),
+                                    ),
                                   ),
-                                ),
-                                pw.Text(
-                                  'Wiz',
-                                  style: pw.TextStyle(
-                                    fontSize: 27,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: const PdfColor.fromInt(0xFF0284C7),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                            pw.SizedBox(height: 2),
-                            pw.Row(
-                              mainAxisAlignment: pw.MainAxisAlignment.center,
-                              children: [
-                                pw.Container(width: 44, height: 1.2, color: const PdfColor.fromInt(0xFF0F172A)),
-                                pw.Padding(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10),
-                                  child: pw.Text(
-                                    'QUIZ COMPETITION',
+
+                            // Center: University, Campus, Department
+                            pw.Expanded(
+                              child: pw.Column(
+                                mainAxisSize: pw.MainAxisSize.min,
+                                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                                children: [
+                                  pw.Text(
+                                    config.universityName.trim().isNotEmpty
+                                        ? config.universityName.trim().toUpperCase()
+                                        : 'CEBU TECHNOLOGICAL UNIVERSITY',
+                                    textAlign: pw.TextAlign.center,
                                     style: pw.TextStyle(
-                                      fontSize: 9.5,
+                                      fontSize: 15,
                                       fontWeight: pw.FontWeight.bold,
-                                      letterSpacing: 2,
-                                      color: const PdfColor.fromInt(0xFF0F172A),
+                                      letterSpacing: 1.5,
+                                      color: navyPdfColor,
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 1.5),
+                                  pw.Text(
+                                    config.campusName.trim().isNotEmpty
+                                        ? config.campusName.trim().toUpperCase()
+                                        : 'TUBURAN & TABUELAN CAMPUSES',
+                                    textAlign: pw.TextAlign.center,
+                                    style: const pw.TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: pw.FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                      color: PdfColor.fromInt(0xFF334155),
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 1.5),
+                                  pw.Text(
+                                    config.departmentName.trim().isNotEmpty
+                                        ? config.departmentName.trim().toUpperCase()
+                                        : 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+                                    textAlign: pw.TextAlign.center,
+                                    style: pw.TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: pw.FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                      color: primaryPdfColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Right: TechNoWiz Mascot Robot with Trophy
+                            pw.Container(
+                              width: 80,
+                              child: pw.Column(
+                                mainAxisSize: pw.MainAxisSize.min,
+                                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                                children: [
+                                  if (robotMascotImage != null)
+                                    pw.Image(robotMascotImage, width: 56, height: 56, fit: pw.BoxFit.contain)
+                                  else
+                                    pw.Container(width: 56, height: 56),
+                                  pw.SizedBox(height: 2),
+                                  pw.Text(
+                                    'TechNoWiz',
+                                    style: pw.TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: const PdfColor.fromInt(0xFF0284C7),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Title Section: Double Title (Watermark + Foreground) & Subtitle
+                        pw.Column(
+                          mainAxisSize: pw.MainAxisSize.min,
+                          children: [
+                            pw.Container(
+                              height: 44,
+                              child: pw.Stack(
+                                alignment: pw.Alignment.center,
+                                children: [
+                                  pw.Positioned(
+                                    top: 0,
+                                    child: pw.Text(
+                                      config.certificateWatermark.trim().isNotEmpty
+                                          ? config.certificateWatermark.trim().toUpperCase()
+                                          : 'CERTIFICATE',
+                                      style: pw.TextStyle(
+                                        fontSize: 34,
+                                        fontWeight: pw.FontWeight.bold,
+                                        letterSpacing: 5.5,
+                                        color: watermarkPdfColor,
+                                      ),
+                                    ),
+                                  ),
+                                  pw.Positioned(
+                                    bottom: 0,
+                                    child: pw.Text(
+                                      config.certificateTitle.trim().isNotEmpty
+                                          ? config.certificateTitle.trim().toUpperCase()
+                                          : 'CERTIFICATE OF RECOGNITION',
+                                      style: pw.TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: pw.FontWeight.bold,
+                                        letterSpacing: 2,
+                                        color: navyPdfColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(
+                              config.certificateSubtitle.trim().isNotEmpty
+                                  ? config.certificateSubtitle.trim()
+                                  : 'This certificate is proudly presented to',
+                              style: const pw.TextStyle(
+                                fontSize: 11,
+                                fontStyle: pw.FontStyle.italic,
+                                color: PdfColor.fromInt(0xFF334155),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Contestant / Member Name & Details
+                        pw.Column(
+                          mainAxisSize: pw.MainAxisSize.min,
+                          children: [
+                            pw.Text(
+                              recipientName.toUpperCase(),
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                fontSize: 23,
+                                fontWeight: pw.FontWeight.bold,
+                                letterSpacing: 1.5,
+                                color: navyPdfColor,
+                              ),
+                            ),
+                            if (teamSubtitle.isNotEmpty) ...[
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                teamSubtitle,
+                                textAlign: pw.TextAlign.center,
+                                style: pw.TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: primaryPdfColor,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                            if (school.trim().isNotEmpty) ...[
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                school.trim().toUpperCase(),
+                                textAlign: pw.TextAlign.center,
+                                style: const pw.TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromInt(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                            pw.SizedBox(height: 4),
+                            pw.Container(
+                              width: 400,
+                              height: 1.2,
+                              color: navyPdfColor,
+                            ),
+                          ],
+                        ),
+
+                        // Medallion Rosette Badge with Rank Inside
+                        pw.Container(
+                          width: 62,
+                          height: 72,
+                          child: pw.Stack(
+                            alignment: pw.Alignment.center,
+                            children: [
+                              pw.SvgImage(svg: rosetteSvg, width: 62, height: 72),
+                              pw.Positioned(
+                                top: 25,
+                                child: pw.Container(
+                                  width: 48,
+                                  alignment: pw.Alignment.center,
+                                  child: pw.Text(
+                                    rankBadgeText,
+                                    textAlign: pw.TextAlign.center,
+                                    style: pw.TextStyle(
+                                      fontSize: rankBadgeText.length > 8 ? 6.5 : (rankBadgeText.length > 6 ? 7.5 : 8.5),
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColors.white,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ),
-                                pw.Container(width: 44, height: 1.2, color: const PdfColor.fromInt(0xFF0F172A)),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                      // Center Graphic: Trophy & Laurels or Star & Laurels
-                      pw.SvgImage(
-                        svg: centerGraphicSvg,
-                        width: 170,
-                        height: 56,
-                      ),
-
-                      // 3D Ribbon Banner with Title
-                      pw.Container(
-                        width: 440,
-                        height: 50,
-                        child: pw.Stack(
-                          alignment: pw.Alignment.center,
-                          children: [
-                            pw.SvgImage(svg: ribbonSvg, width: 440, height: 50),
-                            pw.Positioned(
-                              top: 7,
-                              child: pw.Text(
-                                ribbonTitle,
-                                style: pw.TextStyle(
-                                  fontSize: ribbonFontSize,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: ribbonTextColor,
-                                  letterSpacing: 1.5,
-                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
 
-                      // Certificate Subtitles
-                      pw.Column(
-                        children: [
-                          pw.Text(
-                            config.certificateTitle.trim().isNotEmpty
-                                ? config.certificateTitle.trim()
-                                : 'CERTIFICATE OF ACHIEVEMENT',
-                            style: pw.TextStyle(
-                              fontSize: 14,
-                              fontWeight: pw.FontWeight.bold,
-                              color: const PdfColor.fromInt(0xFF0F172A),
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          pw.SizedBox(height: 5),
-                          pw.Text(
-                            config.certificateSubtitle.trim().isNotEmpty
-                                ? config.certificateSubtitle.trim()
-                                : 'This certificate is proudly awarded to',
-                            style: const pw.TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColor.fromInt(0xFF334155),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // Contestant / Team Name & Underline
-                      pw.Column(
-                        children: [
-                          pw.Text(
-                            effectiveName.toUpperCase(),
+                        // Citation Statement
+                        pw.Container(
+                          width: 580,
+                          child: pw.Text(
+                            'for achieving $rankCitationText in the ${config.eventName.trim()} during the ${config.occasionName.trim()}, held on $dateString, at ${config.venue.trim().isNotEmpty ? config.venue.trim() : "BSIT Building"}.',
                             textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(
-                              fontSize: 24,
-                              fontWeight: pw.FontWeight.bold,
-                              color: const PdfColor.fromInt(0xFF0F172A),
-                              letterSpacing: 1.2,
+                            style: const pw.TextStyle(
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.normal,
+                              color: PdfColor.fromInt(0xFF1E293B),
+                              lineSpacing: 2,
                             ),
                           ),
-                          if (teamName.trim().isNotEmpty &&
-                              contestantName.trim().isNotEmpty &&
-                              contestantName.trim().toLowerCase() != teamName.trim().toLowerCase()) ...[
-                            pw.SizedBox(height: 2),
-                            pw.Text(
-                              'Team Leader / Contestant: ${contestantName.trim()}',
-                              textAlign: pw.TextAlign.center,
-                              style: const pw.TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColor.fromInt(0xFF475569),
-                              ),
-                            ),
-                          ],
-                          if (school.trim().isNotEmpty) ...[
-                            pw.SizedBox(height: 2),
-                            pw.Text(
-                              school.trim(),
-                              textAlign: pw.TextAlign.center,
-                              style: const pw.TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColor.fromInt(0xFF475569),
-                              ),
-                            ),
-                          ],
-                          pw.SizedBox(height: 4),
-                          pw.Container(
-                            width: 440,
-                            height: 1.5,
-                            color: const PdfColor.fromInt(0xFF0F172A),
-                          ),
-                        ],
-                      ),
-
-                      // Words & Citations Under Name
-                      pw.Container(
-                        width: 530,
-                        child: pw.Column(
-                          children: [
-                            pw.Text(
-                              citation1,
-                              textAlign: pw.TextAlign.center,
-                              style: const pw.TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColor.fromInt(0xFF1E293B),
-                                lineSpacing: 2,
-                              ),
-                            ),
-                            pw.SizedBox(height: 3),
-                            pw.Text(
-                              citation2,
-                              textAlign: pw.TextAlign.center,
-                              style: pw.TextStyle(
-                                fontSize: 9,
-                                fontWeight: pw.FontWeight.bold,
-                                fontStyle: pw.FontStyle.italic,
-                                color: const PdfColor.fromInt(0xFF334155),
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
 
-                      // Signatures: Configured by Admin via Manage Certificate
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 40),
-                        child: _buildPdfSignaturesRow(config),
-                      ),
-                    ],
+                        // Signatures: 3 Signatories with Scribbles & Lines
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 20),
+                          child: _buildPdfSignaturesRow(config, navyPdfColor, frameNavyHex),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (printAfter) {
-      final safeName = effectiveName.replaceAll(' ', '_').replaceAll(RegExp(r'[^\w\.-]'), '');
+      final safeName = (teamName.isNotEmpty ? teamName : contestantName)
+          .replaceAll(' ', '_')
+          .replaceAll(RegExp(r'[^\w\.-]'), '');
       await Printing.layoutPdf(
         onLayout: (format) async => pdf.save(),
         name: 'TechNoWiz_Certificate_Rank${rank}_$safeName.pdf',
@@ -1116,6 +1114,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         quizTitle: quizTitle,
         rank: index + 1,
         teamName: c.teamName,
+        members: c.members,
         school: c.school,
         totalScore: c.totalScore,
         level1Score: c.level1Score,
@@ -3256,6 +3255,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               quizTitle: quizTitle,
               rank: rank,
               teamName: c.teamName,
+              members: c.members,
               school: c.school,
               totalScore: c.totalScore,
               level1Score: c.level1Score,
@@ -3989,36 +3989,69 @@ class CertificateSignatory {
 }
 
 class CertificateConfig {
+  String universityName;
+  String campusName;
+  String departmentName;
+  String certificateWatermark;
   String certificateTitle;
   String certificateSubtitle;
+  String eventName;
+  String occasionName;
+  String venue;
   List<CertificateSignatory> signatories;
 
   CertificateConfig({
-    this.certificateTitle = 'CERTIFICATE OF ACHIEVEMENT',
-    this.certificateSubtitle = 'This certificate is proudly awarded to',
+    this.universityName = 'CEBU TECHNOLOGICAL UNIVERSITY',
+    this.campusName = 'TUBURAN & TABUELAN CAMPUSES',
+    this.departmentName = 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+    this.certificateWatermark = 'CERTIFICATE',
+    this.certificateTitle = 'CERTIFICATE OF RECOGNITION',
+    this.certificateSubtitle = 'This certificate is proudly presented to',
+    this.eventName = 'TechNoWiz Quiz Competition',
+    this.occasionName = 'Information Technology Days',
+    this.venue = 'BSIT Building',
     required this.signatories,
   });
 
   static CertificateConfig defaultTemplate() => CertificateConfig(
-        certificateTitle: 'CERTIFICATE OF ACHIEVEMENT',
-        certificateSubtitle: 'This certificate is proudly awarded to',
+        universityName: 'CEBU TECHNOLOGICAL UNIVERSITY',
+        campusName: 'TUBURAN & TABUELAN CAMPUSES',
+        departmentName: 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+        certificateWatermark: 'CERTIFICATE',
+        certificateTitle: 'CERTIFICATE OF RECOGNITION',
+        certificateSubtitle: 'This certificate is proudly presented to',
+        eventName: 'TechNoWiz Quiz Competition',
+        occasionName: 'Information Technology Days',
+        venue: 'BSIT Building',
         signatories: [
           CertificateSignatory(
             name: '',
-            title: 'Event Organizer',
+            title: 'Quiz Master / Event Facilitator',
             showLine: true,
           ),
           CertificateSignatory(
             name: '',
-            title: 'TechNoWiz Host',
+            title: 'Department Chairperson',
+            showLine: true,
+          ),
+          CertificateSignatory(
+            name: '',
+            title: 'College Dean / Campus Director',
             showLine: true,
           ),
         ],
       );
 
   Map<String, dynamic> toMap() => {
+        'universityName': universityName,
+        'campusName': campusName,
+        'departmentName': departmentName,
+        'certificateWatermark': certificateWatermark,
         'certificateTitle': certificateTitle,
         'certificateSubtitle': certificateSubtitle,
+        'eventName': eventName,
+        'occasionName': occasionName,
+        'venue': venue,
         'signatories': signatories.map((s) => s.toMap()).toList(),
       };
 
@@ -4039,11 +4072,25 @@ class CertificateConfig {
     }
 
     return CertificateConfig(
-      certificateTitle:
-          (map['certificateTitle'] ?? 'CERTIFICATE OF ACHIEVEMENT').toString(),
-      certificateSubtitle:
-          (map['certificateSubtitle'] ?? 'This certificate is proudly awarded to')
+      universityName:
+          (map['universityName'] ?? 'CEBU TECHNOLOGICAL UNIVERSITY').toString(),
+      campusName:
+          (map['campusName'] ?? 'TUBURAN & TABUELAN CAMPUSES').toString(),
+      departmentName:
+          (map['departmentName'] ?? 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY')
               .toString(),
+      certificateWatermark:
+          (map['certificateWatermark'] ?? 'CERTIFICATE').toString(),
+      certificateTitle:
+          (map['certificateTitle'] ?? 'CERTIFICATE OF RECOGNITION').toString(),
+      certificateSubtitle:
+          (map['certificateSubtitle'] ?? 'This certificate is proudly presented to')
+              .toString(),
+      eventName:
+          (map['eventName'] ?? 'TechNoWiz Quiz Competition').toString(),
+      occasionName:
+          (map['occasionName'] ?? 'Information Technology Days').toString(),
+      venue: (map['venue'] ?? 'BSIT Building').toString(),
       signatories: sigs,
     );
   }
@@ -4072,10 +4119,17 @@ class _ManageCertificateDialog extends StatefulWidget {
 }
 
 class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
+  late final TextEditingController _univController;
+  late final TextEditingController _campusController;
+  late final TextEditingController _deptController;
+  late final TextEditingController _watermarkController;
   late final TextEditingController _titleController;
   late final TextEditingController _subtitleController;
+  late final TextEditingController _eventController;
+  late final TextEditingController _occasionController;
+  late final TextEditingController _venueController;
 
-  int _signatoryCount = 2;
+  int _signatoryCount = 3;
   late final List<TextEditingController> _nameControllers;
   late final List<TextEditingController> _titleControllers;
   late final List<bool> _showLines;
@@ -4085,12 +4139,18 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
   @override
   void initState() {
     super.initState();
-    _titleController =
-        TextEditingController(text: widget.initialConfig.certificateTitle);
-    _subtitleController =
-        TextEditingController(text: widget.initialConfig.certificateSubtitle);
+    final c = widget.initialConfig;
+    _univController = TextEditingController(text: c.universityName);
+    _campusController = TextEditingController(text: c.campusName);
+    _deptController = TextEditingController(text: c.departmentName);
+    _watermarkController = TextEditingController(text: c.certificateWatermark);
+    _titleController = TextEditingController(text: c.certificateTitle);
+    _subtitleController = TextEditingController(text: c.certificateSubtitle);
+    _eventController = TextEditingController(text: c.eventName);
+    _occasionController = TextEditingController(text: c.occasionName);
+    _venueController = TextEditingController(text: c.venue);
 
-    final sigs = widget.initialConfig.signatories;
+    final sigs = c.signatories;
     _signatoryCount = sigs.length.clamp(1, 3);
 
     _nameControllers = List.generate(3, (i) {
@@ -4100,9 +4160,9 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
 
     _titleControllers = List.generate(3, (i) {
       if (i < sigs.length) return TextEditingController(text: sigs[i].title);
-      if (i == 0) return TextEditingController(text: 'Event Organizer');
-      if (i == 1) return TextEditingController(text: 'TechNoWiz Host');
-      return TextEditingController(text: 'Campus Director');
+      if (i == 0) return TextEditingController(text: 'Quiz Master / Event Facilitator');
+      if (i == 1) return TextEditingController(text: 'Department Chairperson');
+      return TextEditingController(text: 'College Dean / Campus Director');
     });
 
     _showLines = List.generate(3, (i) {
@@ -4110,14 +4170,20 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
       return true;
     });
 
-    // Listen to updates for live preview
+    _univController.addListener(_refresh);
+    _campusController.addListener(_refresh);
+    _deptController.addListener(_refresh);
+    _watermarkController.addListener(_refresh);
     _titleController.addListener(_refresh);
     _subtitleController.addListener(_refresh);
-    for (final c in _nameControllers) {
-      c.addListener(_refresh);
+    _eventController.addListener(_refresh);
+    _occasionController.addListener(_refresh);
+    _venueController.addListener(_refresh);
+    for (final ctrl in _nameControllers) {
+      ctrl.addListener(_refresh);
     }
-    for (final c in _titleControllers) {
-      c.addListener(_refresh);
+    for (final ctrl in _titleControllers) {
+      ctrl.addListener(_refresh);
     }
   }
 
@@ -4127,8 +4193,15 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
 
   @override
   void dispose() {
+    _univController.dispose();
+    _campusController.dispose();
+    _deptController.dispose();
+    _watermarkController.dispose();
     _titleController.dispose();
     _subtitleController.dispose();
+    _eventController.dispose();
+    _occasionController.dispose();
+    _venueController.dispose();
     for (final c in _nameControllers) {
       c.dispose();
     }
@@ -4147,41 +4220,63 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
           title: _titleControllers[i].text.trim().isNotEmpty
               ? _titleControllers[i].text.trim()
               : (i == 0
-                  ? 'Event Organizer'
-                  : (i == 1 ? 'TechNoWiz Host' : 'Campus Director')),
+                  ? 'Quiz Master / Event Facilitator'
+                  : (i == 1 ? 'Department Chairperson' : 'College Dean / Campus Director')),
           showLine: _showLines[i],
         ),
       );
     }
 
     return CertificateConfig(
+      universityName: _univController.text.trim().isNotEmpty
+          ? _univController.text.trim()
+          : 'CEBU TECHNOLOGICAL UNIVERSITY',
+      campusName: _campusController.text.trim().isNotEmpty
+          ? _campusController.text.trim()
+          : 'TUBURAN & TABUELAN CAMPUSES',
+      departmentName: _deptController.text.trim().isNotEmpty
+          ? _deptController.text.trim()
+          : 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+      certificateWatermark: _watermarkController.text.trim().isNotEmpty
+          ? _watermarkController.text.trim()
+          : 'CERTIFICATE',
       certificateTitle: _titleController.text.trim().isNotEmpty
           ? _titleController.text.trim()
-          : 'CERTIFICATE OF ACHIEVEMENT',
+          : 'CERTIFICATE OF RECOGNITION',
       certificateSubtitle: _subtitleController.text.trim().isNotEmpty
           ? _subtitleController.text.trim()
-          : 'This certificate is proudly awarded to',
+          : 'This certificate is proudly presented to',
+      eventName: _eventController.text.trim().isNotEmpty
+          ? _eventController.text.trim()
+          : 'TechNoWiz Quiz Competition',
+      occasionName: _occasionController.text.trim().isNotEmpty
+          ? _occasionController.text.trim()
+          : 'Information Technology Days',
+      venue: _venueController.text.trim().isNotEmpty
+          ? _venueController.text.trim()
+          : 'BSIT Building',
       signatories: activeSignatories,
     );
   }
 
   void _resetToDefault() {
     final def = CertificateConfig.defaultTemplate();
+    _univController.text = def.universityName;
+    _campusController.text = def.campusName;
+    _deptController.text = def.departmentName;
+    _watermarkController.text = def.certificateWatermark;
     _titleController.text = def.certificateTitle;
     _subtitleController.text = def.certificateSubtitle;
-    _signatoryCount = 2;
+    _eventController.text = def.eventName;
+    _occasionController.text = def.occasionName;
+    _venueController.text = def.venue;
+    _signatoryCount = 3;
 
-    _nameControllers[0].text = def.signatories[0].name;
-    _titleControllers[0].text = def.signatories[0].title;
-    _showLines[0] = def.signatories[0].showLine;
-
-    _nameControllers[1].text = def.signatories[1].name;
-    _titleControllers[1].text = def.signatories[1].title;
-    _showLines[1] = def.signatories[1].showLine;
-
-    _nameControllers[2].text = '';
-    _titleControllers[2].text = 'Campus Director';
-    _showLines[2] = true;
+    for (int i = 0; i < 3; i++) {
+      _nameControllers[i].text = def.signatories[i].name;
+      _titleControllers[i].text = def.signatories[i].title;
+      _showLines[i] = def.signatories[i].showLine;
+    }
 
     setState(() {});
   }
@@ -4195,7 +4290,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
         width: double.infinity,
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 760),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(22),
@@ -4241,7 +4336,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Manage Certificate Signatures',
+                          'Manage Certificate & Layout',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -4250,7 +4345,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Edit signatory names, lines, and certificate titles',
+                          'Customize institutional header, titles, event info, and signatures',
                           style: TextStyle(
                             color: Colors.white70,
                             fontSize: 11.5,
@@ -4274,16 +4369,137 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Section 1: Number of Signatories
-                    Text(
-                      'NUMBER OF SIGNATORIES',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                        color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
+                    // Section 1: Institutional Header
+                    _buildSectionHeader('INSTITUTIONAL HEADER & DEPARTMENT', isDark),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _univController,
+                      decoration: InputDecoration(
+                        labelText: 'University / Institution Name',
+                        hintText: 'e.g. CEBU TECHNOLOGICAL UNIVERSITY',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _campusController,
+                      decoration: InputDecoration(
+                        labelText: 'Campuses',
+                        hintText: 'e.g. TUBURAN & TABUELAN CAMPUSES',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _deptController,
+                      decoration: InputDecoration(
+                        labelText: 'Program / Department',
+                        hintText: 'e.g. BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section 2: Certificate Titles
+                    _buildSectionHeader('CERTIFICATE TITLES & PRESENTATION', isDark),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _watermarkController,
+                      decoration: InputDecoration(
+                        labelText: 'Background Watermark Text',
+                        hintText: 'e.g. CERTIFICATE',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Foreground Certificate Title',
+                        hintText: 'e.g. CERTIFICATE OF RECOGNITION',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _subtitleController,
+                      decoration: InputDecoration(
+                        labelText: 'Presentation Subtitle',
+                        hintText: 'e.g. This certificate is proudly presented to',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section 3: Event & Citation Details
+                    _buildSectionHeader('EVENT & OCCASION DETAILS (CITATION)', isDark),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _eventController,
+                      decoration: InputDecoration(
+                        labelText: 'Event / Competition Name',
+                        hintText: 'e.g. TechNoWiz Quiz Competition',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _occasionController,
+                      decoration: InputDecoration(
+                        labelText: 'Occasion / Celebration',
+                        hintText: 'e.g. Information Technology Days',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _venueController,
+                      decoration: InputDecoration(
+                        labelText: 'Venue / School Location',
+                        hintText: 'e.g. BSIT Building',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section 4: Number of Signatories & Signatory Cards
+                    _buildSectionHeader('AUTHORIZED SIGNATORIES', isDark),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
@@ -4341,108 +4557,164 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
 
-                    // Section 2: Signatory Details Cards
                     for (int i = 0; i < _signatoryCount; i++) ...[
                       _buildSignatoryEditorCard(i, isDark),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                     ],
-
-                    const SizedBox(height: 6),
-
-                    // Section 3: Certificate Title & Award Statement
-                    Theme(
-                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        initiallyExpanded: false,
-                        tilePadding: EdgeInsets.zero,
-                        title: Text(
-                          'CERTIFICATE TITLES & WORDING (OPTIONAL)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
-                          ),
-                        ),
-                        children: [
-                          TextField(
-                            controller: _titleController,
-                            decoration: InputDecoration(
-                              labelText: 'Certificate Title',
-                              hintText: 'e.g. CERTIFICATE OF ACHIEVEMENT',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _subtitleController,
-                            decoration: InputDecoration(
-                              labelText: 'Award Statement / Subtitle',
-                              hintText: 'e.g. This certificate is proudly awarded to',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                      ),
-                    ),
 
                     const SizedBox(height: 10),
 
-                    // Section 4: Real-time In-App Visual Preview
-                    Text(
-                      'REAL-TIME SIGNATURE PREVIEW',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                        color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
-                      ),
-                    ),
+                    // Section 5: Real-time In-App Visual Preview
+                    _buildSectionHeader('REAL-TIME CERTIFICATE PREVIEW', isDark),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
+                        color: const Color(0xFFFFFDF5),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
+                        border: Border.all(color: const Color(0xFFD4AF37), width: 1.8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Column(
                         children: [
+                          // Header CTU & BSIT
                           Text(
-                            _titleController.text.trim().isNotEmpty
-                                ? _titleController.text.trim().toUpperCase()
-                                : 'CERTIFICATE OF ACHIEVEMENT',
+                            _univController.text.trim().isNotEmpty
+                                ? _univController.text.trim().toUpperCase()
+                                : 'CEBU TECHNOLOGICAL UNIVERSITY',
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: Color(0xFF0F172A),
                               fontWeight: FontWeight.w900,
-                              fontSize: 12,
+                              fontSize: 11.5,
                               letterSpacing: 1.2,
                             ),
+                          ),
+                          Text(
+                            _campusController.text.trim().isNotEmpty
+                                ? _campusController.text.trim().toUpperCase()
+                                : 'TUBURAN & TABUELAN CAMPUSES',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF475569),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 8.5,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          Text(
+                            _deptController.text.trim().isNotEmpty
+                                ? _deptController.text.trim().toUpperCase()
+                                : 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFFB45309),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 9,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Watermark & Title
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Text(
+                                _watermarkController.text.trim().isNotEmpty
+                                    ? _watermarkController.text.trim().toUpperCase()
+                                    : 'CERTIFICATE',
+                                style: TextStyle(
+                                  color: const Color(0xFFD4AF37).withValues(alpha: 0.30),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 22,
+                                  letterSpacing: 4.0,
+                                ),
+                              ),
+                              Text(
+                                _titleController.text.trim().isNotEmpty
+                                    ? _titleController.text.trim().toUpperCase()
+                                    : 'CERTIFICATE OF RECOGNITION',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12.5,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _subtitleController.text.trim().isNotEmpty
                                 ? _subtitleController.text.trim()
-                                : 'This certificate is proudly awarded to',
+                                : 'This certificate is proudly presented to',
                             style: const TextStyle(
                               color: Color(0xFF475569),
-                              fontSize: 10,
+                              fontSize: 9.5,
                               fontStyle: FontStyle.italic,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 8),
+
+                          // Sample Contestant
+                          const Text(
+                            'CONTESTANT / TEAM MEMBER NAME',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Container(width: 220, height: 1.2, color: const Color(0xFF0F172A)),
+                          const SizedBox(height: 8),
+
+                          // Rosette Medal badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFB45309), width: 1.2),
+                            ),
+                            child: const Text(
+                              '★ CHAMPION ★',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Citation preview
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              'for achieving CHAMPION in the ${_eventController.text.trim()} during the ${_occasionController.text.trim()}, held on [Date of Event], at ${_venueController.text.trim()}.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 8.5,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
 
                           // Live Signatures Row Preview
                           Row(
@@ -4461,30 +4733,30 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                                             : '(Manual Signature)',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          fontSize: 10.5,
+                                          fontSize: 9.5,
                                           fontWeight: FontWeight.bold,
                                           color: _nameControllers[i].text.trim().isNotEmpty
                                               ? const Color(0xFF0F172A)
                                               : Colors.grey.shade500,
                                         ),
                                       ),
-                                      const SizedBox(height: 3),
+                                      const SizedBox(height: 2),
                                       if (_showLines[i])
                                         Container(
-                                          height: 1.5,
+                                          height: 1.2,
                                           color: const Color(0xFF0F172A),
-                                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                                          margin: const EdgeInsets.symmetric(horizontal: 8),
                                         )
                                       else
-                                        const SizedBox(height: 1.5),
-                                      const SizedBox(height: 3),
+                                        const SizedBox(height: 1.2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         _titleControllers[i].text.trim().isNotEmpty
                                             ? _titleControllers[i].text.trim()
                                             : 'Authorized Signatory',
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
-                                          fontSize: 9.5,
+                                          fontSize: 8.5,
                                           fontWeight: FontWeight.w700,
                                           color: Color(0xFF0F172A),
                                         ),
@@ -4493,7 +4765,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                                   ),
                                 ),
                                 if (i < _signatoryCount - 1)
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 8),
                               ],
                             ],
                           ),
@@ -4592,12 +4864,24 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
     );
   }
 
+  Widget _buildSectionHeader(String title, bool isDark) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.8,
+        color: isDark ? Colors.white70 : AdminThemeColors.textSecondary,
+      ),
+    );
+  }
+
   Widget _buildSignatoryEditorCard(int index, bool isDark) {
     final positionLabel = index == 0
-        ? 'Signatory 1 (Left / Organizer)'
+        ? 'Signatory 1 (Left / Quiz Master)'
         : (index == 1
-            ? 'Signatory 2 (Right / Quiz Master)'
-            : 'Signatory 3 (Center / Approver)');
+            ? 'Signatory 2 (Center / Chairperson)'
+            : 'Signatory 3 (Right / Dean & Director)');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -4682,7 +4966,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
             controller: _titleControllers[index],
             decoration: InputDecoration(
               labelText: 'Designation / Title',
-              hintText: 'e.g. Event Organizer, Dean, Quiz Master',
+              hintText: 'e.g. Quiz Master / Chairperson / Dean',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               filled: true,
               fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
@@ -5536,15 +5820,31 @@ class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> 
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Radio<ReportPrintSection>(
-                                value: opt['section'] as ReportPrintSection,
-                                groupValue: _selectedSection,
-                                activeColor: const Color(0xFF4F46E5),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _selectedSection = val);
-                                },
+                              Container(
+                                width: 20,
+                                height: 20,
+                                margin: const EdgeInsets.only(top: 2, right: 8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _selectedSection == opt['section']
+                                        ? const Color(0xFF4F46E5)
+                                        : (isDark ? Colors.white38 : Colors.grey.shade400),
+                                    width: 2,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: _selectedSection == opt['section']
+                                    ? Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Color(0xFF4F46E5),
+                                        ),
+                                      )
+                                    : null,
                               ),
-                              const SizedBox(width: 4),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
