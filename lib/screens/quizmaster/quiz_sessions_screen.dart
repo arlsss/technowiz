@@ -4253,6 +4253,15 @@ class ParticipantReadinessPage extends StatelessWidget {
           'Check the difficulty and contestants to proceed.',
         ],
       },
+      {
+        'icon': Icons.military_tech_rounded,
+        'title': 'TIE BREAKER',
+        'bullets': <String>[
+          'Triggered automatically when contestants tie for top ranks.',
+          'Only tied contestants participate in sudden-death questions.',
+          'Tie-breaker points directly determine final podium rankings.',
+        ],
+      },
     ];
 
     return Container(
