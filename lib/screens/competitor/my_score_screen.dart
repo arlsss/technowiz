@@ -44,6 +44,27 @@ class _MyScoreScreenState extends State<MyScoreScreen> {
     }
   }
 
+  int _extractEffectiveScore(Map<String, dynamic> data) {
+    int total = int.tryParse(data['score']?.toString() ?? '') ??
+        int.tryParse(data['totalScore']?.toString() ?? '') ?? 0;
+    int lvlSum = 0;
+    for (int l = 1; l <= 20; l++) {
+      final v = data['level${l}Score'] ?? data['level_$l'];
+      if (v != null) lvlSum += int.tryParse(v.toString()) ?? 0;
+    }
+    if (data['levelScores'] is Map) {
+      int mSum = 0;
+      for (final v in (data['levelScores'] as Map).values) {
+        if (v != null) mSum += int.tryParse(v.toString()) ?? 0;
+      }
+      if (mSum > lvlSum) lvlSum = mSum;
+    }
+    if (lvlSum > total) total = lvlSum;
+    final tiePts = int.tryParse(data['tieBreakerScore']?.toString() ?? '') ?? 0;
+    if (tiePts > 0 && total < (lvlSum + tiePts)) total += tiePts;
+    return total;
+  }
+
   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -124,14 +145,14 @@ class _MyScoreScreenState extends State<MyScoreScreen> {
 
                     if (userScoreDoc != null) {
                       final data = userScoreDoc.data();
-                      liveScore = data['score'] ?? 0;
+                      liveScore = _extractEffectiveScore(data);
                       liveRank = data['rank'];
                     }
 
                     final sortedScores = scores.toList()
                       ..sort(
-                        (a, b) => ((b.data()['score'] ?? 0) as int).compareTo(
-                          (a.data()['score'] ?? 0) as int,
+                        (a, b) => _extractEffectiveScore(b.data()).compareTo(
+                          _extractEffectiveScore(a.data()),
                         ),
                       );
 

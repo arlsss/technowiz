@@ -1811,8 +1811,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           respUpdate['quizmasterComment'] = comment;
           respUpdate['rejectionReason'] = comment;
         }
-        await respRef.set(respUpdate, SetOptions(merge: true));
-
         // When approved, award points directly to the contestant's score
         if (approve) {
           int pointsToAward = 1;
@@ -1831,22 +1829,35 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             }
           }
 
+          respUpdate['points'] = pointsToAward;
+
           final scoreRef = FirebaseFirestore.instance
               .collection('quiz_sessions')
               .doc(widget.quizCode)
               .collection('scores')
               .doc(contestantUid);
 
-          await scoreRef.set({
+          final qLevel = _getLevel(qIndex);
+          final scoreUpdate = <String, dynamic>{
             'score': FieldValue.increment(pointsToAward),
             'totalScore': FieldValue.increment(pointsToAward),
+            'level${qLevel}Score': FieldValue.increment(pointsToAward),
+            'levelScores': {
+              'Level $qLevel': FieldValue.increment(pointsToAward),
+            },
             'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          };
+          if (_isTieBreakerActive) {
+            scoreUpdate['tieBreakerScore'] = FieldValue.increment(pointsToAward);
+          }
+          await scoreRef.set(scoreUpdate, SetOptions(merge: true));
 
           await request.reference.update({
             'scoreApplied': true,
           });
         }
+
+        await respRef.set(respUpdate, SetOptions(merge: true));
       }
 
       if (mounted) {
@@ -5887,8 +5898,22 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 }
               }
 
-              final int score =
-                  _asInt(sData['score']) ?? _asInt(jData['score']) ?? 0;
+              int score =
+                  _asInt(sData['score']) ?? _asInt(sData['totalScore']) ?? _asInt(jData['score']) ?? 0;
+              int lvlSum = 0;
+              for (int l = 1; l <= 20; l++) {
+                lvlSum += _asInt(sData['level${l}Score']) ?? _asInt(sData['level_$l']) ?? 0;
+              }
+              if (sData['levelScores'] is Map) {
+                int mSum = 0;
+                for (final v in (sData['levelScores'] as Map).values) {
+                  mSum += _asInt(v) ?? 0;
+                }
+                if (mSum > lvlSum) lvlSum = mSum;
+              }
+              if (lvlSum > score) score = lvlSum;
+              final tiePts = _asInt(sData['tieBreakerScore']) ?? 0;
+              if (tiePts > 0 && score < (lvlSum + tiePts)) score += tiePts;
 
               final bool isEliminated =
                   sData['eliminated'] == true ||

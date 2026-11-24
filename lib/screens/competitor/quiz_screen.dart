@@ -4663,16 +4663,29 @@ class _QuizScreenState extends State<QuizScreen> {
       final newLevelScore =
           (oldLevelScore + points) < 0 ? 0 : (oldLevelScore + points);
 
+      int sumOfLevels = 0;
+      for (int l = 1; l <= 20; l++) {
+        if (l == targetLevel) {
+          sumOfLevels += newLevelScore;
+        } else {
+          final dynamic r = scoreDoc.data()?[levelKey] ?? scoreDoc.data()?['level_$l'];
+          if (r != null) sumOfLevels += int.tryParse(r.toString()) ?? 0;
+        }
+      }
+      final effectiveScore = newScore > sumOfLevels ? newScore : sumOfLevels;
+
       transaction.set(scoreRef, {
         'uid': uid,
         'name': name,
         'teamName': teamName,
         'teamMembers': teamMembers,
         'members': teamMembers,
-        'score': newScore,
-        'totalScore': newScore,
+        'score': effectiveScore,
+        'totalScore': effectiveScore,
         levelKey: newLevelScore,
-        'levelScores.Level $targetLevel': newLevelScore,
+        'levelScores': {
+          'Level $targetLevel': newLevelScore,
+        },
         'currentLevel': targetLevel,
         'lastQuestion': questionNumber,
         'lastPoints': points,
@@ -5366,6 +5379,26 @@ class _QuizScreenState extends State<QuizScreen> {
                                   finalPoints = parsed;
                                   _localLevelPoints[currentLevel] = finalPoints;
                                 }
+                              }
+                            }
+
+                            if (finalPoints > 0 && FirebaseAuth.instance.currentUser != null) {
+                              final currentUid = FirebaseAuth.instance.currentUser!.uid;
+                              final scoreRef = _sessionRef.collection('scores').doc(currentUid);
+                              final levelKey = 'level${currentLevel}Score';
+                              final int existingLvlScore = int.tryParse(sData?[levelKey]?.toString() ?? '') ?? 0;
+                              if (finalPoints > existingLvlScore) {
+                                final int diff = finalPoints - existingLvlScore;
+                                final int currentTotal = int.tryParse(sData?['score']?.toString() ?? '') ?? 0;
+                                scoreRef.set({
+                                  levelKey: finalPoints,
+                                  'levelScores': {
+                                    'Level $currentLevel': finalPoints,
+                                  },
+                                  'score': currentTotal + diff,
+                                  'totalScore': currentTotal + diff,
+                                  'updatedAt': FieldValue.serverTimestamp(),
+                                }, SetOptions(merge: true)).catchError((_) {});
                               }
                             }
 
@@ -6097,7 +6130,22 @@ class _QuizScreenState extends State<QuizScreen> {
                             ? (teamName.isNotEmpty ? teamName : personalName)
                             : personalName;
 
-                        final scoreVal = int.tryParse((sData['score'] ?? cData['score'])?.toString() ?? '') ?? 0;
+                        int scoreVal = int.tryParse((sData['score'] ?? sData['totalScore'] ?? cData['score'])?.toString() ?? '') ?? 0;
+                        int lvlSum = 0;
+                        for (int l = 1; l <= 20; l++) {
+                          final v = sData['level${l}Score'] ?? sData['level_$l'];
+                          if (v != null) lvlSum += int.tryParse(v.toString()) ?? 0;
+                        }
+                        if (sData['levelScores'] is Map) {
+                          int mSum = 0;
+                          for (final v in (sData['levelScores'] as Map).values) {
+                            if (v != null) mSum += int.tryParse(v.toString()) ?? 0;
+                          }
+                          if (mSum > lvlSum) lvlSum = mSum;
+                        }
+                        if (lvlSum > scoreVal) scoreVal = lvlSum;
+                        final tiePts = int.tryParse(sData['tieBreakerScore']?.toString() ?? '') ?? 0;
+                        if (tiePts > 0 && scoreVal < (lvlSum + tiePts)) scoreVal += tiePts;
 
                         rows.add({
                           'uid': uid,

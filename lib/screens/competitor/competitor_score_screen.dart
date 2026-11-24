@@ -26,7 +26,24 @@ class CompetitorScoreScreen extends StatelessWidget {
 
           int totalScore = 0;
           if (snapshot.data!.docs.isNotEmpty) {
-            totalScore = snapshot.data!.docs.first['score'] ?? 0;
+            final data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+            totalScore = int.tryParse(data['score']?.toString() ?? '') ??
+                int.tryParse(data['totalScore']?.toString() ?? '') ?? 0;
+            int lvlSum = 0;
+            for (int l = 1; l <= 20; l++) {
+              final v = data['level${l}Score'] ?? data['level_$l'];
+              if (v != null) lvlSum += int.tryParse(v.toString()) ?? 0;
+            }
+            if (data['levelScores'] is Map) {
+              int mSum = 0;
+              for (final v in (data['levelScores'] as Map).values) {
+                if (v != null) mSum += int.tryParse(v.toString()) ?? 0;
+              }
+              if (mSum > lvlSum) lvlSum = mSum;
+            }
+            if (lvlSum > totalScore) totalScore = lvlSum;
+            final tiePts = int.tryParse(data['tieBreakerScore']?.toString() ?? '') ?? 0;
+            if (tiePts > 0 && totalScore < (lvlSum + tiePts)) totalScore += tiePts;
           }
 
           return Center(

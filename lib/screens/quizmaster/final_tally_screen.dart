@@ -1081,10 +1081,30 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                             _ensureResponseSubscription(uid);
 
                             final sData = scoreByUid[uid] ?? {};
-                            final rawScore = sData['score'];
-                            final int score = rawScore is num
+                            final rawScore = sData['score'] ?? sData['totalScore'];
+                            int score = rawScore is num
                                 ? rawScore.toInt()
                                 : int.tryParse(rawScore?.toString() ?? '') ?? 0;
+                            int lvlSum = 0;
+                            for (int l = 1; l <= 20; l++) {
+                              final v = sData['level${l}Score'] ?? sData['level_$l'];
+                              if (v is num) {
+                                lvlSum += v.toInt();
+                              } else if (v != null) {
+                                lvlSum += int.tryParse(v.toString()) ?? 0;
+                              }
+                            }
+                            final cachedResp = _contestantResponsesCache[uid];
+                            if (cachedResp != null && cachedResp['levelPoints'] is Map) {
+                              int rSum = 0;
+                              for (final v in (cachedResp['levelPoints'] as Map).values) {
+                                if (v is num) rSum += v.toInt();
+                              }
+                              if (rSum > lvlSum) lvlSum = rSum;
+                            }
+                            if (lvlSum > score) score = lvlSum;
+                            final tiePts = int.tryParse(sData['tieBreakerScore']?.toString() ?? '') ?? 0;
+                            if (tiePts > 0 && score < (lvlSum + tiePts)) score += tiePts;
 
                             final isElim = sData['eliminated'] == true ||
                                 sData['isEliminated'] == true ||
@@ -2069,7 +2089,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                         if (widget.onProceedToNextLevel != null) {
                           await widget.onProceedToNextLevel!();
                         }
-                        if (!context.mounted) return;
+                        if (!mounted) return;
                         Navigator.of(context).pushReplacement(
                           PageRouteBuilder<void>(
                             pageBuilder: (_, _, _) => FinalRankingScreen(

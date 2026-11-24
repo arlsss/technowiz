@@ -2008,10 +2008,14 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
       int finalTotal = total;
       final sumLevels = extractedLevels.values.fold<int>(0, (acc, pts) => acc + pts);
-      if (finalTotal == 0 && sumLevels > 0) {
+      if (sumLevels > finalTotal) {
         finalTotal = sumLevels;
       } else if (finalTotal > 0 && sumLevels == 0) {
         extractedLevels[1] = finalTotal;
+      }
+      final tieBreakerExtra = _toInt(d['tieBreakerScore']);
+      if (tieBreakerExtra > 0 && finalTotal < (sumLevels + tieBreakerExtra)) {
+        finalTotal += tieBreakerExtra;
       }
 
       int timeMs = 0;

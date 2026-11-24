@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,9 +41,19 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   String selectedLevel = 'Overall';
 
   final Map<String, Map<int, int>> _levelScoresCache = {};
+  final Map<String, StreamSubscription> _responseSubs = {};
   final Set<String> _syncingUids = {};
   final Set<String> _checkedUids = {};
   String? _lastSyncedQuizCode;
+
+  @override
+  void dispose() {
+    for (final sub in _responseSubs.values) {
+      sub.cancel();
+    }
+    _responseSubs.clear();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -2544,6 +2555,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     if (_lastSyncedQuizCode != quizCode) {
       _lastSyncedQuizCode = quizCode;
       _levelScoresCache.clear();
+      for (final sub in _responseSubs.values) {
+        sub.cancel();
+      }
+      _responseSubs.clear();
       _syncingUids.clear();
       _checkedUids.clear();
     }
@@ -2552,61 +2567,75 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final data = doc.data() as Map<String, dynamic>;
       final uid = (data['uid'] ?? doc.id).toString();
 
-      // Check if doc already has explicit level breakdown
-      final hasLevel1 = data.containsKey('level1Score') ||
-          (data['levelScores'] is Map &&
-              data['levelScores']['Level 1'] != null);
-      final hasLevel2 = data.containsKey('level2Score') ||
-          (data['levelScores'] is Map &&
-              data['levelScores']['Level 2'] != null);
+      if (!_responseSubs.containsKey(uid)) {
+        final sub = FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(quizCode)
+            .collection('answers')
+            .doc(uid)
+            .collection('responses')
+            .snapshots()
+            .listen((responsesSnap) {
+          if (!mounted) return;
+          final Map<int, int> userLevelScores = {};
+          int totalRespPoints = 0;
+          for (final r in responsesSnap.docs) {
+            final rData = r.data();
+            final rawLvl = rData['level'] ?? rData['sessionLevel'];
+            int lvl = 1;
+            if (rawLvl is num) {
+              lvl = rawLvl.toInt();
+            } else if (rawLvl != null) {
+              final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+              if (m != null) lvl = int.tryParse(m.group(1)!) ?? 1;
+            }
+            final rawPts = rData['points'] ?? rData['score'];
+            int pts = 0;
+            if (rawPts is num) {
+              pts = rawPts.toInt();
+            } else if (rawPts != null) {
+              pts = int.tryParse(rawPts.toString()) ?? 0;
+            }
+            final isCorrect = rData['isCorrect'] == true ||
+                (rData['answerStatus'] ?? '').toString().toLowerCase() ==
+                    'correct' ||
+                (rData['contestStatus'] ?? '').toString().toLowerCase() ==
+                    'approved';
+            if (pts == 0 && isCorrect) {
+              pts = 1;
+            }
+            if (pts > 0 && isCorrect) {
+              userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
+              totalRespPoints += pts;
+            }
+          }
 
-      if (hasLevel1 && hasLevel2) {
-        continue;
+          if (userLevelScores.isNotEmpty) {
+            setState(() {
+              _levelScoresCache[uid] = userLevelScores;
+            });
+
+            final updateData = <String, dynamic>{};
+            for (final entry in userLevelScores.entries) {
+              updateData['level${entry.key}Score'] = entry.value;
+              updateData['level_${entry.key}'] = entry.value;
+            }
+            updateData['levelScores'] = {
+              for (final entry in userLevelScores.entries)
+                'Level ${entry.key}': entry.value,
+            };
+            final currentDocScore = _toInt(data['score'] ?? data['totalScore']);
+            if (totalRespPoints > currentDocScore) {
+              updateData['score'] = totalRespPoints;
+              updateData['totalScore'] = totalRespPoints;
+            }
+            doc.reference
+                .set(updateData, SetOptions(merge: true))
+                .catchError((_) {});
+          }
+        }, onError: (_) {});
+        _responseSubs[uid] = sub;
       }
-
-      if (_checkedUids.contains(uid) || _syncingUids.contains(uid)) continue;
-      _syncingUids.add(uid);
-      _checkedUids.add(uid);
-
-      FirebaseFirestore.instance
-          .collection('quiz_sessions')
-          .doc(quizCode)
-          .collection('answers')
-          .doc(uid)
-          .collection('responses')
-          .get()
-          .then((responsesSnap) {
-        if (!mounted) return;
-        final Map<int, int> userLevelScores = {};
-        for (final r in responsesSnap.docs) {
-          final rData = r.data();
-          final lvl = (rData['level'] as num?)?.toInt() ?? 1;
-          final pts = (rData['points'] as num?)?.toInt() ?? 0;
-          final isCorrect = rData['isCorrect'] == true ||
-              (rData['answerStatus'] ?? '').toString().toLowerCase() ==
-                  'correct';
-          if (pts > 0 && isCorrect) {
-            userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
-          }
-        }
-
-        if (userLevelScores.isNotEmpty) {
-          setState(() {
-            _levelScoresCache[uid] = userLevelScores;
-          });
-
-          final updateData = <String, dynamic>{};
-          for (final entry in userLevelScores.entries) {
-            updateData['level${entry.key}Score'] = entry.value;
-            updateData['levelScores.Level ${entry.key}'] = entry.value;
-          }
-          doc.reference
-              .set(updateData, SetOptions(merge: true))
-              .catchError((_) {});
-        }
-      }).catchError((_) {}).whenComplete(() {
-        _syncingUids.remove(uid);
-      });
     }
   }
 
@@ -2787,18 +2816,38 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       int contestantScore = 0;
       final cached = _levelScoresCache[uid];
 
+      // Robust accumulation across all level keys and levelScores map
+      int sumOfAllLevels = 0;
+      for (int i = 1; i <= 20; i++) {
+        final lKey = 'level${i}Score';
+        final aKey = 'level_$i';
+        if (data.containsKey(lKey)) {
+          sumOfAllLevels += _toInt(data[lKey]);
+        } else if (data.containsKey(aKey)) {
+          sumOfAllLevels += _toInt(data[aKey]);
+        }
+      }
+      if (data['levelScores'] is Map) {
+        int mapSum = 0;
+        for (final val in (data['levelScores'] as Map).values) {
+          mapSum += _toInt(val);
+        }
+        if (mapSum > sumOfAllLevels) sumOfAllLevels = mapSum;
+      }
+      if (cached != null && cached.isNotEmpty) {
+        final cachedSum = cached.values.fold<int>(0, (acc, val) => acc + val);
+        if (cachedSum > sumOfAllLevels) sumOfAllLevels = cachedSum;
+      }
+      final tieBreakerExtra = _toInt(data['tieBreakerScore']);
+      final storedTotal = _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
+
       if (selectedLevel == 'Overall') {
-        int total = _toInt(
-          data['score'] ?? data['totalScore'] ?? data['points'] ?? 0,
-        );
-        if (total == 0 && cached != null && cached.isNotEmpty) {
-          total = cached.values.fold<int>(0, (acc, val) => acc + val);
-        } else if (total == 0 && data['levelScores'] is Map) {
-          int mapSum = 0;
-          for (final val in (data['levelScores'] as Map).values) {
-            mapSum += _toInt(val);
-          }
-          if (mapSum > 0) total = mapSum;
+        int total = storedTotal;
+        if (sumOfAllLevels > total) {
+          total = sumOfAllLevels;
+        }
+        if (tieBreakerExtra > 0 && total < (sumOfAllLevels + tieBreakerExtra)) {
+          total += tieBreakerExtra;
         }
         contestantScore = total;
       } else {
@@ -2808,31 +2857,23 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
             : 1;
         final levelKey = 'level${levelNum}Score';
         final altKey = 'level_$levelNum';
+        int lvlScore = 0;
         if (data.containsKey(levelKey)) {
-          contestantScore = _toInt(data[levelKey]);
+          lvlScore = _toInt(data[levelKey]);
         } else if (data.containsKey(altKey)) {
-          contestantScore = _toInt(data[altKey]);
-        } else if (data['levelScores'] is Map &&
-            (data['levelScores'] as Map).containsKey('Level $levelNum')) {
-          contestantScore =
-              _toInt((data['levelScores'] as Map)['Level $levelNum']);
-        } else if (data['levelScores'] is Map &&
-            (data['levelScores'] as Map).containsKey(levelNum.toString())) {
-          contestantScore =
-              _toInt((data['levelScores'] as Map)[levelNum.toString()]);
-        } else if (cached != null && cached.containsKey(levelNum)) {
-          contestantScore = cached[levelNum]!;
-        } else {
-          final currentLevel = _toInt(
-            data['currentLevel'] ?? data['level'] ?? 1,
-          );
-          if (configuredLevels.length <= 1 &&
-              (currentLevel == levelNum || levelNum == 1)) {
-            contestantScore = _toInt(data['score'] ?? data['points'] ?? 0);
-          } else {
-            contestantScore = 0;
-          }
+          lvlScore = _toInt(data[altKey]);
         }
+        if (data['levelScores'] is Map) {
+          final fromMap = _toInt(
+            (data['levelScores'] as Map)['Level $levelNum'] ??
+            (data['levelScores'] as Map)[levelNum.toString()],
+          );
+          if (fromMap > lvlScore) lvlScore = fromMap;
+        }
+        if (cached != null && (cached[levelNum] ?? 0) > lvlScore) {
+          lvlScore = cached[levelNum]!;
+        }
+        contestantScore = lvlScore;
       }
 
       final key = teamName.isNotEmpty ? 'team:$teamName' : 'user:$uid';

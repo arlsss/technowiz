@@ -26,8 +26,26 @@ class _MyResultScreenState extends State<MyResultScreen> {
   DocumentReference<Map<String, dynamic>> get _myRequest =>
       _session.collection('join_requests').doc(_uid);
 
-  int _scoreOf(Map<String, dynamic> data) =>
-      int.tryParse(data['score']?.toString() ?? '') ?? 0;
+  int _scoreOf(Map<String, dynamic> data) {
+    int total = int.tryParse(data['score']?.toString() ?? '') ??
+        int.tryParse(data['totalScore']?.toString() ?? '') ?? 0;
+    int lvlSum = 0;
+    for (int l = 1; l <= 20; l++) {
+      final v = data['level${l}Score'] ?? data['level_$l'];
+      if (v != null) lvlSum += int.tryParse(v.toString()) ?? 0;
+    }
+    if (data['levelScores'] is Map) {
+      int mSum = 0;
+      for (final v in (data['levelScores'] as Map).values) {
+        if (v != null) mSum += int.tryParse(v.toString()) ?? 0;
+      }
+      if (mSum > lvlSum) lvlSum = mSum;
+    }
+    if (lvlSum > total) total = lvlSum;
+    final tiePts = int.tryParse(data['tieBreakerScore']?.toString() ?? '') ?? 0;
+    if (tiePts > 0 && total < (lvlSum + tiePts)) total += tiePts;
+    return total;
+  }
 
   bool _isEliminated(Map<String, dynamic> data) =>
       data['eliminated'] == true ||

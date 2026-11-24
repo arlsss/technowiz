@@ -203,7 +203,23 @@ class _ContestantLeaderboardScreenState
       final teamName = data['teamName']?.toString().trim() ?? '';
       final name = _displayName(data);
       final key = teamName.isNotEmpty ? 'team:$teamName' : 'user:$uid';
-      final score = _toInt(data['score']);
+      int score = _toInt(data['score'] ?? data['totalScore'] ?? data['points']);
+      int levelSum = 0;
+      for (int l = 1; l <= 20; l++) {
+        levelSum += _toInt(data['level${l}Score'] ?? data['level_$l']);
+      }
+      if (data['levelScores'] is Map) {
+        int mapSum = 0;
+        for (final v in (data['levelScores'] as Map).values) {
+          mapSum += _toInt(v);
+        }
+        if (mapSum > levelSum) levelSum = mapSum;
+      }
+      if (levelSum > score) score = levelSum;
+      final tiePts = _toInt(data['tieBreakerScore']);
+      if (tiePts > 0 && score < (levelSum + tiePts)) {
+        score += tiePts;
+      }
       final members = teamName.isNotEmpty
           ? _teamMembers(data['teamMembers'] ?? data['members'])
           : <String>[];
