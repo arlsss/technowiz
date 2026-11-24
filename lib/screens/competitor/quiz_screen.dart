@@ -4662,20 +4662,42 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
 
-      final newScore = (oldScore + points) < 0 ? 0 : (oldScore + points);
+      final scoreData = scoreDoc.data() ?? {};
+      final dynamic rawLvl = scoreData[levelKey] ??
+          scoreData['level_$targetLevel'] ??
+          (scoreData['levelScores'] is Map
+              ? scoreData['levelScores']['Level $targetLevel']
+              : null);
+      if (rawLvl != null) {
+        oldLevelScore = int.tryParse(rawLvl.toString()) ?? 0;
+      }
+
       final newLevelScore =
           (oldLevelScore + points) < 0 ? 0 : (oldLevelScore + points);
+
+      final Map<String, dynamic> mergedLevelScores = {};
+      if (scoreData['levelScores'] is Map) {
+        (scoreData['levelScores'] as Map).forEach((k, v) {
+          mergedLevelScores[k.toString()] = v;
+        });
+      }
+      mergedLevelScores['Level $targetLevel'] = newLevelScore;
 
       int sumOfLevels = 0;
       for (int l = 1; l <= 20; l++) {
         if (l == targetLevel) {
           sumOfLevels += newLevelScore;
         } else {
-          final dynamic r = scoreDoc.data()?[levelKey] ?? scoreDoc.data()?['level_$l'];
+          final dynamic r = scoreData['level${l}Score'] ??
+              scoreData['level_$l'] ??
+              mergedLevelScores['Level $l'] ??
+              mergedLevelScores['$l'];
           if (r != null) sumOfLevels += int.tryParse(r.toString()) ?? 0;
         }
       }
-      final effectiveScore = newScore > sumOfLevels ? newScore : sumOfLevels;
+      final int tieBreaker =
+          int.tryParse(scoreData['tieBreakerScore']?.toString() ?? '') ?? 0;
+      final effectiveScore = sumOfLevels + tieBreaker;
 
       transaction.set(scoreRef, {
         'uid': uid,
@@ -4686,9 +4708,7 @@ class _QuizScreenState extends State<QuizScreen> {
         'score': effectiveScore,
         'totalScore': effectiveScore,
         levelKey: newLevelScore,
-        'levelScores': {
-          'Level $targetLevel': newLevelScore,
-        },
+        'levelScores': mergedLevelScores,
         'currentLevel': targetLevel,
         'lastQuestion': questionNumber,
         'lastPoints': points,
@@ -5507,18 +5527,44 @@ class _QuizScreenState extends State<QuizScreen> {
                                           sData?[levelKey]?.toString() ?? '') ??
                                       0;
                                   if (finalPoints > existingLvlScore) {
-                                    final int diff =
-                                        finalPoints - existingLvlScore;
-                                    final int currentTotal = int.tryParse(
-                                            sData?['score']?.toString() ?? '') ??
+                                    final Map<String, dynamic> mergedScores = {};
+                                    if (sData?['levelScores'] is Map) {
+                                      (sData!['levelScores'] as Map)
+                                          .forEach((k, v) {
+                                        mergedScores[k.toString()] = v;
+                                      });
+                                    }
+                                    mergedScores['Level $currentLevel'] =
+                                        finalPoints;
+
+                                    int recalculatedTotal = 0;
+                                    for (int l = 1; l <= 20; l++) {
+                                      if (l == currentLevel) {
+                                        recalculatedTotal += finalPoints;
+                                      } else {
+                                        final dynamic val =
+                                            sData?['level${l}Score'] ??
+                                                sData?['level_$l'] ??
+                                                mergedScores['Level $l'] ??
+                                                mergedScores['$l'];
+                                        if (val != null) {
+                                          recalculatedTotal +=
+                                              int.tryParse(val.toString()) ?? 0;
+                                        }
+                                      }
+                                    }
+                                    final int tb = int.tryParse(
+                                            sData?['tieBreakerScore']
+                                                    ?.toString() ??
+                                                '') ??
                                         0;
+                                    recalculatedTotal += tb;
+
                                     scoreRef.set({
                                       levelKey: finalPoints,
-                                      'levelScores': {
-                                        'Level $currentLevel': finalPoints,
-                                      },
-                                      'score': currentTotal + diff,
-                                      'totalScore': currentTotal + diff,
+                                      'levelScores': mergedScores,
+                                      'score': recalculatedTotal,
+                                      'totalScore': recalculatedTotal,
                                       'updatedAt': FieldValue.serverTimestamp(),
                                     }, SetOptions(merge: true)).catchError((_) {});
                                   }

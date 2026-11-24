@@ -482,7 +482,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
                             final requests = requestSnap.data?.docs ?? [];
                             final scores = scoreSnap.data?.docs ?? [];
-                            _syncOrFetchLevelScores(effectiveCode, scores);
+                            _syncOrFetchLevelScores(
+                              effectiveCode,
+                              scores,
+                              quizData: quizData,
+                            );
                             final configuredLevels = _extractConfiguredLevels(
                               quizData,
                             );
@@ -2650,10 +2654,50 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   // LEVEL SCORES SYNC & ENGINE
   // ================================================================
 
+  int _getAdminPointsForLevel(int level, Map<String, dynamic>? quizData) {
+    if (quizData == null) return level;
+    final rawSettings = quizData['levelSettings'] ?? quizData['levels'];
+    if (rawSettings is Map) {
+      final target = 'level$level';
+      for (final entry in rawSettings.entries) {
+        final norm = entry.key
+            .toString()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if ((norm == target || norm == '$level') && entry.value is Map) {
+          final val = entry.value['pointsPerCorrectAnswer'] ??
+              entry.value['points_per_correct_answer'] ??
+              entry.value['pointsPerQuestion'] ??
+              entry.value['points'];
+          if (val is num && val > 0) return val.toInt();
+          if (val != null) {
+            final p = int.tryParse(val.toString());
+            if (p != null && p > 0) return p;
+          }
+        }
+      }
+    }
+    for (final key in [
+      'level${level}Points',
+      'level${level}PointsPerCorrectAnswer',
+      'level${level}PointsPerQuestion',
+      'level_${level}_points',
+    ]) {
+      final val = quizData[key];
+      if (val is num && val > 0) return val.toInt();
+      if (val != null) {
+        final p = int.tryParse(val.toString());
+        if (p != null && p > 0) return p;
+      }
+    }
+    return level;
+  }
+
   void _syncOrFetchLevelScores(
     String quizCode,
-    List<QueryDocumentSnapshot> scoreDocs,
-  ) {
+    List<QueryDocumentSnapshot> scoreDocs, {
+    Map<String, dynamic>? quizData,
+  }) {
     if (quizCode.isEmpty) return;
 
     if (_lastSyncedQuizCode != quizCode) {
@@ -2694,21 +2738,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               if (m != null) lvl = int.tryParse(m.group(1)!) ?? 1;
             }
             final rawPts = rData['points'] ?? rData['score'];
-            int pts = 0;
-            if (rawPts is num) {
-              pts = rawPts.toInt();
-            } else if (rawPts != null) {
-              pts = int.tryParse(rawPts.toString()) ?? 0;
-            }
             final isCorrect = rData['isCorrect'] == true ||
                 (rData['answerStatus'] ?? '').toString().toLowerCase() ==
                     'correct' ||
                 (rData['contestStatus'] ?? '').toString().toLowerCase() ==
                     'approved';
-            if (pts == 0 && isCorrect) {
-              pts = 1;
-            }
-            if (pts > 0 && isCorrect) {
+            if (isCorrect) {
+              final adminPts = _getAdminPointsForLevel(lvl, quizData);
+              int pts = adminPts > 0 ? adminPts : _toInt(rawPts);
+              if (pts <= 0) pts = 1;
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
               totalRespPoints += pts;
             }
@@ -2728,11 +2766,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               for (final entry in userLevelScores.entries)
                 'Level ${entry.key}': entry.value,
             };
-            final currentDocScore = _toInt(data['score'] ?? data['totalScore']);
-            if (totalRespPoints > currentDocScore) {
-              updateData['score'] = totalRespPoints;
-              updateData['totalScore'] = totalRespPoints;
-            }
+            final int tiePts = _toInt(data['tieBreakerScore']);
+            final int realTotal = totalRespPoints + tiePts;
+            updateData['score'] = realTotal;
+            updateData['totalScore'] = realTotal;
             doc.reference
                 .set(updateData, SetOptions(merge: true))
                 .catchError((_) {});
@@ -2841,62 +2878,51 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
       // Robust accumulation across all level keys and levelScores map
       int sumOfAllLevels = 0;
-      for (int i = 1; i <= 20; i++) {
-        final lKey = 'level${i}Score';
-        final aKey = 'level_$i';
-        if (data.containsKey(lKey)) {
-          sumOfAllLevels += _toInt(data[lKey]);
-        } else if (data.containsKey(aKey)) {
-          sumOfAllLevels += _toInt(data[aKey]);
-        }
-      }
-      if (data['levelScores'] is Map) {
-        int mapSum = 0;
-        for (final val in (data['levelScores'] as Map).values) {
-          mapSum += _toInt(val);
-        }
-        if (mapSum > sumOfAllLevels) sumOfAllLevels = mapSum;
-      }
+      final Map<int, int> levelPointsMap = {};
+
       if (cached != null && cached.isNotEmpty) {
-        final cachedSum = cached.values.fold<int>(0, (acc, val) => acc + val);
-        if (cachedSum > sumOfAllLevels) sumOfAllLevels = cachedSum;
+        levelPointsMap.addAll(cached);
+        sumOfAllLevels = cached.values.fold<int>(0, (acc, val) => acc + val);
+      } else {
+        if (data['levelScores'] is Map) {
+          (data['levelScores'] as Map).forEach((k, v) {
+            final m = RegExp(r'\d+').firstMatch(k.toString());
+            final lvlNum = m != null ? int.tryParse(m.group(0)!) ?? 0 : 0;
+            final p = _toInt(v);
+            if (lvlNum > 0 && p > 0) {
+              levelPointsMap[lvlNum] = p;
+            }
+          });
+        }
+        for (int i = 1; i <= 20; i++) {
+          final lKey = 'level${i}Score';
+          final aKey = 'level_$i';
+          final val = _toInt(data[lKey] ?? data[aKey]);
+          if (val > 0 &&
+              (!levelPointsMap.containsKey(i) || levelPointsMap[i]! < val)) {
+            levelPointsMap[i] = val;
+          }
+        }
+        sumOfAllLevels =
+            levelPointsMap.values.fold<int>(0, (acc, val) => acc + val);
       }
+
       final tieBreakerExtra = _toInt(data['tieBreakerScore']);
-      final storedTotal = _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
+      final storedTotal =
+          _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
 
       if (selectedLevel == 'Overall') {
-        int total = storedTotal;
-        if (sumOfAllLevels > total) {
-          total = sumOfAllLevels;
+        if (sumOfAllLevels > 0) {
+          contestantScore = sumOfAllLevels + tieBreakerExtra;
+        } else {
+          contestantScore = storedTotal;
         }
-        if (tieBreakerExtra > 0 && total < (sumOfAllLevels + tieBreakerExtra)) {
-          total += tieBreakerExtra;
-        }
-        contestantScore = total;
       } else {
         final levelMatch = RegExp(r'\d+').firstMatch(selectedLevel);
         final levelNum = levelMatch != null
             ? int.tryParse(levelMatch.group(0)!) ?? 1
             : 1;
-        final levelKey = 'level${levelNum}Score';
-        final altKey = 'level_$levelNum';
-        int lvlScore = 0;
-        if (data.containsKey(levelKey)) {
-          lvlScore = _toInt(data[levelKey]);
-        } else if (data.containsKey(altKey)) {
-          lvlScore = _toInt(data[altKey]);
-        }
-        if (data['levelScores'] is Map) {
-          final fromMap = _toInt(
-            (data['levelScores'] as Map)['Level $levelNum'] ??
-            (data['levelScores'] as Map)[levelNum.toString()],
-          );
-          if (fromMap > lvlScore) lvlScore = fromMap;
-        }
-        if (cached != null && (cached[levelNum] ?? 0) > lvlScore) {
-          lvlScore = cached[levelNum]!;
-        }
-        contestantScore = lvlScore;
+        contestantScore = levelPointsMap[levelNum] ?? 0;
       }
 
       final key = teamName.isNotEmpty ? 'team:$teamName' : 'user:$uid';
@@ -2923,7 +2949,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           members: {...current.members, ...members}.toList(),
           school: current.school.isNotEmpty ? current.school : school,
           score: teamName.isNotEmpty
-              ? current.score + contestantScore
+              ? (contestantScore > current.score
+                  ? contestantScore
+                  : current.score)
               : contestantScore,
           eliminated: current.eliminated || isEliminated,
           status: status.isNotEmpty ? status : current.status,
