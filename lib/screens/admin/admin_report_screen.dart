@@ -514,19 +514,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   <line x1="8" y1="92" x2="8" y2="140" stroke="$accent" stroke-width="1.2" />
 </svg>''';
 
-  String _getCertRosetteSvg({
-    required String rosetteMain,
-    required String rosetteDark,
-    required String rosetteRibbon,
-  }) =>
-      '''<svg viewBox="0 0 100 115" width="62" height="72">
-  <polygon points="32,48 18,105 32,94 44,105 42,48" fill="$rosetteRibbon" stroke="$rosetteDark" stroke-width="1.2" />
-  <polygon points="68,48 56,105 68,94 82,105 68,48" fill="$rosetteRibbon" stroke="$rosetteDark" stroke-width="1.2" />
-  <circle cx="50" cy="46" r="34" fill="$rosetteMain" stroke="$rosetteDark" stroke-width="1.8" />
-  <circle cx="50" cy="46" r="30" fill="none" stroke="#FFFFFF" stroke-dasharray="2,2" stroke-width="1.2" />
-  <circle cx="50" cy="46" r="25" fill="$rosetteDark" />
-</svg>''';
-
   String _getSignatureScribbleSvg(int index, String colorHex) {
     if (index == 0) {
       return '''<svg viewBox="0 0 130 32" width="105" height="26">
@@ -646,62 +633,42 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     // Rank-based color themes and titles
     final String primaryColorHex;
     final String frameNavyHex;
-    final String rosetteMainHex;
-    final String rosetteDarkHex;
-    final String rosetteRibbonHex;
     final PdfColor navyPdfColor;
     final PdfColor primaryPdfColor;
     final PdfColor topTitlePdfColor;
-    final String rankBadgeText;
     final String rankCitationText;
 
     if (rank == 1 && !eliminated) {
       // 1ST PLACE - GOLD EDITION
       primaryColorHex = '#D4AF37';
       frameNavyHex = '#0B192C';
-      rosetteMainHex = '#F59E0B';
-      rosetteDarkHex = '#B45309';
-      rosetteRibbonHex = '#D97706';
       navyPdfColor = const PdfColor.fromInt(0xFF0B192C);
       primaryPdfColor = const PdfColor.fromInt(0xFFB45309);
       topTitlePdfColor = const PdfColor.fromInt(0xFFC59B27);
-      rankBadgeText = 'CHAMPION';
       rankCitationText = 'CHAMPION';
     } else if (rank == 2 && !eliminated) {
       // 2ND PLACE - SILVER EDITION
       primaryColorHex = '#94A3B8';
       frameNavyHex = '#0F172A';
-      rosetteMainHex = '#94A3B8';
-      rosetteDarkHex = '#475569';
-      rosetteRibbonHex = '#64748B';
       navyPdfColor = const PdfColor.fromInt(0xFF0F172A);
       primaryPdfColor = const PdfColor.fromInt(0xFF475569);
       topTitlePdfColor = const PdfColor.fromInt(0xFF64748B);
-      rankBadgeText = '2ND PLACE';
       rankCitationText = '2ND PLACE';
     } else if (rank == 3 && !eliminated) {
       // 3RD PLACE - BRONZE EDITION
       primaryColorHex = '#CD7F32';
       frameNavyHex = '#1E1B18';
-      rosetteMainHex = '#EA580C';
-      rosetteDarkHex = '#9A3412';
-      rosetteRibbonHex = '#C2410C';
       navyPdfColor = const PdfColor.fromInt(0xFF1E1B18);
       primaryPdfColor = const PdfColor.fromInt(0xFF9A3412);
       topTitlePdfColor = const PdfColor.fromInt(0xFFC2410C);
-      rankBadgeText = '3RD PLACE';
       rankCitationText = '3RD PLACE';
     } else {
       // RANK 4+ & PARTICIPANTS - GREEN EDITION
       primaryColorHex = '#10B981';
       frameNavyHex = '#064E3B';
-      rosetteMainHex = '#10B981';
-      rosetteDarkHex = '#047857';
-      rosetteRibbonHex = '#059669';
       navyPdfColor = const PdfColor.fromInt(0xFF064E3B);
       primaryPdfColor = const PdfColor.fromInt(0xFF047857);
       topTitlePdfColor = const PdfColor.fromInt(0xFF059669);
-      rankBadgeText = rank > 0 ? 'RANK $rank' : 'FINALIST';
       rankCitationText = rank > 0 ? 'RANK $rank' : 'FINALIST';
     }
 
@@ -711,11 +678,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final cornerBottomRightSvg = _getCertCornerBottomRightSvg(frameNavyHex, primaryColorHex);
     final edgeTopBottomSvg = _getCertEdgeTopBottomSvg(frameNavyHex, primaryColorHex);
     final edgeLeftRightSvg = _getCertEdgeLeftRightSvg(frameNavyHex, primaryColorHex);
-    final rosetteSvg = _getCertRosetteSvg(
-      rosetteMain: rosetteMainHex,
-      rosetteDark: rosetteDarkHex,
-      rosetteRibbon: rosetteRibbonHex,
-    );
 
     // Build list of recipients:
     // If team with members, each member receives their own personalized certificate with the team name!
@@ -1015,35 +977,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                               color: navyPdfColor,
                             ),
                           ],
-                        ),
-
-                        // Medallion Rosette Badge with Rank Inside
-                        pw.Container(
-                          width: 62,
-                          height: 72,
-                          child: pw.Stack(
-                            alignment: pw.Alignment.center,
-                            children: [
-                              pw.SvgImage(svg: rosetteSvg, width: 62, height: 72),
-                              pw.Positioned(
-                                top: 25,
-                                child: pw.Container(
-                                  width: 48,
-                                  alignment: pw.Alignment.center,
-                                  child: pw.Text(
-                                    rankBadgeText,
-                                    textAlign: pw.TextAlign.center,
-                                    style: pw.TextStyle(
-                                      fontSize: rankBadgeText.length > 8 ? 6.5 : (rankBadgeText.length > 6 ? 7.5 : 8.5),
-                                      fontWeight: pw.FontWeight.bold,
-                                      color: PdfColors.white,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
 
                         // Citation Statement
@@ -4598,27 +4531,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                           ),
                           const SizedBox(height: 3),
                           Container(width: 220, height: 1.2, color: const Color(0xFF0F172A)),
-                          const SizedBox(height: 8),
-
-                          // Rosette Medal badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFB45309), width: 1.2),
-                            ),
-                            child: const Text(
-                              '★ CHAMPION ★',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
 
                           // Citation preview
                           Padding(
