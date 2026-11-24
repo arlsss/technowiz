@@ -1802,6 +1802,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
         final respUpdate = <String, dynamic>{
           'contestStatus': status,
+          'answerStatus': approve ? 'correct' : 'wrong',
+          'isCorrect': approve,
+          'updatedAt': FieldValue.serverTimestamp(),
         };
         if (!approve && comment != null && comment.isNotEmpty) {
           respUpdate['contestComment'] = comment;
@@ -1809,6 +1812,41 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           respUpdate['rejectionReason'] = comment;
         }
         await respRef.set(respUpdate, SetOptions(merge: true));
+
+        // When approved, award points directly to the contestant's score
+        if (approve) {
+          int pointsToAward = 1;
+          if (qIndex < _questions.length) {
+            final qDoc = _questions[qIndex];
+            final qData = qDoc.data() as Map<String, dynamic>;
+            final p = qData['points'] ??
+                qData['pointValue'] ??
+                qData['pts'] ??
+                qData['score'];
+            if (p is num && p > 0) {
+              pointsToAward = p.toInt();
+            } else if (p != null) {
+              final parsed = int.tryParse(p.toString());
+              if (parsed != null && parsed > 0) pointsToAward = parsed;
+            }
+          }
+
+          final scoreRef = FirebaseFirestore.instance
+              .collection('quiz_sessions')
+              .doc(widget.quizCode)
+              .collection('scores')
+              .doc(contestantUid);
+
+          await scoreRef.set({
+            'score': FieldValue.increment(pointsToAward),
+            'totalScore': FieldValue.increment(pointsToAward),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+          await request.reference.update({
+            'scoreApplied': true,
+          });
+        }
       }
 
       if (mounted) {
@@ -4869,6 +4907,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 var correctCount = 0;
                 var wrongCount = 0;
                 var unansweredCount = 0;
+                var pendingContestCount = 0;
 
                 for (final responseDoc in responseDocs) {
                   final data = responseDoc.data();
@@ -4876,10 +4915,30 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       .toString()
                       .toLowerCase();
                   final rawCorrect = data['isCorrect'];
+                  final contestStatus = (data['contestStatus'] ?? '')
+                      .toString()
+                      .toLowerCase();
 
-                  if (answerStatus == 'correct' || rawCorrect == true) {
+                  final bool isApproved = contestStatus == 'approved';
+                  final bool isRejected = contestStatus == 'rejected' ||
+                      contestStatus == 'declined' ||
+                      contestStatus == 'invalid';
+                  final bool isPending = contestStatus == 'pending' ||
+                      (answerStatus == 'contested' &&
+                          !isApproved &&
+                          !isRejected);
+
+                  if (isPending) {
+                    pendingContestCount++;
+                  }
+
+                  if (isApproved ||
+                      answerStatus == 'correct' ||
+                      rawCorrect == true) {
                     correctCount++;
-                  } else if (answerStatus == 'wrong' ||
+                  } else if (isRejected ||
+                      answerStatus == 'wrong' ||
+                      isPending ||
                       (answerStatus.isEmpty && rawCorrect == false)) {
                     wrongCount++;
                   } else if (answerStatus == 'unanswered') {
@@ -4892,26 +4951,410 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         ConnectionState.waiting &&
                     !responsesSnapshot.hasData;
 
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: background,
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade100),
+                    onTap: () {
+                      _showContestantAnswersDialog(
+                        context: context,
+                        uid: contestantDoc.id,
+                        name: name,
+                        isTeam: isTeam,
+                        teamMembers: teamMembers,
+                        responseDocs: responseDocs,
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade100),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                isTeam
+                                    ? Icons.groups_rounded
+                                    : Icons.person_rounded,
+                                color: primaryBlue,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: darkBlue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (isTeam && teamMembers.isNotEmpty)
+                                      Text(
+                                        'Members: ${teamMembers.join(', ')}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF5B7A9C),
+                                          fontSize: 10.5,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              if (contestant['eliminated'] == true ||
+                                  contestant['isEliminated'] == true ||
+                                  (contestant['status'] ?? '')
+                                          .toString()
+                                          .trim()
+                                          .toLowerCase() ==
+                                      'eliminated' ||
+                                  contestant['eliminationConfirmed'] ==
+                                      true) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFFFCA5A5),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.cancel_rounded,
+                                        size: 11,
+                                        color: Color(0xFFDC2626),
+                                      ),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'ELIMINATED',
+                                        style: TextStyle(
+                                          color: Color(0xFFDC2626),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              if (isTeam)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: primaryBlue.withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color:
+                                          primaryBlue.withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'TEAM',
+                                    style: TextStyle(
+                                      color: primaryBlue,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(
+                                      alpha: 0.10,
+                                    ),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFF10B981).withValues(
+                                        alpha: 0.25,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'SOLO',
+                                    style: TextStyle(
+                                      color: Color(0xFF059669),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.open_in_new_rounded,
+                                size: 14,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (isLoading)
+                            const LinearProgressIndicator(minHeight: 2)
+                          else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _answerCountChip(
+                                    icon: Icons.check_circle_rounded,
+                                    label: 'Correct: $correctCount',
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: _answerCountChip(
+                                    icon: Icons.cancel_rounded,
+                                    label: 'Wrong: $wrongCount',
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: _answerCountChip(
+                                    icon: Icons.help_outline_rounded,
+                                    label: 'Unanswered: $unansweredCount',
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (pendingContestCount > 0) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.amber.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.hourglass_top_rounded,
+                                      size: 12,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '$pendingContestCount contest pending review',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: Colors.amber.shade900,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
+                );
+              },
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  void _showContestantAnswersDialog({
+    required BuildContext context,
+    required String uid,
+    required String name,
+    required bool isTeam,
+    required List<String> teamMembers,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> responseDocs,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        String filter = 'all';
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final List<Map<String, dynamic>> items = [];
+
+            for (final doc in responseDocs) {
+              final data = doc.data();
+              final rawIdx = doc.id.replaceAll('question_', '');
+              final int qIdx = int.tryParse(rawIdx) ??
+                  ((data['questionNumber'] as num?)?.toInt() ?? 1) - 1;
+              final qNum = qIdx + 1;
+
+              final answerStatus = (data['answerStatus'] ?? '')
+                  .toString()
+                  .toLowerCase();
+              final rawCorrect = data['isCorrect'];
+              final contestStatus = (data['contestStatus'] ?? '')
+                  .toString()
+                  .toLowerCase();
+
+              final bool isApproved = contestStatus == 'approved';
+              final bool isRejected = contestStatus == 'rejected' ||
+                  contestStatus == 'declined' ||
+                  contestStatus == 'invalid';
+              final bool isPendingContest = contestStatus == 'pending' ||
+                  (answerStatus == 'contested' && !isApproved && !isRejected);
+
+              final bool isCheck = isApproved ||
+                  answerStatus == 'correct' ||
+                  rawCorrect == true;
+              final bool isUnanswered = answerStatus == 'unanswered';
+              final bool isWrong = !isCheck && !isUnanswered;
+
+              String questionText = (data['questionText'] ??
+                      data['question'] ??
+                      '')
+                  .toString();
+              String expectedAnswer = (data['expectedAnswer'] ??
+                      data['correctAnswer'] ??
+                      data['answer'] ??
+                      '')
+                  .toString();
+
+              if (qIdx >= 0 && qIdx < _questions.length) {
+                final qDocData =
+                    _questions[qIdx].data() as Map<String, dynamic>;
+                if (questionText.isEmpty) {
+                  questionText = (qDocData['questionText'] ??
+                          qDocData['question'] ??
+                          qDocData['text'] ??
+                          '')
+                      .toString();
+                }
+                if (expectedAnswer.isEmpty) {
+                  expectedAnswer = (qDocData['correctAnswer'] ??
+                          qDocData['answer'] ??
+                          '')
+                      .toString();
+                }
+              }
+
+              final contestantAnswer = (data['selectedAnswer'] ??
+                      data['contestantAnswer'] ??
+                      data['answer'] ??
+                      (isUnanswered ? 'No answer' : ''))
+                  .toString();
+
+              items.add({
+                'qIndex': qIdx,
+                'qNumber': qNum,
+                'questionText': questionText,
+                'contestantAnswer': contestantAnswer,
+                'expectedAnswer': expectedAnswer,
+                'isCheck': isCheck,
+                'isWrong': isWrong,
+                'isUnanswered': isUnanswered,
+                'isApproved': isApproved,
+                'isRejected': isRejected,
+                'isPendingContest': isPendingContest,
+                'contestStatus': contestStatus,
+                'contestComment': (data['contestComment'] ??
+                        data['quizmasterComment'] ??
+                        data['rejectionReason'] ??
+                        '')
+                    .toString(),
+              });
+            }
+
+            items.sort((a, b) =>
+                (a['qIndex'] as int).compareTo(b['qIndex'] as int));
+
+            final filteredItems = items.where((item) {
+              if (filter == 'correct') return item['isCheck'] == true;
+              if (filter == 'wrong') return item['isWrong'] == true;
+              if (filter == 'unanswered') return item['isUnanswered'] == true;
+              if (filter == 'contested') {
+                return item['isApproved'] == true ||
+                    item['isRejected'] == true ||
+                    item['isPendingContest'] == true;
+              }
+              return true;
+            }).toList();
+
+            final int correctTotal =
+                items.where((i) => i['isCheck'] == true).length;
+            final int wrongTotal =
+                items.where((i) => i['isWrong'] == true).length;
+            final int unansweredTotal =
+                items.where((i) => i['isUnanswered'] == true).length;
+            final int contestedTotal = items.where((i) =>
+                i['isApproved'] == true ||
+                i['isRejected'] == true ||
+                i['isPendingContest'] == true).length;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 580,
+                  maxHeight: 680,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header
                       Row(
                         children: [
-                          Icon(
-                            isTeam ? Icons.groups_rounded : Icons.person_rounded,
-                            color: primaryBlue,
-                            size: 20,
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryBlue.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              isTeam
+                                  ? Icons.groups_rounded
+                                  : Icons.person_rounded,
+                              color: primaryBlue,
+                              size: 22,
+                            ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4919,8 +5362,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 Text(
                                   name,
                                   style: const TextStyle(
-                                    color: darkBlue,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: darkBlue,
                                   ),
                                 ),
                                 if (isTeam && teamMembers.isNotEmpty)
@@ -4929,148 +5373,334 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      color: Color(0xFF5B7A9C),
-                                      fontSize: 10.5,
+                                      color: Colors.black54,
+                                      fontSize: 11,
                                     ),
                                   ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          if (contestant['eliminated'] == true ||
-                              contestant['isEliminated'] == true ||
-                              (contestant['status'] ?? '').toString().trim().toLowerCase() == 'eliminated' ||
-                              contestant['eliminationConfirmed'] == true) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: const Color(0xFFFCA5A5),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.cancel_rounded,
-                                    size: 11,
-                                    color: Color(0xFFDC2626),
-                                  ),
-                                  SizedBox(width: 3),
-                                  Text(
-                                    'ELIMINATED',
-                                    style: TextStyle(
-                                      color: Color(0xFFDC2626),
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          if (isTeam)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: primaryBlue.withValues(alpha: 0.10),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: primaryBlue.withValues(alpha: 0.25),
-                                ),
-                              ),
-                              child: const Text(
-                                'TEAM',
-                                style: TextStyle(
-                                  color: primaryBlue,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(
-                                  alpha: 0.10,
-                                ),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: const Color(0xFF10B981).withValues(
-                                    alpha: 0.25,
-                                  ),
-                                ),
-                              ),
-                              child: const Text(
-                                'SOLO',
-                                style: TextStyle(
-                                  color: Color(0xFF059669),
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          if (contestantStatus == 'eliminated') ...[
-                            const SizedBox(width: 6),
-                            const Text(
-                              'ELIMINATED',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            tooltip: 'Close',
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      if (isLoading)
-                        const LinearProgressIndicator(minHeight: 2)
-                      else
-                        Row(
+                      const SizedBox(height: 14),
+
+                      // Filter chips row
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
                           children: [
-                            Expanded(
-                              child: _answerCountChip(
-                                icon: Icons.check_circle_rounded,
-                                label: 'Correct: $correctCount',
-                                color: Colors.green,
-                              ),
+                            _buildDialogFilterChip(
+                              label: 'ALL (${items.length})',
+                              isSelected: filter == 'all',
+                              color: primaryBlue,
+                              onTap: () =>
+                                  setDialogState(() => filter = 'all'),
                             ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: _answerCountChip(
-                                icon: Icons.cancel_rounded,
-                                label: 'Wrong: $wrongCount',
-                                color: Colors.red,
-                              ),
+                            const SizedBox(width: 6),
+                            _buildDialogFilterChip(
+                              label: '✔ CHECK ($correctTotal)',
+                              isSelected: filter == 'correct',
+                              color: Colors.green,
+                              onTap: () =>
+                                  setDialogState(() => filter = 'correct'),
                             ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: _answerCountChip(
-                                icon: Icons.help_outline_rounded,
-                                label: 'Unanswered: $unansweredCount',
+                            const SizedBox(width: 6),
+                            _buildDialogFilterChip(
+                              label: '✖ WRONG ($wrongTotal)',
+                              isSelected: filter == 'wrong',
+                              color: Colors.red,
+                              onTap: () =>
+                                  setDialogState(() => filter = 'wrong'),
+                            ),
+                            const SizedBox(width: 6),
+                            if (unansweredTotal > 0) ...[
+                              _buildDialogFilterChip(
+                                label: '? UNANSWERED ($unansweredTotal)',
+                                isSelected: filter == 'unanswered',
                                 color: Colors.orange,
+                                onTap: () => setDialogState(
+                                    () => filter = 'unanswered'),
                               ),
-                            ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (contestedTotal > 0) ...[
+                              _buildDialogFilterChip(
+                                label: '⚡ CONTESTS ($contestedTotal)',
+                                isSelected: filter == 'contested',
+                                color: Colors.purple,
+                                onTap: () => setDialogState(
+                                    () => filter = 'contested'),
+                              ),
+                            ],
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+
+                      // Answer items list
+                      Expanded(
+                        child: filteredItems.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No answers found for filter "$filter".',
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: filteredItems.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, idx) {
+                                  final item = filteredItems[idx];
+                                  final qNum = item['qNumber'];
+                                  final isCheck = item['isCheck'] == true;
+                                  final isApproved = item['isApproved'] == true;
+                                  final isRejected = item['isRejected'] == true;
+                                  final isPending =
+                                      item['isPendingContest'] == true;
+                                  final isUnanswered =
+                                      item['isUnanswered'] == true;
+                                  final qText = item['questionText'] as String;
+                                  final userAns =
+                                      item['contestantAnswer'] as String;
+                                  final correctAns =
+                                      item['expectedAnswer'] as String;
+                                  final comment =
+                                      item['contestComment'] as String;
+
+                                  final Color statusColor = isCheck
+                                      ? Colors.green
+                                      : (isPending
+                                          ? Colors.orange
+                                          : (isUnanswered
+                                              ? Colors.grey
+                                              : Colors.red));
+
+                                  final String badgeLabel = isApproved
+                                      ? '✔ CHECK (CONTEST APPROVED)'
+                                      : (isRejected
+                                          ? '✖ WRONG (CONTEST REJECTED)'
+                                          : (isPending
+                                              ? '⚡ CONTEST PENDING'
+                                              : (isCheck
+                                                  ? '✔ CORRECT'
+                                                  : (isUnanswered
+                                                      ? '? UNANSWERED'
+                                                      : '✖ WRONG'))));
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          statusColor.withValues(alpha: 0.05),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color:
+                                            statusColor.withValues(alpha: 0.25),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 7,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: primaryBlue
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'Q$qNum',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: primaryBlue,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 7,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: statusColor
+                                                    .withValues(alpha: 0.12),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                badgeLabel,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w900,
+                                                  color: statusColor,
+                                                  fontSize: 10,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (qText.isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            qText,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12.5,
+                                              color: darkBlue,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Answer: ',
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                color: Colors.black54,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Text(
+                                                userAns.isNotEmpty
+                                                    ? userAns
+                                                    : '(No answer)',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isCheck
+                                                      ? Colors.green.shade800
+                                                      : Colors.red.shade800,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (correctAns.isNotEmpty &&
+                                            !isCheck) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Correct: ',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  color: Colors.black54,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: Text(
+                                                  correctAns,
+                                                  style: const TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF15803D),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                        if (isRejected &&
+                                            comment.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.shade50,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: Colors.red.shade200,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Rejection Reason: $comment',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.red.shade900,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
                     ],
                   ),
-                );
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDialogFilterChip({
+    required String label,
+    required bool isSelected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? color : color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.3),
+            width: 1.2,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: isSelected ? Colors.white : color,
+          ),
+        ),
+      ),
+    );
+  }
               },
             );
           }).toList(),
