@@ -828,23 +828,23 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
-                            // Left: BSIT Program Logo
+                            // Left: BSIT Program Logo (Enlarged & Transparent)
                             pw.Container(
-                              width: 80,
+                              width: 92,
                               child: pw.Column(
                                 mainAxisSize: pw.MainAxisSize.min,
                                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                                 children: [
                                   if (bsitLogoImage != null)
-                                    pw.Image(bsitLogoImage, width: 56, height: 56, fit: pw.BoxFit.contain)
+                                    pw.Image(bsitLogoImage, width: 75, height: 75, fit: pw.BoxFit.contain)
                                   else
-                                    pw.Container(width: 56, height: 56),
+                                    pw.Container(width: 75, height: 75),
                                   pw.SizedBox(height: 2),
                                   pw.Text(
                                     'BSIT Program Logo',
                                     style: const pw.TextStyle(
                                       fontSize: 7.5,
-                                      color: PdfColor.fromInt(0xFF64748B),
+                                      color: PdfColor.fromInt(0xFF475569),
                                     ),
                                   ),
                                 ],
@@ -869,7 +869,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                                       color: navyPdfColor,
                                     ),
                                   ),
-                                  pw.SizedBox(height: 1.5),
+                                  pw.SizedBox(height: 2),
                                   pw.Text(
                                     config.campusName.trim().isNotEmpty
                                         ? config.campusName.trim().toUpperCase()
@@ -882,7 +882,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                                       color: PdfColor.fromInt(0xFF334155),
                                     ),
                                   ),
-                                  pw.SizedBox(height: 1.5),
+                                  pw.SizedBox(height: 2),
                                   pw.Text(
                                     config.departmentName.trim().isNotEmpty
                                         ? config.departmentName.trim().toUpperCase()
@@ -899,22 +899,22 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                               ),
                             ),
 
-                            // Right: TechNoWiz Mascot Robot with Trophy
+                            // Right: TechNoWiz Mascot Robot with Trophy (Enlarged & Transparent)
                             pw.Container(
-                              width: 80,
+                              width: 92,
                               child: pw.Column(
                                 mainAxisSize: pw.MainAxisSize.min,
                                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                                 children: [
                                   if (robotMascotImage != null)
-                                    pw.Image(robotMascotImage, width: 56, height: 56, fit: pw.BoxFit.contain)
+                                    pw.Image(robotMascotImage, width: 78, height: 75, fit: pw.BoxFit.contain)
                                   else
-                                    pw.Container(width: 56, height: 56),
+                                    pw.Container(width: 78, height: 75),
                                   pw.SizedBox(height: 2),
                                   pw.Text(
                                     'TechNoWiz',
                                     style: pw.TextStyle(
-                                      fontSize: 9,
+                                      fontSize: 9.5,
                                       fontWeight: pw.FontWeight.bold,
                                       color: const PdfColor.fromInt(0xFF0284C7),
                                     ),
