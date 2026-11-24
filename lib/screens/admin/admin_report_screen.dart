@@ -5467,35 +5467,265 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
 
                     const SizedBox(height: 20),
 
-                    // Live Footer Preview Box
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isDark ? Colors.white10 : const Color(0xFFCBD5E1),
+                    // Real-time Report Document Preview
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.description_rounded, size: 16, color: Color(0xFF4F46E5)),
+                            SizedBox(width: 6),
+                            Text(
+                              'REAL-TIME REPORT DOCUMENT PREVIEW',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                            ),
+                          ],
                         ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Live Page Replica',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF4F46E5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Realistic Official Report Sheet Container
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // 1. Official Report Document Header
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.visibility_rounded, size: 14, color: Color(0xFF4F46E5)),
-                              const SizedBox(width: 6),
-                              Text(
-                                'LIVE REPORT SIGNATURE PREVIEW',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.8,
-                                  color: isDark ? Colors.white70 : const Color(0xFF475569),
-                                ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text(
+                                    'TECHNOWIZ COMPETITION SYSTEM',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF581C87),
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Official Session Report & Documentation',
+                                    style: TextStyle(
+                                      fontSize: 8.5,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Generated: ${_todayDateText()}',
+                                    style: const TextStyle(
+                                      fontSize: 8,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    'Quiz Code: ${widget.quizCode}',
+                                    style: const TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF581C87),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 8),
+                          Container(
+                            height: 2,
+                            color: const Color(0xFF6B21A8),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 2. Event Info Box
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'QUIZ TIME!!',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Date: ${_todayDateText()}',
+                                        style: const TextStyle(fontSize: 8, color: Color(0xFF475569)),
+                                      ),
+                                    ),
+                                    const Expanded(
+                                      child: Text(
+                                        'Location: BSIT BUILDING',
+                                        style: TextStyle(fontSize: 8, color: Color(0xFF475569)),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Row(
+                                        children: const [
+                                          Text(
+                                            'Status: ',
+                                            style: TextStyle(fontSize: 8, color: Color(0xFF475569)),
+                                          ),
+                                          Text(
+                                            'FINISHED',
+                                            style: TextStyle(
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF15803D),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // 3. Score Summary Mini Table
+                          const Text(
+                            '1. SCORE SUMMARY & STATISTICS',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF581C87),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                                  color: const Color(0xFF4C1D95),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: const [
+                                      Text('Total Contestants', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text('Active / Completed', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text('Eliminated', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text('Top Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text('Average Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                                  color: Colors.white,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: const [
+                                      Text('3', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('3', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('0', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('12 pts', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('9.7 pts', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // 4. Final Standings Mini Table
+                          const Text(
+                            '2. FINAL STANDINGS & RANKINGS',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF581C87),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                  color: const Color(0xFF4C1D95),
+                                  child: Row(
+                                    children: const [
+                                      SizedBox(width: 32, child: Text('Rank', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                                      Expanded(child: Text('Contestant Name', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                                      SizedBox(width: 50, child: Text('Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                                      SizedBox(width: 70, child: Text('Award / Status', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                                    ],
+                                  ),
+                                ),
+                                _buildPreviewStandingRow('1', 'TECHNOWIZ BABIES', '12 pts', 'Champion', true),
+                                _buildPreviewStandingRow('2', 'KULAFU BOYS', '10 pts', '1st Runner-Up', false),
+                                _buildPreviewStandingRow('3', 'Rhealyn Legaspino', '7 pts', '2nd Runner-Up', true),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+
+                          // 5. Official Signatures Section (Live updating with form fields)
                           Row(
                             mainAxisAlignment: _signatoryCount == 1
                                 ? MainAxisAlignment.center
@@ -5511,11 +5741,13 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                     children: [
                                       if (_showLines[i])
                                         Container(
-                                          width: 140,
-                                          height: 1.5,
-                                          color: isDark ? Colors.white70 : Colors.black87,
-                                        ),
-                                      const SizedBox(height: 5),
+                                          width: _signatoryCount == 1 ? 180 : 130,
+                                          height: 1.2,
+                                          color: const Color(0xFF0F172A),
+                                        )
+                                      else
+                                        const SizedBox(height: 1.2),
+                                      const SizedBox(height: 4),
                                       Text(
                                         _labelControllers[i].text.trim().isNotEmpty &&
                                                 _nameControllers[i].text.trim().isNotEmpty
@@ -5527,10 +5759,10 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                                     : 'Signatory Name')),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark ? Colors.white : Colors.black87,
+                                        style: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
                                         ),
                                       ),
                                       Text(
@@ -5539,17 +5771,39 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                             : 'Title / Designation',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 9.5,
-                                          color: isDark ? Colors.white60 : Colors.black54,
+                                        style: const TextStyle(
+                                          fontSize: 8,
+                                          color: Color(0xFF475569),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                if (i < _signatoryCount - 1) const SizedBox(width: 12),
+                                if (i < _signatoryCount - 1) const SizedBox(width: 14),
                               ],
                             ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 6. Report Footer
+                          Container(
+                            padding: const EdgeInsets.only(top: 6),
+                            decoration: const BoxDecoration(
+                              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: const [
+                                Text(
+                                  'TechNoWiz - System Generated Official Document',
+                                  style: TextStyle(fontSize: 7, color: Color(0xFF94A3B8)),
+                                ),
+                                Text(
+                                  'Page 1 of 1',
+                                  style: TextStyle(fontSize: 7, color: Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -5766,6 +6020,53 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
               isDense: true,
             ),
             style: const TextStyle(fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _todayDateText() {
+    final now = DateTime.now();
+    return '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+  }
+
+  Widget _buildPreviewStandingRow(String rank, String name, String score, String award, bool isStripe) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 3.5, horizontal: 8),
+      color: isStripe ? const Color(0xFFF8FAFC) : Colors.white,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 32,
+            child: Text(
+              rank,
+              style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+            ),
+          ),
+          SizedBox(
+            width: 50,
+            child: Text(
+              score,
+              style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFF581C87)),
+            ),
+          ),
+          SizedBox(
+            width: 70,
+            child: Text(
+              award,
+              style: TextStyle(
+                fontSize: 7.5,
+                fontWeight: FontWeight.bold,
+                color: rank == '1' ? const Color(0xFFB45309) : const Color(0xFF475569),
+              ),
+            ),
           ),
         ],
       ),
