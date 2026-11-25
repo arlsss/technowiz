@@ -1245,6 +1245,32 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   bool isAddingLevel = false;
   String? editingLevelName;
 
+  // Staged / pending questions for the level currently being added or edited.
+  // These are kept in memory until the admin explicitly clicks "SAVE LEVEL".
+  final Set<String> _pendingLevelQuestionIds = {};
+  final Map<String, Map<String, dynamic>> _pendingQuestionsCache = {};
+  bool _loadingPendingQuestions = false;
+
+  Future<void> _fetchPendingQuestionsData(Set<String> ids) async {
+    final missing = ids.where((id) => !_pendingQuestionsCache.containsKey(id)).toList();
+    if (missing.isEmpty) return;
+
+    if (mounted) setState(() => _loadingPendingQuestions = true);
+    try {
+      final firestore = FirebaseFirestore.instance;
+      for (final id in missing) {
+        final doc = await firestore.collection('questions').doc(id).get();
+        if (doc.exists && doc.data() != null) {
+          _pendingQuestionsCache[id] = doc.data()!;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching question details: $e');
+    } finally {
+      if (mounted) setState(() => _loadingPendingQuestions = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1519,12 +1545,41 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) {
-        return AddQuestionsDialog(quizCode: widget.quizCode, level: level);
+        return AddQuestionsDialog(
+          quizCode: widget.quizCode,
+          level: level,
+          initialSelectedIds: isAddingLevel ? _pendingLevelQuestionIds : null,
+        );
       },
     );
 
     if (result == null) return;
 
+    // If currently creating or editing a level, DO NOT write to Firestore immediately!
+    // Hold the questions in memory so they can be reviewed below the level settings,
+    // and only committed once the admin clicks "SAVE LEVEL" / "UPDATE LEVEL".
+    if (isAddingLevel) {
+      setState(() {
+        _pendingLevelQuestionIds.clear();
+        _pendingLevelQuestionIds.addAll(result);
+      });
+      await _fetchPendingQuestionsData(result);
+      if (!mounted) return;
+      AdminNotification.success(
+        context,
+        '${result.length} question(s) selected for $level. Click "${editingLevelName != null ? 'UPDATE LEVEL' : 'SAVE LEVEL'}" to apply.',
+      );
+      return;
+    }
+
+    await _commitQuestionsForLevel(level, result);
+  }
+
+  Future<void> _commitQuestionsForLevel(
+    String level,
+    Set<String> questionIds, {
+    bool suppressNotification = false,
+  }) async {
     try {
       final firestore = FirebaseFirestore.instance;
       final questionsRef = quizRef.collection('questions');
@@ -1570,10 +1625,10 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
       // A question belongs to one quiz level. If it is selected for this
       // level, remove it from any other level first.
       for (final ids in levelQuestions.values) {
-        ids.removeWhere((id) => result.contains(id));
+        ids.removeWhere((id) => questionIds.contains(id));
       }
 
-      levelQuestions[level] = result.toList();
+      levelQuestions[level] = questionIds.toList();
 
       final allAssignedIds = <String>{
         for (final ids in levelQuestions.values) ...ids,
@@ -1611,8 +1666,6 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                 data['question'] ?? data['questionText'] ?? data['text'] ?? '',
 
             // Preserve the question type chosen in Admin's Question Bank.
-            // Without this field, QuizScreen may incorrectly infer the type
-            // (for example, Enumeration may be displayed as Multiple Choice).
             'questionType':
                 data['questionType'] ??
                 data['type'] ??
@@ -1628,8 +1681,6 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                   if (data['optionD'] != null) data['optionD'],
                 ],
 
-            // Keep accepted answers and legacy answer fields too, especially
-            // for Enumeration and Identification questions.
             'correctAnswers':
                 data['correctAnswers'] ??
                 (data['correctAnswer'] is List
@@ -1684,10 +1735,12 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
       if (!mounted) return;
 
-      AdminNotification.success(
-        context,
-        '${result.length} question(s) assigned to $level.',
-      );
+      if (!suppressNotification) {
+        AdminNotification.success(
+          context,
+          '${questionIds.length} question(s) assigned to $level.',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -1703,6 +1756,8 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     if (!mounted) return;
 
     setState(() {
+      _pendingLevelQuestionIds.clear();
+      _pendingQuestionsCache.clear();
       editingLevelName = null;
       isAddingLevel = true;
       addLevelController.clear();
@@ -1776,7 +1831,29 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         : <String, dynamic>{};
     final number = int.tryParse(level.replaceFirst(RegExp(r'^Level\s*'), ''));
 
+    final rawLevelQuestions = latestData['levelQuestions'];
+    final existingIds = <String>{};
+    if (rawLevelQuestions is Map && rawLevelQuestions[level] is List) {
+      existingIds.addAll(
+        (rawLevelQuestions[level] as List).map((e) => e.toString()),
+      );
+    } else {
+      final existingSub = await quizRef.collection('questions').get();
+      for (final doc in existingSub.docs) {
+        final d = doc.data();
+        final sLevel = (d['sessionLevel'] ?? d['level'] ?? '').toString();
+        final normalized = sLevel.toLowerCase().startsWith('level ')
+            ? sLevel
+            : 'Level $sLevel';
+        if (normalized.trim().toLowerCase() == level.trim().toLowerCase()) {
+          existingIds.add(doc.id);
+        }
+      }
+    }
+
     setState(() {
+      _pendingLevelQuestionIds.clear();
+      _pendingLevelQuestionIds.addAll(existingIds);
       editingLevelName = level;
       isAddingLevel = true;
       addLevelController.text = number?.toString() ?? '';
@@ -1795,18 +1872,22 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
               'Multiple Choice')
           .toString();
     });
+
+    await _fetchPendingQuestionsData(existingIds);
   }
 
   Future<void> confirmCancelLevel() async {
     final isEditing = editingLevelName != null;
+    final stagedCount = _pendingLevelQuestionIds.length;
+    final stagedNote = stagedCount > 0 ? ' and $stagedCount unsaved question(s)' : '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(isEditing ? 'Cancel Level Editing?' : 'Cancel Add Level?'),
         content: Text(
           isEditing
-              ? 'Discard the changes made to $editingLevelName?'
-              : 'Discard the level information you entered?',
+              ? 'Discard the changes made to $editingLevelName$stagedNote?'
+              : 'Discard the level information$stagedNote you entered?',
         ),
         actions: [
           TextButton(
@@ -1835,14 +1916,16 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     final levelLabel =
         editingLevelName ??
         'Level ${addLevelController.text.trim().isEmpty ? '?' : addLevelController.text.trim()}';
+    final stagedCount = _pendingLevelQuestionIds.length;
+    final stagedNote = stagedCount > 0 ? ' with $stagedCount question(s)' : '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(isEditing ? 'Update Level Settings?' : 'Save New Level?'),
         content: Text(
           isEditing
-              ? 'Save the updated settings for $levelLabel?'
-              : 'Create $levelLabel with the settings you entered?',
+              ? 'Save the updated settings$stagedNote for $levelLabel?'
+              : 'Create $levelLabel$stagedNote with the settings you entered?',
         ),
         actions: [
           TextButton(
@@ -1870,6 +1953,8 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     if (!mounted) return;
 
     setState(() {
+      _pendingLevelQuestionIds.clear();
+      _pendingQuestionsCache.clear();
       editingLevelName = null;
       isAddingLevel = false;
       addLevelController.clear();
@@ -1990,12 +2075,22 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // Commit the staged questions for this level to Firestore now that level is saved!
+      await _commitQuestionsForLevel(
+        level,
+        _pendingLevelQuestionIds,
+        suppressNotification: true,
+      );
+
       if (!mounted) return;
 
+      final savedCount = _pendingLevelQuestionIds.length;
       setState(() {
         selectedLevel = level;
         editingLevelName = null;
         isAddingLevel = false;
+        _pendingLevelQuestionIds.clear();
+        _pendingQuestionsCache.clear();
         addLevelController.clear();
         levelTimerController.clear();
         levelEliminateController.clear();
@@ -2005,7 +2100,11 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         levelQuestionType = 'Multiple Choice';
       });
 
-      showMessage('$level saved successfully.');
+      showMessage(
+        savedCount > 0
+            ? '$level saved successfully with $savedCount question(s).'
+            : '$level saved successfully.',
+      );
     } catch (e) {
       showMessage('Failed to add level: $e', error: true);
     }
@@ -2456,7 +2555,6 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // BUILD
   // =========================================================
 
-  @override
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -3146,82 +3244,82 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     const SizedBox(height: 10),
 
                     if (isAddingLevel)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE7E1F2)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.tune_rounded,
-                                  color: primaryPurple,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    editingLevelName == null
-                                        ? 'Level Settings'
-                                        : 'Edit $editingLevelName',
-                                    style: const TextStyle(
-                                      color: textDark,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    final currentLvlText =
-                                        addLevelController.text.trim();
-                                    final String targetLevel;
-                                    if (editingLevelName != null) {
-                                      targetLevel = editingLevelName!;
-                                    } else if (currentLvlText.isNotEmpty) {
-                                      targetLevel = currentLvlText
-                                              .toLowerCase()
-                                              .startsWith('level')
-                                          ? currentLvlText
-                                          : 'Level $currentLvlText';
-                                    } else if (effectiveSelectedLevel
-                                        .isNotEmpty) {
-                                      targetLevel = effectiveSelectedLevel;
-                                    } else {
-                                      targetLevel = 'Level 1';
-                                    }
-                                    openAddQuestions(targetLevel);
-                                  },
-                                  icon: const Icon(Icons.add_rounded, size: 16),
-                                  label: const Text('ADD QUESTION'),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: primaryPurple,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    minimumSize: const Size(0, 32),
-                                    visualDensity: VisualDensity.compact,
-                                    textStyle: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.3,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                      Builder(
+                        builder: (context) {
+                          final currentLvlText = addLevelController.text.trim();
+                          final String currentEditingTargetLevel;
+                          if (editingLevelName != null) {
+                            currentEditingTargetLevel = editingLevelName!;
+                          } else if (currentLvlText.isNotEmpty) {
+                            currentEditingTargetLevel = currentLvlText
+                                    .toLowerCase()
+                                    .startsWith('level')
+                                ? currentLvlText
+                                : 'Level $currentLvlText';
+                          } else if (effectiveSelectedLevel.isNotEmpty) {
+                            currentEditingTargetLevel = effectiveSelectedLevel;
+                          } else {
+                            currentEditingTargetLevel = 'Level 1';
+                          }
+
+                          return Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE7E1F2)),
                             ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.tune_rounded,
+                                      color: primaryPurple,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        editingLevelName == null
+                                            ? 'Level Settings'
+                                            : 'Edit $editingLevelName',
+                                        style: const TextStyle(
+                                          color: textDark,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    FilledButton.icon(
+                                      onPressed: () =>
+                                          openAddQuestions(currentEditingTargetLevel),
+                                      icon: const Icon(Icons.add_rounded, size: 16),
+                                      label: const Text('ADD QUESTION'),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: primaryPurple,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        minimumSize: const Size(0, 32),
+                                        visualDensity: VisualDensity.compact,
+                                        textStyle: const TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.3,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
 
                             const SizedBox(height: 12),
 
@@ -3397,6 +3495,11 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
                             const SizedBox(height: 12),
 
+                            // Staged / Pending questions for this level
+                            _buildPendingLevelQuestionsSection(currentEditingTargetLevel),
+
+                            const SizedBox(height: 12),
+
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
@@ -3432,7 +3535,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                             ),
                           ],
                         ),
-                      ),
+                      );
+                    },
+                  ),
 
                     if (levels.isNotEmpty)
                       Wrap(
@@ -4091,6 +4196,283 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           },
         ),
       ],
+    );
+  }
+
+  // =========================================================
+  // PENDING LEVEL QUESTIONS SECTION (STAGED BEFORE SAVING)
+  // =========================================================
+
+  Widget _buildPendingLevelQuestionsSection(String targetLevel) {
+    final pendingIdsList = _pendingLevelQuestionIds.toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F7FD),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _pendingLevelQuestionIds.isNotEmpty
+              ? primaryPurple.withValues(alpha: 0.3)
+              : const Color(0xFFE2DCF0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.quiz_outlined,
+                size: 16,
+                color: primaryPurple,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Questions for $targetLevel (${_pendingLevelQuestionIds.length})',
+                  style: const TextStyle(
+                    color: textDark,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (_pendingLevelQuestionIds.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Text(
+                    'Pending Save',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_loadingPendingQuestions)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: primaryPurple,
+                  ),
+                ),
+              ),
+            )
+          else if (_pendingLevelQuestionIds.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFEAE5F3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.format_list_bulleted_add,
+                    size: 24,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'No questions assigned yet for $targetLevel.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Click "+ ADD QUESTION" above to choose questions.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const ClampingScrollPhysics(),
+                    itemCount: pendingIdsList.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) {
+                      final qId = pendingIdsList[index];
+                      final qData = _pendingQuestionsCache[qId] ?? {};
+                      final qText = (qData['questionText'] ??
+                              qData['question'] ??
+                              qData['text'] ??
+                              'Question ID: $qId')
+                          .toString();
+                      final qType = (qData['questionType'] ??
+                              qData['type'] ??
+                              'Multiple Choice')
+                          .toString();
+                      final answer = _resolveQuestionAnswer(qData);
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE8E2F2)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryPurple.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Q${index + 1}',
+                                style: const TextStyle(
+                                  color: primaryPurple,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    qText,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: textDark,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3E8FF),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          qType,
+                                          style: const TextStyle(
+                                            color: Color(0xFF7E22CE),
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (answer.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            'Ans: $answer',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Color(0xFF15803D),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _pendingLevelQuestionIds.remove(qId);
+                                });
+                              },
+                              icon: const Icon(
+                                Icons.remove_circle_outline_rounded,
+                                size: 18,
+                                color: Color(0xFFDC2626),
+                              ),
+                              tooltip: 'Remove from level',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 26,
+                                minHeight: 26,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Questions will only be saved to this level after clicking "SAVE LEVEL" below.',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
+      ),
     );
   }
 
@@ -4815,11 +5197,13 @@ class _CreateQuestionDialogState extends State<CreateQuestionDialog> {
 class AddQuestionsDialog extends StatefulWidget {
   final String quizCode;
   final String level;
+  final Set<String>? initialSelectedIds;
 
   const AddQuestionsDialog({
     super.key,
     required this.quizCode,
     required this.level,
+    this.initialSelectedIds,
   });
 
   @override
@@ -4892,7 +5276,12 @@ class _AddQuestionsDialogState extends State<AddQuestionsDialog> {
       if (!mounted) return;
 
       setState(() {
-        selectedIds.addAll(currentIds);
+        if (widget.initialSelectedIds != null) {
+          selectedIds.addAll(widget.initialSelectedIds!);
+        } else {
+          selectedIds.addAll(currentIds);
+        }
+        selectedIdsNotifier.value = Set<String>.from(selectedIds);
         assignedToOtherLevels.addAll(otherLevelIds);
         loadingExisting = false;
       });
@@ -4939,6 +5328,11 @@ class _AddQuestionsDialogState extends State<AddQuestionsDialog> {
         }
       }
 
+      if (widget.initialSelectedIds != null) {
+        selectedIds.clear();
+        selectedIds.addAll(widget.initialSelectedIds!);
+      }
+      selectedIdsNotifier.value = Set<String>.from(selectedIds);
       loadingExisting = false;
     });
   }
@@ -5049,7 +5443,6 @@ class _AddQuestionsDialogState extends State<AddQuestionsDialog> {
     );
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     return Dialog(
