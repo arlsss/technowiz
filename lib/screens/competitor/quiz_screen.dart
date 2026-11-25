@@ -790,6 +790,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int confirmedQuestionIndex = -1;
   bool _tieBreakerInviteConfirmed = false;
   String? _confirmedTieBreakerSessionId;
+  bool _refreshedQuestionsForTieBreaker = false;
 
   // Prevent the 30-second question timer from starting while
   // the Quiz Master is still running the ready check/countdown.
@@ -2123,6 +2124,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget synchronizedCountdownScreen(int countdown, {int questionNumber = 1}) {
     timer?.cancel();
+    final bool isTieBreaker = _latestQuizData['tieBreakerActive'] == true;
     int activeLevel = _currentQuestionLevel;
     if (activeLevel <= 0 && previousQuestion >= 0) {
       final pos = _getLevelPositionForGlobalIndex(previousQuestion);
@@ -2135,10 +2137,20 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     if (activeLevel <= 0) activeLevel = 1;
 
+    final int effectiveQuestionNumber = isTieBreaker
+        ? ((_latestQuizData['tieBreakerQuestionIndex'] is int)
+            ? ((_latestQuizData['tieBreakerQuestionIndex'] as int) + 1)
+            : ((_latestQuizData['currentQuestion'] is int &&
+                    (_latestQuizData['currentQuestion'] as int) >= 0)
+                ? ((_latestQuizData['currentQuestion'] as int) + 1)
+                : 1))
+        : questionNumber;
+
     return QuizCountdownScreen(
       countdown: countdown,
-      questionNumber: questionNumber,
-      currentLevel: activeLevel,
+      questionNumber: effectiveQuestionNumber,
+      currentLevel: isTieBreaker ? null : activeLevel,
+      isTieBreaker: isTieBreaker,
     );
   }
 
@@ -8627,6 +8639,15 @@ class _QuizScreenState extends State<QuizScreen> {
           final countdownActive = quizData['countdownActive'] == true;
 
           if (isTieBreakerActive) {
+            if (!_refreshedQuestionsForTieBreaker) {
+              _refreshedQuestionsForTieBreaker = true;
+              _questionsFuture = FirebaseFirestore.instance
+                  .collection('quiz_sessions')
+                  .doc(widget.quizCode)
+                  .collection('questions')
+                  .get();
+            }
+
             if (!isTiedContestant) {
               return _buildTieBreakerSpectatorScreen(context, quizData);
             }
@@ -8677,6 +8698,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 );
               }
             }
+          } else {
+            _refreshedQuestionsForTieBreaker = false;
           }
 
           if (isTieBreakerEnded &&
@@ -9134,10 +9157,14 @@ class _QuizScreenState extends State<QuizScreen> {
           // while the Quiz Master countdown is active.
           // ==================================================
 
-          if (countdownActive) {
+          if (countdownActive || status == 'countdown') {
             return synchronizedCountdownScreen(
               countdown,
-              questionNumber: _getQuestionNumberWithinLevel(currentQuestion),
+              questionNumber: isTieBreakerActive
+                  ? ((quizData['tieBreakerQuestionIndex'] is int)
+                      ? ((quizData['tieBreakerQuestionIndex'] as int) + 1)
+                      : ((currentQuestion >= 0) ? (currentQuestion + 1) : 1))
+                  : _getQuestionNumberWithinLevel(currentQuestion),
             );
           }
 
@@ -9430,7 +9457,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          "Question $levelQuestionNumber / $levelQuestionTotal",
+                          isTieBreakerActive
+                              ? "Tie Breaker Question $questionNumber"
+                              : "Question $levelQuestionNumber / $levelQuestionTotal",
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -9447,29 +9476,37 @@ class _QuizScreenState extends State<QuizScreen> {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: currentLevel == 1
-                              ? const Color(0xFFE8F7EC)
-                              : currentLevel == 2
-                              ? const Color(0xFFEDE7FF)
-                              : const Color(0xFFFFF3D6),
+                          color: isTieBreakerActive
+                              ? const Color(0xFFFEF3C7)
+                              : (currentLevel == 1
+                                  ? const Color(0xFFE8F7EC)
+                                  : currentLevel == 2
+                                      ? const Color(0xFFEDE7FF)
+                                      : const Color(0xFFFFF3D6)),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: currentLevel == 1
-                                ? const Color(0xFFB7E4C7)
-                                : currentLevel == 2
-                                ? const Color(0xFFD5C7FF)
-                                : const Color(0xFFFFD98A),
+                            color: isTieBreakerActive
+                                ? const Color(0xFFF59E0B)
+                                : (currentLevel == 1
+                                    ? const Color(0xFFB7E4C7)
+                                    : currentLevel == 2
+                                        ? const Color(0xFFD5C7FF)
+                                        : const Color(0xFFFFD98A)),
                           ),
                         ),
                         child: Text(
-                          "LEVEL $currentLevel",
+                          isTieBreakerActive
+                              ? "TIE BREAKER"
+                              : "LEVEL $currentLevel",
                           maxLines: 1,
                           style: TextStyle(
-                            color: currentLevel == 1
-                                ? const Color(0xFF168447)
-                                : currentLevel == 2
-                                ? const Color(0xFF7038C9)
-                                : const Color(0xFF9A6700),
+                            color: isTieBreakerActive
+                                ? const Color(0xFF92400E)
+                                : (currentLevel == 1
+                                    ? const Color(0xFF168447)
+                                    : currentLevel == 2
+                                        ? const Color(0xFF7038C9)
+                                        : const Color(0xFF9A6700)),
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                             letterSpacing: 0.3,
@@ -9490,7 +9527,18 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         child: Text(
-                          "$points ${points == 1 ? 'PT' : 'PTS'}",
+                          isTieBreakerActive
+                              ? "1 PT"
+                              : "$points ${points == 1 ? 'PT' : 'PTS'}",
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
                           maxLines: 1,
                           style: const TextStyle(
                             color: Color(0xFFB45309),

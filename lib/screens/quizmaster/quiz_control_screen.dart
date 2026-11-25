@@ -6688,7 +6688,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             (_isManuallyPaused && _secondsLeft > 0) ||
             (_status == 'level_pause' && _secondsLeft > 0));
     final bool isLevelPause = _status == 'level_pause' && !isPaused;
-    final bool isWaiting = _status == 'waiting';
+    final bool isWaiting = _status == 'waiting' ||
+        _status == 'tie_breaker_preparation' ||
+        _status == 'tie_breaker_invite';
     final bool isCountdown = _status == 'countdown';
 
     // Keep the timer hidden until the Quiz Master starts the question.
@@ -7202,7 +7204,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                           ? (_currentQuestion == 0 &&
                                                   (isWaiting ||
                                                       _status ==
-                                                          'tie_breaker_invite')
+                                                          'tie_breaker_invite' ||
+                                                      _status ==
+                                                          'tie_breaker_preparation')
                                               ? Icons.play_arrow_rounded
                                               : Icons.skip_next_rounded)
                                           : (_currentQuestion == 0 &&
@@ -7214,8 +7218,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                           ? (_currentQuestion == 0 &&
                                                   (isWaiting ||
                                                       _status ==
-                                                          'tie_breaker_invite')
-                                              ? 'START TIE BREAKER'
+                                                          'tie_breaker_invite' ||
+                                                      _status ==
+                                                          'tie_breaker_preparation')
+                                              ? 'START QUESTION'
                                               : 'NEXT QUESTION')
                                           : _levelPreparedForStart
                                               ? 'START LEVEL $_currentLevel'
@@ -7229,7 +7235,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                           ? (_currentQuestion == 0 &&
                                                   (isWaiting ||
                                                       _status ==
-                                                          'tie_breaker_invite')
+                                                          'tie_breaker_invite' ||
+                                                      _status ==
+                                                          'tie_breaker_preparation')
                                               ? Colors.green
                                               : primaryBlue)
                                           : _levelPreparedForStart ||
@@ -7248,7 +7256,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                               ? ((_currentQuestion == 0 &&
                                                       (isWaiting ||
                                                           _status ==
-                                                              'tie_breaker_invite'))
+                                                              'tie_breaker_invite' ||
+                                                          _status ==
+                                                              'tie_breaker_preparation'))
                                                   ? true
                                                   : (!isWaiting &&
                                                       !isCountdown &&
@@ -7270,7 +7280,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                           ? ((_currentQuestion == 0 &&
                                                   (isWaiting ||
                                                       _status ==
-                                                          'tie_breaker_invite'))
+                                                          'tie_breaker_invite' ||
+                                                      _status ==
+                                                          'tie_breaker_preparation'))
                                               ? _startInitialCountdownFromButton
                                               : _confirmNextQuestion)
                                           : _levelPreparedForStart

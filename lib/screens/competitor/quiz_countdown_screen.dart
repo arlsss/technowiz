@@ -7,12 +7,14 @@ class QuizCountdownScreen extends StatelessWidget {
   final int countdown;
   final int questionNumber;
   final int? currentLevel;
+  final bool isTieBreaker;
 
   const QuizCountdownScreen({
     super.key,
     required this.countdown,
     this.questionNumber = 1,
     this.currentLevel,
+    this.isTieBreaker = false,
   });
 
   static const Color primaryGreen = Color(0xFF16A34A);
@@ -68,18 +70,18 @@ class QuizCountdownScreen extends StatelessWidget {
                               color: const Color(0xFF86EFAC),
                             ),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.bolt_rounded,
                                 size: 18,
                                 color: Color(0xFF15803D),
                               ),
-                              SizedBox(width: 6),
+                              const SizedBox(width: 6),
                               Text(
-                                'READY!!',
-                                style: TextStyle(
+                                isTieBreaker ? 'TIE BREAKER' : 'READY!!',
+                                style: const TextStyle(
                                   color: Color(0xFF15803D),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
@@ -162,9 +164,11 @@ class QuizCountdownScreen extends StatelessWidget {
                             ],
                           ),
                           child: Text(
-                            currentLevel != null
-                                ? 'Level $currentLevel, Question $questionNumber'
-                                : 'Question $questionNumber',
+                            isTieBreaker
+                                ? 'Tie Breaker Question $questionNumber'
+                                : (currentLevel != null
+                                    ? 'Level $currentLevel, Question $questionNumber'
+                                    : 'Question $questionNumber'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: darkGreen,
