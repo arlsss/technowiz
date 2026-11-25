@@ -10,6 +10,7 @@ import 'quiz_instructions_screen.dart';
 import 'quiz_preparation_screen.dart';
 import 'quiz_countdown_screen.dart';
 import 'technowiz_theme.dart';
+import 'contestant_overall_tally_screen.dart';
 import '../../navigation_persistence.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -7752,11 +7753,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                             height: 56,
                                             child: ElevatedButton.icon(
                                               icon: const Icon(
-                                                Icons.emoji_events_rounded,
+                                                Icons.analytics_rounded,
                                                 size: 24,
                                               ),
                                               label: const Text(
-                                                "FINAL RESULTS",
+                                                "OVERALL TALLY",
                                                 style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w900,
@@ -7769,6 +7770,48 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 elevation: 4,
                                                 shadowColor: primaryGreen
                                                     .withValues(alpha: 0.4),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        ContestantOverallTallyScreen(
+                                                      quizCode: widget.quizCode,
+                                                      currentLevel: currentLevel,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 52,
+                                            child: OutlinedButton.icon(
+                                              icon: const Icon(
+                                                Icons.emoji_events_rounded,
+                                                size: 22,
+                                                color: primaryGreen,
+                                              ),
+                                              label: const Text(
+                                                "FINAL RESULTS",
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: primaryGreen,
+                                                  letterSpacing: 0.6,
+                                                ),
+                                              ),
+                                              style: OutlinedButton.styleFrom(
+                                                side: const BorderSide(
+                                                    color: primaryGreen,
+                                                    width: 1.8),
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius:
                                                       BorderRadius.circular(16),
@@ -7851,6 +7894,48 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   ),
                                                 ),
                                               ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 54,
+                                            child: ElevatedButton.icon(
+                                              icon: const Icon(
+                                                Icons.analytics_rounded,
+                                                size: 22,
+                                              ),
+                                              label: const Text(
+                                                "OVERALL TALLY",
+                                                style: TextStyle(
+                                                  fontSize: 15.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 0.8,
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: primaryGreen,
+                                                foregroundColor: Colors.white,
+                                                elevation: 3,
+                                                shadowColor: primaryGreen
+                                                    .withValues(alpha: 0.35),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        ContestantOverallTallyScreen(
+                                                      quizCode: widget.quizCode,
+                                                      currentLevel: currentLevel,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
                                         ],
