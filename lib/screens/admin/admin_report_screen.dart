@@ -61,6 +61,12 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   final Set<String> _syncingSchoolUids = {};
   final Set<String> _checkedSchoolUids = {};
   String? _lastSyncedQuizCode;
+  String? _currentQuizTitle;
+  String? _currentQuizStatus;
+  String? _currentQuizDate;
+  String? _currentQuizLocation;
+  List<ReportContestant> _currentRankings = [];
+  List<ReportContestant> _currentParticipants = [];
 
   @override
   void initState() {
@@ -293,14 +299,36 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     }
   }
 
-  void _openManageReportSignaturesDialog() {
+  void _openManageReportSignaturesDialog({
+    String? quizTitle,
+    String? quizCode,
+    String? quizStatus,
+    String? quizDate,
+    String? location,
+    List<ReportContestant>? rankings,
+    List<ReportContestant>? participants,
+  }) {
+    final effectiveCode = quizCode ?? selectedQuizCode ?? '';
+    final effectiveTitle = quizTitle ?? _currentQuizTitle ?? 'TechNoWiz Quiz';
+    final effectiveStatus = quizStatus ?? _currentQuizStatus ?? 'FINISHED';
+    final effectiveDate = quizDate ?? _currentQuizDate ?? _dateText();
+    final effectiveLocation = location ?? _currentQuizLocation ?? 'Main Campus';
+    final effectiveRankings = rankings ?? _currentRankings;
+    final effectiveParticipants = participants ?? _currentParticipants;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         return _ManageReportSignaturesDialog(
           initialConfig: _reportConfig,
-          quizCode: selectedQuizCode ?? '',
+          quizCode: effectiveCode,
+          quizTitle: effectiveTitle,
+          quizDate: effectiveDate,
+          location: effectiveLocation,
+          quizStatus: effectiveStatus,
+          rankings: effectiveRankings,
+          participants: effectiveParticipants,
           onSave: (newConfig) async {
             await _saveReportConfig(newConfig);
             if (mounted) {
@@ -315,13 +343,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           },
           onPreview: (previewConfig) async {
             await _generateOfficialReportPdf(
-              quizTitle: 'TechNoWiz Championship Quiz',
-              quizCode: selectedQuizCode ?? 'SAMPLE',
-              quizStatus: 'FINISHED',
-              quizDate: _dateText(),
-              location: 'Main Auditorium',
-              rankings: const [],
-              participants: const [],
+              quizTitle: effectiveTitle,
+              quizCode: effectiveCode.isNotEmpty ? effectiveCode : 'SAMPLE',
+              quizStatus: effectiveStatus,
+              quizDate: effectiveDate,
+              location: effectiveLocation,
+              rankings: effectiveRankings,
+              participants: effectiveParticipants,
               section: ReportPrintSection.scoreSummaryOnly,
               customConfig: previewConfig,
             );
@@ -349,7 +377,15 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           reportConfig: _reportConfig,
           onEditSignatures: () {
             Navigator.of(dialogContext).pop();
-            _openManageReportSignaturesDialog();
+            _openManageReportSignaturesDialog(
+              quizTitle: quizTitle,
+              quizCode: quizCode,
+              quizStatus: quizStatus,
+              quizDate: quizDate,
+              location: location,
+              rankings: rankings,
+              participants: participants,
+            );
           },
           onExport: (section) async {
             Navigator.of(dialogContext).pop();
@@ -2547,6 +2583,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 final participants = [...contestants];
                 participants.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
+                _currentQuizTitle = quizTitle;
+                _currentQuizStatus = status;
+                _currentQuizDate = quizDate;
+                _currentQuizLocation = location;
+                _currentRankings = contestants;
+                _currentParticipants = participants;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2758,6 +2801,26 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                   onPressed: _openManageCertificateDialog,
                   icon: const Icon(Icons.draw_rounded, size: 16),
                   label: const Text('Manage Certificate'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _openManageReportSignaturesDialog(
+                    quizTitle: quizTitle,
+                    quizCode: quizCode,
+                    quizStatus: status,
+                    quizDate: date,
+                    location: location,
+                    rankings: contestants,
+                    participants: participants,
+                  ),
+                  icon: const Icon(Icons.edit_note_rounded, size: 16),
+                  label: const Text('Report Signatures'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
@@ -4897,7 +4960,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                                             width: 66,
                                             height: 66,
                                             fit: BoxFit.contain,
-                                            errorBuilder: (_, __, ___) => const SizedBox(width: 66, height: 66),
+                                            errorBuilder: (context, error, stackTrace) => const SizedBox(width: 66, height: 66),
                                           ),
                                         ),
                                       ),
@@ -4959,7 +5022,7 @@ class _ManageCertificateDialogState extends State<_ManageCertificateDialog> {
                                             width: 66,
                                             height: 66,
                                             fit: BoxFit.contain,
-                                            errorBuilder: (_, __, ___) => const SizedBox(width: 66, height: 66),
+                                            errorBuilder: (context, error, stackTrace) => const SizedBox(width: 66, height: 66),
                                           ),
                                         ),
                                       ),
@@ -5449,12 +5512,24 @@ class ReportConfig {
 class _ManageReportSignaturesDialog extends StatefulWidget {
   final ReportConfig initialConfig;
   final String quizCode;
+  final String quizTitle;
+  final String quizDate;
+  final String location;
+  final String quizStatus;
+  final List<ReportContestant> rankings;
+  final List<ReportContestant> participants;
   final Future<void> Function(ReportConfig) onSave;
   final Future<void> Function(ReportConfig) onPreview;
 
   const _ManageReportSignaturesDialog({
     required this.initialConfig,
     required this.quizCode,
+    this.quizTitle = 'TechNoWiz Competition Quiz',
+    this.quizDate = '',
+    this.location = '',
+    this.quizStatus = 'FINISHED',
+    this.rankings = const [],
+    this.participants = const [],
     required this.onSave,
     required this.onPreview,
   });
@@ -5569,6 +5644,18 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final totalParticipants = widget.participants.isNotEmpty
+        ? widget.participants.length
+        : widget.rankings.length;
+    final activeCount = widget.rankings.where((c) => !c.isEliminated).length;
+    final eliminatedCount = widget.participants.isNotEmpty
+        ? widget.participants.where((c) => c.isEliminated).length
+        : widget.rankings.where((c) => c.isEliminated).length;
+    final topScore = widget.rankings.isNotEmpty ? widget.rankings.first.totalScore : 0;
+    final avgScore = widget.rankings.isNotEmpty
+        ? (widget.rankings.map((c) => c.totalScore).reduce((a, b) => a + b) / widget.rankings.length).toStringAsFixed(1)
+        : '0.0';
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -5773,7 +5860,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    'Generated: ${_todayDateText()}',
+                                    'Generated: ${widget.quizDate.isNotEmpty ? widget.quizDate : _todayDateText()}',
                                     style: const TextStyle(
                                       fontSize: 8,
                                       color: Color(0xFF64748B),
@@ -5810,9 +5897,11 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'QUIZ TIME!!',
-                                  style: TextStyle(
+                                Text(
+                                  widget.quizTitle.isNotEmpty ? widget.quizTitle : 'TechNoWiz Competition Quiz',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF0F172A),
@@ -5823,29 +5912,40 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        'Date: ${_todayDateText()}',
+                                        'Date: ${widget.quizDate.isNotEmpty ? widget.quizDate : _todayDateText()}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontSize: 8, color: Color(0xFF475569)),
                                       ),
                                     ),
-                                    const Expanded(
+                                    Expanded(
                                       child: Text(
-                                        'Location: BSIT BUILDING',
-                                        style: TextStyle(fontSize: 8, color: Color(0xFF475569)),
+                                        'Location: ${widget.location.isNotEmpty ? widget.location : 'Main Campus'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 8, color: Color(0xFF475569)),
                                       ),
                                     ),
                                     Expanded(
                                       child: Row(
-                                        children: const [
-                                          Text(
+                                        children: [
+                                          const Text(
                                             'Status: ',
                                             style: TextStyle(fontSize: 8, color: Color(0xFF475569)),
                                           ),
-                                          Text(
-                                            'FINISHED',
-                                            style: TextStyle(
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF15803D),
+                                          Flexible(
+                                            child: Text(
+                                              widget.quizStatus.isNotEmpty ? widget.quizStatus.toUpperCase() : 'FINISHED',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.bold,
+                                                color: widget.quizStatus.toUpperCase() == 'FINISHED' ||
+                                                        widget.quizStatus.toUpperCase() == 'COMPLETED'
+                                                    ? const Color(0xFF15803D)
+                                                    : const Color(0xFF2563EB),
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -5895,12 +5995,12 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                   color: Colors.white,
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                    children: const [
-                                      Text('3', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('3', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('0', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('12 pts', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('9.7 pts', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                    children: [
+                                      Text('$totalParticipants', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('$activeCount', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('$eliminatedCount', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('$topScore pts', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text('$avgScore pts', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                                     ],
                                   ),
                                 ),
@@ -5939,9 +6039,45 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                     ],
                                   ),
                                 ),
-                                _buildPreviewStandingRow('1', 'TECHNOWIZ BABIES', '12 pts', 'Champion', true),
-                                _buildPreviewStandingRow('2', 'KULAFU BOYS', '10 pts', '1st Runner-Up', false),
-                                _buildPreviewStandingRow('3', 'Rhealyn Legaspino', '7 pts', '2nd Runner-Up', true),
+                                if (widget.rankings.isEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                    color: Colors.white,
+                                    alignment: Alignment.center,
+                                    child: const Text(
+                                      'No contestants or scores recorded yet for this quiz.',
+                                      style: TextStyle(fontSize: 7.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                                    ),
+                                  )
+                                else ...[
+                                  ...widget.rankings.take(3).toList().asMap().entries.map((entry) {
+                                    final idx = entry.key;
+                                    final c = entry.value;
+                                    final rank = '${idx + 1}';
+                                    final name = c.teamName.isNotEmpty ? c.teamName : c.name;
+                                    final score = '${c.totalScore} pts';
+                                    final award = c.isEliminated
+                                        ? 'Eliminated'
+                                        : (idx == 0
+                                            ? 'Champion'
+                                            : (idx == 1
+                                                ? '1st Runner-Up'
+                                                : (idx == 2
+                                                    ? '2nd Runner-Up'
+                                                    : 'Finalist')));
+                                    return _buildPreviewStandingRow(rank, name, score, award, idx % 2 == 0);
+                                  }),
+                                  if (widget.rankings.length > 3)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 8),
+                                      color: const Color(0xFFF8FAFC),
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '+ ${widget.rankings.length - 3} more contestant(s) included in official PDF export',
+                                        style: const TextStyle(fontSize: 6.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                                      ),
+                                    ),
+                                ],
                               ],
                             ),
                           ),
@@ -6269,6 +6405,8 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
           Expanded(
             child: Text(
               name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
             ),
           ),
@@ -6283,10 +6421,14 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
             width: 70,
             child: Text(
               award,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 7.5,
                 fontWeight: FontWeight.bold,
-                color: rank == '1' ? const Color(0xFFB45309) : const Color(0xFF475569),
+                color: rank == '1'
+                    ? const Color(0xFFB45309)
+                    : (award == 'Eliminated' ? const Color(0xFFDC2626) : const Color(0xFF475569)),
               ),
             ),
           ),
