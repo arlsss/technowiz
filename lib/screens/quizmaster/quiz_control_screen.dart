@@ -4512,7 +4512,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                               ),
                               Text(
                                 isBroken
-                                    ? 'A contestant has broken the tie! Tap END QUESTION to finalize results.'
+                                    ? 'A contestant has broken the tie! Tap END TIE BREAKER to finalize results.'
                                     : 'Sudden-Death Rule: Higher point wins immediately.',
                                 style: const TextStyle(
                                   color: Colors.black54,
@@ -7161,12 +7161,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         // --------------------------------------------------
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final compact = constraints.maxWidth < 560;
-                            final columns = compact ? 2 : 4;
-                            const gap = 8.0;
-                            final buttonWidth =
-                                (constraints.maxWidth - gap * (columns - 1)) /
-                                columns;
                             final currentLevel = _getLevel(_currentQuestion);
                             final lastQuestionOfCurrentLevel =
                                 _getLastQuestionIndexForLevel(currentLevel) ==
@@ -7176,125 +7170,128 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 (_totalQuestions > 0 &&
                                     _currentQuestion >= _totalQuestions - 1);
 
+                            // When tie breaker is active and tie is broken (or questions done),
+                            // do not show the green END QUESTION button.
+                            // The red END TIE BREAKER button is the only action needed to finalize.
+                            final bool hideTieBreakerMainButton =
+                                _isTieBreakerActive &&
+                                    (_tieBreakerBroken || isLastQuestionOrLevelDone);
+
+                            final compact = constraints.maxWidth < 560;
+                            final columns = compact ? 2 : (hideTieBreakerMainButton ? 3 : 4);
+                            const gap = 8.0;
+                            final buttonWidth =
+                                (constraints.maxWidth - gap * (columns - 1)) /
+                                columns;
+
                             return Wrap(
                               spacing: gap,
                               runSpacing: gap,
                               children: [
-                                SizedBox(
-                                  width: buttonWidth,
-                                  child: _compactControlButton(
-                                    icon: _isTieBreakerActive
-                                        ? ((_currentQuestion == 0 &&
-                                                (isWaiting ||
-                                                    _status ==
-                                                        'tie_breaker_invite'))
-                                            ? Icons.play_arrow_rounded
-                                            : (_tieBreakerBroken ||
-                                                    isLastQuestionOrLevelDone)
-                                                ? Icons.check_circle_rounded
-                                                : Icons.skip_next_rounded)
-                                        : (_currentQuestion == 0 &&
-                                                isWaiting &&
-                                                _quizData?['startedAt'] == null)
-                                            ? Icons.play_arrow_rounded
-                                            : Icons.skip_next_rounded,
-                                    label: _isTieBreakerActive
-                                        ? ((_currentQuestion == 0 &&
-                                                (isWaiting ||
-                                                    _status ==
-                                                        'tie_breaker_invite'))
-                                            ? 'START TIE BREAKER'
-                                            : (_tieBreakerBroken ||
-                                                    isLastQuestionOrLevelDone)
-                                                ? 'END QUESTION'
-                                                : 'NEXT QUESTION')
-                                        : _levelPreparedForStart
-                                            ? 'START LEVEL $_currentLevel'
-                                            : (_currentQuestion == 0 &&
-                                                    isWaiting &&
-                                                    _quizData?['startedAt'] ==
-                                                        null)
-                                                ? 'START'
-                                                : 'NEXT QUESTION',
-                                    color: _isTieBreakerActive
-                                        ? ((_currentQuestion == 0 &&
-                                                (isWaiting ||
-                                                    _status ==
-                                                        'tie_breaker_invite'))
-                                            ? Colors.green
-                                            : (_tieBreakerBroken ||
-                                                    isLastQuestionOrLevelDone)
-                                                ? Colors.green
-                                                : primaryBlue)
-                                        : _levelPreparedForStart ||
-                                                (_currentQuestion == 0 &&
-                                                    isWaiting &&
-                                                    _quizData?['startedAt'] ==
-                                                        null)
-                                            ? Colors.green
-                                            : isLastQuestionOrLevelDone
-                                                ? Colors.grey
-                                                : primaryBlue,
-                                    enabled: !_isFinished &&
-                                        !_isAdvancingQuestion &&
-                                        !_startingFromMainButton &&
-                                        (_isTieBreakerActive
-                                            ? ((_currentQuestion == 0 &&
-                                                    (isWaiting ||
-                                                        _status ==
-                                                            'tie_breaker_invite'))
-                                                ? true
-                                                : (!isWaiting &&
-                                                    !isCountdown &&
-                                                    !_contestReviewActive &&
-                                                    !_isManuallyPaused))
-                                            : (_levelPreparedForStart ||
-                                                ((_currentQuestion == 0 &&
-                                                        isWaiting &&
-                                                        _quizData?['startedAt'] ==
-                                                            null)
-                                                    ? isWaiting
-                                                    : (!isLastQuestionOrLevelDone &&
-                                                        !isWaiting &&
-                                                        !isCountdown &&
-                                                        !_contestReviewActive &&
-                                                        !_isManuallyPaused)))),
-                                    // One primary control starts the next question or level.
-                                    onTap: _isTieBreakerActive
-                                        ? ((_currentQuestion == 0 &&
-                                                (isWaiting ||
-                                                    _status ==
-                                                        'tie_breaker_invite'))
-                                            ? _startInitialCountdownFromButton
-                                            : (_tieBreakerBroken ||
-                                                    isLastQuestionOrLevelDone)
-                                                ? _endTieBreakerAndOpenFinalTally
-                                                : _confirmNextQuestion)
-                                        : _levelPreparedForStart
-                                            ? () async {
-                                                final targetQuestion =
-                                                    _pendingQuestionIndex ??
-                                                        _currentQuestion;
-                                                final targetLevel =
-                                                    _pendingLevel ??
-                                                        _currentLevel;
-                                                setState(
-                                                  () => _levelPreparedForStart =
-                                                      false,
-                                                );
-                                                await _startQuestionCountdown(
-                                                  questionIndex: targetQuestion,
-                                                  level: targetLevel,
-                                                );
-                                              }
-                                            : (_currentQuestion == 0 &&
-                                                    isWaiting &&
-                                                    _quizData?['startedAt'] ==
-                                                        null)
-                                                ? _startInitialCountdownFromButton
-                                                : _confirmNextQuestion,
+                                if (!hideTieBreakerMainButton)
+                                  SizedBox(
+                                    width: buttonWidth,
+                                    child: _compactControlButton(
+                                      icon: _isTieBreakerActive
+                                          ? (_currentQuestion == 0 &&
+                                                  (isWaiting ||
+                                                      _status ==
+                                                          'tie_breaker_invite')
+                                              ? Icons.play_arrow_rounded
+                                              : Icons.skip_next_rounded)
+                                          : (_currentQuestion == 0 &&
+                                                  isWaiting &&
+                                                  _quizData?['startedAt'] == null)
+                                              ? Icons.play_arrow_rounded
+                                              : Icons.skip_next_rounded,
+                                      label: _isTieBreakerActive
+                                          ? (_currentQuestion == 0 &&
+                                                  (isWaiting ||
+                                                      _status ==
+                                                          'tie_breaker_invite')
+                                              ? 'START TIE BREAKER'
+                                              : 'NEXT QUESTION')
+                                          : _levelPreparedForStart
+                                              ? 'START LEVEL $_currentLevel'
+                                              : (_currentQuestion == 0 &&
+                                                      isWaiting &&
+                                                      _quizData?['startedAt'] ==
+                                                          null)
+                                                  ? 'START'
+                                                  : 'NEXT QUESTION',
+                                      color: _isTieBreakerActive
+                                          ? (_currentQuestion == 0 &&
+                                                  (isWaiting ||
+                                                      _status ==
+                                                          'tie_breaker_invite')
+                                              ? Colors.green
+                                              : primaryBlue)
+                                          : _levelPreparedForStart ||
+                                                  (_currentQuestion == 0 &&
+                                                      isWaiting &&
+                                                      _quizData?['startedAt'] ==
+                                                          null)
+                                              ? Colors.green
+                                              : isLastQuestionOrLevelDone
+                                                  ? Colors.grey
+                                                  : primaryBlue,
+                                      enabled: !_isFinished &&
+                                          !_isAdvancingQuestion &&
+                                          !_startingFromMainButton &&
+                                          (_isTieBreakerActive
+                                              ? ((_currentQuestion == 0 &&
+                                                      (isWaiting ||
+                                                          _status ==
+                                                              'tie_breaker_invite'))
+                                                  ? true
+                                                  : (!isWaiting &&
+                                                      !isCountdown &&
+                                                      !_contestReviewActive &&
+                                                      !_isManuallyPaused))
+                                              : (_levelPreparedForStart ||
+                                                  ((_currentQuestion == 0 &&
+                                                          isWaiting &&
+                                                          _quizData?['startedAt'] ==
+                                                              null)
+                                                      ? isWaiting
+                                                      : (!isLastQuestionOrLevelDone &&
+                                                          !isWaiting &&
+                                                          !isCountdown &&
+                                                          !_contestReviewActive &&
+                                                          !_isManuallyPaused)))),
+                                      // One primary control starts the next question or level.
+                                      onTap: _isTieBreakerActive
+                                          ? ((_currentQuestion == 0 &&
+                                                  (isWaiting ||
+                                                      _status ==
+                                                          'tie_breaker_invite'))
+                                              ? _startInitialCountdownFromButton
+                                              : _confirmNextQuestion)
+                                          : _levelPreparedForStart
+                                              ? () async {
+                                                  final targetQuestion =
+                                                      _pendingQuestionIndex ??
+                                                          _currentQuestion;
+                                                  final targetLevel =
+                                                      _pendingLevel ??
+                                                          _currentLevel;
+                                                  setState(
+                                                    () => _levelPreparedForStart =
+                                                        false,
+                                                  );
+                                                  await _startQuestionCountdown(
+                                                    questionIndex: targetQuestion,
+                                                    level: targetLevel,
+                                                  );
+                                                }
+                                              : (_currentQuestion == 0 &&
+                                                      isWaiting &&
+                                                      _quizData?['startedAt'] ==
+                                                          null)
+                                                  ? _startInitialCountdownFromButton
+                                                  : _confirmNextQuestion,
+                                    ),
                                   ),
-                                ),
                                 SizedBox(
                                   width: buttonWidth,
                                   child: _compactControlButton(
@@ -7330,7 +7327,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   ),
                                 ),
                                 SizedBox(
-                                  width: buttonWidth,
+                                  width: (compact && hideTieBreakerMainButton)
+                                      ? constraints.maxWidth
+                                      : buttonWidth,
                                   child: _compactControlButton(
                                     icon: Icons.flag_rounded,
                                     label: _isTieBreakerActive
