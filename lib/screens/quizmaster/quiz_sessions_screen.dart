@@ -169,6 +169,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
         return status != 'left' &&
             status != 'rejected' &&
             status != 'declined' &&
+            status != 'pending' &&
             doc.data()['leftQuiz'] != true;
       }).toList();
 
@@ -349,6 +350,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
         return status != 'left' &&
             status != 'rejected' &&
             status != 'declined' &&
+            status != 'pending' &&
             doc.data()['leftQuiz'] != true;
       }).toList();
 
@@ -4856,6 +4858,7 @@ class ParticipantReadinessPage extends StatelessWidget {
                     return status != 'left' &&
                         status != 'rejected' &&
                         status != 'declined' &&
+                        status != 'pending' &&
                         doc.data()['leftQuiz'] != true;
                   }).toList();
                   final readyCount = displayParticipants
