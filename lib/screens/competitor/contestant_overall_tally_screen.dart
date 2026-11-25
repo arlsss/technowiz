@@ -314,55 +314,12 @@ class _ContestantOverallTallyScreenState
                                 // ==========================================
                                 // CURRENT CONTESTANT HIGHLIGHT CARD
                                 // ==========================================
-                                if (myParticipant != null) ...[
+                                if (myParticipant != null)
                                   _buildMyTallyCard(
                                     myParticipant,
                                     sortedLevels,
-                                  ),
-                                  const SizedBox(height: 22),
-                                ],
-
-                                // ==========================================
-                                // ALL CONTESTANTS STANDINGS SECTION
-                                // ==========================================
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFDCFCE7),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(
-                                        Icons.leaderboard_rounded,
-                                        color: primaryGreen,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      "ALL CONTESTANTS TALLY",
-                                      style: TextStyle(
-                                        color: darkGreen,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      "${participants.length} Joined",
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-
-                                if (participants.isEmpty)
+                                  )
+                                else
                                   Container(
                                     padding: const EdgeInsets.all(24),
                                     decoration: BoxDecoration(
@@ -379,24 +336,9 @@ class _ContestantOverallTallyScreenState
                                         fontSize: 14,
                                       ),
                                     ),
-                                  )
-                                else
-                                  ListView.separated(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: participants.length,
-                                    separatorBuilder: (_, _) =>
-                                        const SizedBox(height: 10),
-                                    itemBuilder: (context, index) {
-                                      final item = participants[index];
-                                      return _buildParticipantCard(
-                                        item,
-                                        sortedLevels,
-                                      );
-                                    },
                                   ),
 
-                                const SizedBox(height: 30),
+                                const SizedBox(height: 20),
                               ],
                             ),
                           ),
@@ -440,12 +382,27 @@ class _ContestantOverallTallyScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top Row: Avatar/Trophy + Name + Rank Badge
+          // Top Row: Avatar + Name + Rank Badge
           Row(
             children: [
-              Tech3DTrophyWidget(
-                rank: me.rank,
-                size: 50,
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF86EFAC),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    me.isTeam ? Icons.groups_rounded : Icons.person_rounded,
+                    color: primaryGreen,
+                    size: 26,
+                  ),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -529,7 +486,13 @@ class _ContestantOverallTallyScreenState
                   border: Border.all(color: rankStyle.borderColor, width: 1.2),
                 ),
                 child: Text(
-                  rankStyle.label,
+                  me.rank == 1
+                      ? "1ST PLACE"
+                      : (me.rank == 2
+                          ? "2ND PLACE"
+                          : (me.rank == 3
+                              ? "3RD PLACE"
+                              : "RANK #${me.rank}")),
                   style: TextStyle(
                     color: rankStyle.primaryColor,
                     fontSize: 12,
@@ -674,244 +637,6 @@ class _ContestantOverallTallyScreenState
               color: textColor,
               fontSize: 12.5,
               fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================================
-  // ALL PARTICIPANTS CARD
-  // ==========================================================
-  Widget _buildParticipantCard(
-    _TallyParticipant item,
-    List<int> sortedLevels,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: item.isMe ? const Color(0xFFF0FDF4) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: item.isMe ? primaryGreen : const Color(0xFFE2E8F0),
-          width: item.isMe ? 1.8 : 1.0,
-        ),
-        boxShadow: item.isMe
-            ? [
-                BoxShadow(
-                  color: primaryGreen.withValues(alpha: 0.12),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Rank Badge with 3D Trophy
-          Tech3DTrophyWidget(
-            rank: item.rank,
-            size: 40,
-          ),
-          const SizedBox(width: 12),
-
-          // Name, Team, and Level Chips
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      item.isTeam
-                          ? Icons.groups_rounded
-                          : Icons.person_rounded,
-                      size: 14,
-                      color:
-                          item.isMe ? primaryGreen : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        item.name,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: item.isMe
-                              ? primaryGreen
-                              : const Color(0xFF0F172A),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (item.isMe) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: const Text(
-                          "YOU",
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: primaryGreen,
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (item.isTeam) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE9FE),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: const Text(
-                          "TEAM",
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF6D28D9),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-
-                if (item.isTeam && item.teamMembers.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    "Members: ${item.teamMembers.join(', ')}",
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-
-                const SizedBox(height: 6),
-
-                // Level points breakdown chips
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    for (final lvl in sortedLevels) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: item.isMe
-                              ? const Color(0xFFDCFCE7)
-                              : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: item.isMe
-                                ? const Color(0xFF86EFAC)
-                                : const Color(0xFFCBD5E1),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          (item.levelPoints[lvl] ?? 0) == 0
-                              ? "L$lvl: 0"
-                              : "L$lvl: ${item.levelPoints[lvl] ?? 0} ${(item.levelPoints[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: item.isMe
-                                ? const Color(0xFF14532D)
-                                : const Color(0xFF334155),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (item.tieBreakerPoints > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(0xFFFDE68A),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          "TB: +${item.tieBreakerPoints} ${item.tieBreakerPoints == 1 ? 'pt' : 'pts'}",
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFB45309),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Total Score Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: item.isMe ? primaryGreen : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: item.isMe
-                  ? [
-                      BoxShadow(
-                        color: primaryGreen.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "${item.totalScore}",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: item.isMe
-                        ? Colors.white
-                        : const Color(0xFF0F172A),
-                    height: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  item.totalScore == 1 ? "PT" : "PTS",
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                    color: item.isMe
-                        ? Colors.white70
-                        : const Color(0xFF64748B),
-                    height: 1.0,
-                  ),
-                ),
-              ],
             ),
           ),
         ],
