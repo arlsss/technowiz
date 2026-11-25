@@ -2801,12 +2801,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           const SizedBox(height: 12),
                           const Text(
                             '• 1 Point per question.\n\n'
-                            '• Sudden-Death Rule: Ug makakuha dayon sa points ang contestant '
-                            '(nakatubag og sakto samtang ang kaatbang sayop o walay tubag), '
-                            'automatic na nga mahuman ang tie breaker ug modaog sa maong pwesto!\n\n'
-                            '• Kung parehas kamo nga sakto (o parehas walay nakatubag/sayop), '
-                            'magpadayon sa sunod nga question hangtod madeterminar ang winner.\n\n'
-                            '• I-click ang CONFIRM aron automatic nga ma-ready ug mapadulong sa official instructions.',
+                            '• Sudden-Death Rule: If a contestant scores a point '
+                            '(answers correctly while the opponent answers incorrectly or runs out of time), '
+                            'the tie breaker concludes immediately and that contestant wins the contested rank!\n\n'
+                            '• If both contestants answer correctly (or both answer incorrectly / run out of time), '
+                            'the tie breaker continues to the next question until a winner is determined.\n\n'
+                            '• Click CONFIRM to confirm your readiness and proceed to the official instructions.',
                             style: TextStyle(
                               fontSize: 13,
                               color: Color(0xFF334155),
@@ -2826,126 +2826,58 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF64748B),
-                              side: const BorderSide(
-                                color: Color(0xFFCBD5E1),
-                                width: 1.5,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            onPressed: () {
-                              showDialog<void>(
-                                context: context,
-                                builder: (dlgCtx) => AlertDialog(
-                                  title: const Text('Cancel Tie Breaker?'),
-                                  content: const Text(
-                                    'If you cancel, you will forfeit the tie breaker and share the tied rank with your opponent.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(dlgCtx),
-                                      child: const Text('STAY'),
-                                    ),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      onPressed: () async {
-                                        Navigator.pop(dlgCtx);
-                                        await CompetitorNavPersistence.savePage(
-                                          'dashboard',
-                                          clearQuiz: true,
-                                        );
-                                        if (!context.mounted) return;
-                                        Navigator.of(context).pushAndRemoveUntil(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const CompetitorDashboard(
-                                                  initialPage: 'dashboard',
-                                                ),
-                                          ),
-                                          (route) => false,
-                                        );
-                                      },
-                                      child: const Text('FORFEIT & EXIT'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                            child: const Text(
-                              'CANCEL',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryGreen,
-                              foregroundColor: Colors.white,
-                              elevation: 2,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            icon: const Icon(
-                              Icons.check_circle_rounded,
-                              size: 22,
-                            ),
-                            label: const Text(
-                              'CONFIRM',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            onPressed: () async {
-                              final sessId =
-                                  quizData['tieBreakerSessionId']?.toString();
-                              setState(() {
-                                _tieBreakerInviteConfirmed = true;
-                                _confirmedTieBreakerSessionId = sessId;
-                              });
-                              try {
-                                if (myUid.isNotEmpty) {
-                                  await _sessionRef
-                                      .collection('join_requests')
-                                      .doc(myUid)
-                                      .set({
-                                    'tieBreakerReady': true,
-                                    'ready': true,
-                                    'updatedAt': FieldValue.serverTimestamp(),
-                                  }, SetOptions(merge: true));
+                        icon: const Icon(
+                          Icons.check_circle_rounded,
+                          size: 22,
+                        ),
+                        label: const Text(
+                          'CONFIRM',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        onPressed: () async {
+                          final sessId =
+                              quizData['tieBreakerSessionId']?.toString();
+                          setState(() {
+                            _tieBreakerInviteConfirmed = true;
+                            _confirmedTieBreakerSessionId = sessId;
+                          });
+                          try {
+                            if (myUid.isNotEmpty) {
+                              await _sessionRef
+                                  .collection('join_requests')
+                                  .doc(myUid)
+                                  .set({
+                                'tieBreakerReady': true,
+                                'ready': true,
+                                'updatedAt': FieldValue.serverTimestamp(),
+                              }, SetOptions(merge: true));
 
-                                  await _sessionRef.update({
-                                    'tieBreakerReadyUids':
-                                        FieldValue.arrayUnion([myUid]),
-                                  });
-                                }
-                              } catch (e) {
-                                debugPrint('Error confirming tie breaker: $e');
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+                              await _sessionRef.update({
+                                'tieBreakerReadyUids':
+                                    FieldValue.arrayUnion([myUid]),
+                              });
+                            }
+                          } catch (e) {
+                            debugPrint('Error confirming tie breaker: $e');
+                          }
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -3198,7 +3130,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         SizedBox(width: 10),
                         Flexible(
                           child: Text(
-                            'Please standby. Mapunta ka sa tie breaker preparation sa dihang i-start na sa Quiz Master.',
+                            'Please standby. You will proceed to tie breaker preparation once started by the Quiz Master.',
                             style: TextStyle(
                               fontSize: 12.5,
                               color: Color(0xFF475569),
@@ -3386,7 +3318,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Ug makakuha dayon sa points, automatic na mahuman!',
+                            'First to score a point wins immediately!',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -3396,7 +3328,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Ug makakuha dayon og puntos ang contestant (nakatubag og sakto samtang ang kaatbang sayop o walay tubag), automatic na nga mahuman ang tie breaker ug maoy opisyal nga modaog sa maong pwesto!',
+                            'If a contestant scores a point (answers correctly while the opponent is incorrect or runs out of time), the tie breaker concludes immediately and they officially win the contested rank!',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -3449,10 +3381,10 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                           const SizedBox(height: 10),
                           const Text(
-                            '• 1 Point matag sakto nga tubag.\n'
-                            '• Tubaga ang matag pangutana sulod sa gitakdang timer.\n'
-                            '• Kung parehas kamong makatubag og sakto (o parehas sayop/walay tubag), walay labaw busa magpadayon sa sunod nga tie-breaker question.\n'
-                            '• Kung ang usa makapuntos ug ang usa dili, matapos dayon ang tie breaker.',
+                            '• 1 Point for each correct answer.\n'
+                            '• Answer each question within the allotted timer.\n'
+                            '• If both contestants answer correctly (or both are incorrect / out of time), the tie remains and proceeds to the next tie-breaker question.\n'
+                            '• If one contestant scores while the other does not, the tie breaker ends immediately.',
                             style: TextStyle(
                               fontSize: 12.5,
                               color: Color(0xFF334155),
@@ -3585,7 +3517,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         SizedBox(width: 10),
                         Flexible(
                           child: Text(
-                            'Andam na ka! Naghulat sa Quiz Master nga sugdan ang pangutana...',
+                            'You are ready! Waiting for the Quiz Master to start the question...',
                             style: TextStyle(
                               fontSize: 13,
                               color: Color(0xFF475569),
