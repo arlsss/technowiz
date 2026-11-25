@@ -7998,7 +7998,6 @@ class _QuizScreenState extends State<QuizScreen> {
                                               ),
                                             ),
                                           ],
-                                          ),
                                         ],
                                       ),
                                   ],
