@@ -41,9 +41,12 @@ class CompetitorScoreScreen extends StatelessWidget {
               }
               if (mSum > lvlSum) lvlSum = mSum;
             }
-            if (lvlSum > totalScore) totalScore = lvlSum;
             final tiePts = int.tryParse(data['tieBreakerScore']?.toString() ?? '') ?? 0;
-            if (tiePts > 0 && totalScore < (lvlSum + tiePts)) totalScore += tiePts;
+            if (lvlSum > 0) {
+              totalScore = lvlSum + tiePts;
+            } else if (tiePts > 0) {
+              totalScore += tiePts;
+            }
           }
 
           return Center(

@@ -59,9 +59,12 @@ class _MyScoreScreenState extends State<MyScoreScreen> {
       }
       if (mSum > lvlSum) lvlSum = mSum;
     }
-    if (lvlSum > total) total = lvlSum;
     final tiePts = int.tryParse(data['tieBreakerScore']?.toString() ?? '') ?? 0;
-    if (tiePts > 0 && total < (lvlSum + tiePts)) total += tiePts;
+    if (lvlSum > 0) {
+      total = lvlSum + tiePts;
+    } else if (tiePts > 0) {
+      total += tiePts;
+    }
     return total;
   }
 

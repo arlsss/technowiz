@@ -1081,30 +1081,105 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                             _ensureResponseSubscription(uid);
 
                             final sData = scoreByUid[uid] ?? {};
-                            final rawScore = sData['score'] ?? sData['totalScore'];
-                            int score = rawScore is num
-                                ? rawScore.toInt()
-                                : int.tryParse(rawScore?.toString() ?? '') ?? 0;
-                            int lvlSum = 0;
+                            final Map<int, int> levelPoints = {};
                             for (int l = 1; l <= 20; l++) {
-                              final v = sData['level${l}Score'] ?? sData['level_$l'];
-                              if (v is num) {
-                                lvlSum += v.toInt();
+                              final v = sData['level${l}Score'] ??
+                                  sData['level_$l'] ??
+                                  data['level${l}Score'] ??
+                                  data['level_$l'];
+                              if (v is num && v > 0) {
+                                levelPoints[l] = v.toInt();
                               } else if (v != null) {
-                                lvlSum += int.tryParse(v.toString()) ?? 0;
+                                final parsed = int.tryParse(v.toString());
+                                if (parsed != null && parsed > 0) {
+                                  levelPoints[l] = parsed;
+                                }
+                              }
+                            }
+                            if (sData['levelScores'] is Map) {
+                              for (final entry in (sData['levelScores'] as Map).entries) {
+                                final numStr = entry.key
+                                    .toString()
+                                    .replaceAll(RegExp(r'[^0-9]'), '');
+                                final lvl = int.tryParse(numStr);
+                                final val =
+                                    int.tryParse(entry.value?.toString() ?? '') ??
+                                        0;
+                                if (lvl != null && val > 0) {
+                                  if ((levelPoints[lvl] ?? 0) < val) {
+                                    levelPoints[lvl] = val;
+                                  }
+                                }
+                              }
+                            }
+                            if (data['levelScores'] is Map) {
+                              for (final entry in (data['levelScores'] as Map).entries) {
+                                final numStr = entry.key
+                                    .toString()
+                                    .replaceAll(RegExp(r'[^0-9]'), '');
+                                final lvl = int.tryParse(numStr);
+                                final val =
+                                    int.tryParse(entry.value?.toString() ?? '') ??
+                                        0;
+                                if (lvl != null && val > 0) {
+                                  if ((levelPoints[lvl] ?? 0) < val) {
+                                    levelPoints[lvl] = val;
+                                  }
+                                }
                               }
                             }
                             final cachedResp = _contestantResponsesCache[uid];
-                            if (cachedResp != null && cachedResp['levelPoints'] is Map) {
-                              int rSum = 0;
-                              for (final v in (cachedResp['levelPoints'] as Map).values) {
-                                if (v is num) rSum += v.toInt();
+                            if (cachedResp != null &&
+                                cachedResp['levelPoints'] is Map) {
+                              for (final entry
+                                  in (cachedResp['levelPoints'] as Map).entries) {
+                                final lvl = int.tryParse(entry.key.toString());
+                                final val =
+                                    int.tryParse(entry.value?.toString() ?? '') ??
+                                        0;
+                                if (lvl != null && val > 0) {
+                                  if ((levelPoints[lvl] ?? 0) < val) {
+                                    levelPoints[lvl] = val;
+                                  }
+                                }
                               }
-                              if (rSum > lvlSum) lvlSum = rSum;
                             }
-                            if (lvlSum > score) score = lvlSum;
-                            final tiePts = int.tryParse(sData['tieBreakerScore']?.toString() ?? '') ?? 0;
-                            if (tiePts > 0 && score < (lvlSum + tiePts)) score += tiePts;
+
+                            int lvlSum = 0;
+                            for (final pts in levelPoints.values) {
+                              lvlSum += pts;
+                            }
+
+                            final tiePts = int.tryParse((sData['tieBreakerScore'] ??
+                                        data['tieBreakerScore'])
+                                    ?.toString() ??
+                                '') ??
+                                0;
+
+                            final rawScore = sData['score'] ??
+                                sData['totalScore'] ??
+                                data['score'] ??
+                                data['finalScore'];
+                            final stored = rawScore is num
+                                ? rawScore.toInt()
+                                : int.tryParse(rawScore?.toString() ?? '') ?? 0;
+
+                            int score = 0;
+                            if (lvlSum > 0) {
+                              score = lvlSum + tiePts;
+                            } else {
+                              score = stored > 0 ? (stored + tiePts) : 0;
+                            }
+
+                            // Auto-heal corrupt score in Firestore
+                            if (scoreDocByUid[uid] != null &&
+                                stored != score &&
+                                score > 0) {
+                              scoreDocByUid[uid]!.reference.update({
+                                'score': score,
+                                'totalScore': score,
+                              }).catchError((_) {});
+                            }
 
                             final isElim = sData['eliminated'] == true ||
                                 sData['isEliminated'] == true ||
@@ -1170,8 +1245,6 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
 
                             final int respTimeMs =
                                 (respData['latestTimeMs'] as num?)?.toInt() ?? 0;
-                            final Map<int, int> levelPoints =
-                                Map<int, int>.from(respData['levelPoints'] ?? {});
 
                             int? elimLevel;
                             final rawElim = sData['eliminatedLevel'] ??
@@ -1492,35 +1565,38 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     Map<String, dynamic>? sData,
     int maxLevel,
   ) {
+    int maxVal = 0;
     if (c.levelPoints.containsKey(lvl)) {
-      return c.levelPoints[lvl]!;
+      final p = c.levelPoints[lvl] ?? 0;
+      if (p > maxVal) maxVal = p;
     }
     if (sData != null) {
       final levelKey = 'level${lvl}Score';
       final altKey = 'level_$lvl';
-      if (sData.containsKey(levelKey)) {
-        final val = sData[levelKey];
-        if (val is num) return val.toInt();
-        final parsed = int.tryParse(val?.toString() ?? '');
-        if (parsed != null) return parsed;
-      }
-      if (sData.containsKey(altKey)) {
-        final val = sData[altKey];
-        if (val is num) return val.toInt();
-        final parsed = int.tryParse(val?.toString() ?? '');
-        if (parsed != null) return parsed;
+      for (final key in [levelKey, altKey]) {
+        if (sData.containsKey(key)) {
+          final val = sData[key];
+          final parsed =
+              val is num ? val.toInt() : int.tryParse(val?.toString() ?? '');
+          if (parsed != null && parsed > maxVal) maxVal = parsed;
+        }
       }
       if (sData['levelScores'] is Map) {
         final map = sData['levelScores'] as Map;
-        final val = map['Level $lvl'] ?? map['$lvl'];
-        if (val is num) return val.toInt();
-        if (val != null) {
-          final parsed = int.tryParse(val.toString());
-          if (parsed != null) return parsed;
+        for (final entry in map.entries) {
+          final numStr =
+              entry.key.toString().replaceAll(RegExp(r'[^0-9]'), '');
+          if (int.tryParse(numStr) == lvl) {
+            final val = entry.value;
+            final parsed = val is num
+                ? val.toInt()
+                : int.tryParse(val?.toString() ?? '');
+            if (parsed != null && parsed > maxVal) maxVal = parsed;
+          }
         }
       }
     }
-    // If only 1 level overall, or contestant only participated in level 1 (e.g. eliminated at lvl 1)
+    if (maxVal > 0) return maxVal;
     if (lvl == 1 && (maxLevel == 1 || c.eliminatedLevel == 1)) {
       return c.score;
     }
@@ -1567,7 +1643,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         ),
       ),
       child: Text(
-        '$pts pts',
+        pts == 0 ? '0' : '$pts ${pts == 1 ? 'pt' : 'pts'}',
         style: TextStyle(
           color: pts > 0 ? const Color(0xFF15803D) : QuizMasterColors.textMuted,
           fontWeight: FontWeight.w800,
@@ -1677,30 +1753,44 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   for (int lvl = 1; lvl <= maxLevel; lvl++)
                     DataCell(_buildLevelScoreCell(c, lvl, sData, maxLevel)),
 
-                  // Total Score Cell
+                  // Total Score Cell (strictly accurate sum of displayed levels + tiebreaker)
                   DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: QuizMasterColors.primaryBlue
-                            .withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: QuizMasterColors.primaryBlue
-                              .withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Text(
-                        '${c.score} pts',
-                        style: const TextStyle(
-                          color: QuizMasterColors.darkBlue,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                        ),
-                      ),
+                    Builder(
+                      builder: (context) {
+                        int rowSum = 0;
+                        for (int lvl = 1; lvl <= maxLevel; lvl++) {
+                          rowSum +=
+                              _getContestantLevelScore(c, lvl, sData, maxLevel);
+                        }
+                        final tiePts = int.tryParse(
+                                sData?['tieBreakerScore']?.toString() ?? '') ??
+                            0;
+                        final int displayTotal =
+                            rowSum > 0 ? (rowSum + tiePts) : c.score;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: QuizMasterColors.primaryBlue
+                                .withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: QuizMasterColors.primaryBlue
+                                  .withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Text(
+                            '$displayTotal ${displayTotal == 1 ? 'pt' : 'pts'}',
+                            style: const TextStyle(
+                              color: QuizMasterColors.darkBlue,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

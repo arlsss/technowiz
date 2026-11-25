@@ -6561,9 +6561,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           }
                           if (mSum > lvlSum) lvlSum = mSum;
                         }
-                        if (lvlSum > scoreVal) scoreVal = lvlSum;
                         final tiePts = int.tryParse(sData['tieBreakerScore']?.toString() ?? '') ?? 0;
-                        if (tiePts > 0 && scoreVal < (lvlSum + tiePts)) scoreVal += tiePts;
+                        if (lvlSum > 0) {
+                          scoreVal = lvlSum + tiePts;
+                        } else if (tiePts > 0) {
+                          scoreVal += tiePts;
+                        }
 
                         rows.add({
                           'uid': uid,
