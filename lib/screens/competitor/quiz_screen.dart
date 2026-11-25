@@ -789,6 +789,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool nextReadyConfirmed = false;
   int confirmedQuestionIndex = -1;
   bool _tieBreakerInviteConfirmed = false;
+  String? _confirmedTieBreakerSessionId;
 
   // Prevent the 30-second question timer from starting while
   // the Quiz Master is still running the ready check/countdown.
@@ -2595,12 +2596,34 @@ class _QuizScreenState extends State<QuizScreen> {
     return opponents.isNotEmpty ? opponents.join(', ') : 'Opponent';
   }
 
+  List<String> _getTieBreakerOpponentUids(
+    Map<String, dynamic> quizData,
+    String myUid,
+  ) {
+    final rawUids = quizData['tieBreakerContestantUids'];
+    final uids = rawUids is List
+        ? rawUids.map((e) => e.toString()).toList()
+        : <String>[];
+    return uids.where((u) => u != myUid).toList();
+  }
+
   Widget _buildTieBreakerInvitationScreen(
     BuildContext context,
     Map<String, dynamic> quizData,
     String opponentName,
   ) {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final forText = (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
+        ? quizData['tieBreakerFor'].toString().trim()
+        : ((quizData['tieBreakerRank'] != null)
+            ? (quizData['tieBreakerRank'] == 1
+                ? '1st Place'
+                : quizData['tieBreakerRank'] == 2
+                    ? '2nd Place'
+                    : quizData['tieBreakerRank'] == 3
+                        ? '3rd Place'
+                        : 'Rank ${quizData['tieBreakerRank']}')
+            : 'the Tied Rank');
 
     return TechCircuitBackground(
       baseColor: lightGreen,
@@ -2676,13 +2699,23 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      "You'll be having a tie breaker with\n$opponentName!",
+                      "You'll need to take a tie breaker for\n$forText",
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF1E293B),
                         height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Showdown with: $opponentName',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFD97706),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -2728,12 +2761,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           const SizedBox(height: 12),
                           const Text(
                             '• 1 Point per question.\n\n'
-                            '• Sudden-Death Rule: If example ang isa ka contestant sa tie breaker '
-                            'wala maka answer (o sayop) unya ang usa kay nakatubag ug sakto, '
-                            'automatic na nga maoy daog!\n\n'
-                            '• If pareha kamo nga sakto (o pareha walay nakatubag/sayop), '
+                            '• Sudden-Death Rule: Ug makakuha dayon sa points ang contestant '
+                            '(nakatubag og sakto samtang ang kaatbang sayop o walay tubag), '
+                            'automatic na nga mahuman ang tie breaker ug modaog sa maong pwesto!\n\n'
+                            '• Kung parehas kamo nga sakto (o parehas walay nakatubag/sayop), '
                             'magpadayon sa sunod nga question hangtod madeterminar ang winner.\n\n'
-                            '• Palihug siguroha nga andam ka sa dili pa mo-confirm.',
+                            '• I-click ang CONFIRM aron automatic nga ma-ready ug mapadulong sa official instructions.',
                             style: TextStyle(
                               fontSize: 13,
                               color: Color(0xFF334155),
@@ -2844,8 +2877,11 @@ class _QuizScreenState extends State<QuizScreen> {
                               ),
                             ),
                             onPressed: () async {
+                              final sessId =
+                                  quizData['tieBreakerSessionId']?.toString();
                               setState(() {
                                 _tieBreakerInviteConfirmed = true;
+                                _confirmedTieBreakerSessionId = sessId;
                               });
                               try {
                                 if (myUid.isNotEmpty) {
@@ -2889,6 +2925,21 @@ class _QuizScreenState extends State<QuizScreen> {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final oppName = opponentName ??
         _getTieBreakerOpponentName(quizData, myUid);
+    final forText = (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
+        ? quizData['tieBreakerFor'].toString().trim()
+        : ((quizData['tieBreakerRank'] != null)
+            ? (quizData['tieBreakerRank'] == 1
+                ? '1st Place'
+                : quizData['tieBreakerRank'] == 2
+                    ? '2nd Place'
+                    : quizData['tieBreakerRank'] == 3
+                        ? '3rd Place'
+                        : 'Rank ${quizData['tieBreakerRank']}')
+            : 'the Tied Rank');
+
+    final readyUids = List<String>.from(quizData['tieBreakerReadyUids'] ?? const []);
+    final oppUids = _getTieBreakerOpponentUids(quizData, myUid);
+    final isOpponentReady = oppUids.isNotEmpty && oppUids.every((u) => readyUids.contains(u));
 
     return TechCircuitBackground(
       baseColor: lightGreen,
@@ -2897,9 +2948,9 @@ class _QuizScreenState extends State<QuizScreen> {
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
+                constraints: const BoxConstraints(maxWidth: 580),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -2909,93 +2960,220 @@ class _QuizScreenState extends State<QuizScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: softGreen,
+                        color: const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: borderGreen, width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFFF59E0B),
+                          width: 1.5,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
                           Icon(
                             Icons.bolt_rounded,
-                            color: primaryGreen,
+                            color: Color(0xFFD97706),
                             size: 18,
                           ),
                           SizedBox(width: 8),
                           Text(
-                            'TIE BREAKER • PREPARATION',
+                            'TIE BREAKER • OFFICIAL INSTRUCTIONS',
                             style: TextStyle(
-                              color: darkGreen,
+                              color: Color(0xFF92400E),
                               fontWeight: FontWeight.w900,
-                              fontSize: 13,
+                              fontSize: 12.5,
                               letterSpacing: 0.8,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     Container(
-                      width: 90,
-                      height: 90,
+                      width: 82,
+                      height: 82,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: primaryGreen.withValues(alpha: 0.4),
-                          width: 3,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0D9488), primaryGreen],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
+                        shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: primaryGreen.withValues(alpha: 0.2),
-                            blurRadius: 18,
+                            color: primaryGreen.withValues(alpha: 0.3),
+                            blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: const Center(
                         child: Icon(
-                          Icons.hourglass_top_rounded,
-                          color: primaryGreen,
-                          size: 46,
+                          Icons.assignment_turned_in_rounded,
+                          color: Colors.white,
+                          size: 42,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 18),
                     const Text(
-                      'Please be ready for the tie breaker',
+                      'Tie Breaker Instructions',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 23,
+                        fontSize: 24,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF0F172A),
                         letterSpacing: -0.4,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Waiting for the Quiz Master to start the question...',
+                    const SizedBox(height: 6),
+                    Text(
+                      'Competing for $forText • Showdown with $oppName',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
+                      style: const TextStyle(
+                        fontSize: 14,
                         color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                        height: 1.4,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFF59E0B),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(
+                                Icons.flash_on_rounded,
+                                color: Color(0xFFD97706),
+                                size: 22,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'SUDDEN-DEATH RULE:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13.5,
+                                    color: Color(0xFFB45309),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Ug makakuha dayon sa points, automatic na mahuman!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF92400E),
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Ug makakuha dayon og puntos ang contestant (nakatubag og sakto samtang ang kaatbang sayop o walay tubag), automatic na nga mahuman ang tie breaker ug maoy opisyal nga modaog sa maong pwesto!',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF78350F),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(
+                                Icons.rule_rounded,
+                                color: Color(0xFF2563EB),
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Official Rules & Guidelines:',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            '• 1 Point matag sakto nga tubag.\n'
+                            '• Tubaga ang matag pangutana sulod sa gitakdang timer.\n'
+                            '• Kung parehas kamong makatubag og sakto (o parehas sayop/walay tubag), walay labaw busa magpadayon sa sunod nga tie-breaker question.\n'
+                            '• Kung ang usa makapuntos ug ang usa dili, matapos dayon ang tie breaker.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF334155),
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: borderGreen, width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
@@ -3006,7 +3184,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               const Icon(
                                 Icons.check_circle_rounded,
                                 color: primaryGreen,
-                                size: 22,
+                                size: 20,
                               ),
                               const SizedBox(width: 10),
                               const Expanded(
@@ -3014,7 +3192,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   'YOU',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 14,
+                                    fontSize: 13.5,
                                     color: Color(0xFF0F172A),
                                   ),
                                 ),
@@ -3029,23 +3207,27 @@ class _QuizScreenState extends State<QuizScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Text(
-                                  'READY',
+                                  'CONFIRMED & READY',
                                   style: TextStyle(
                                     color: primaryGreen,
                                     fontWeight: FontWeight.w900,
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                          const Divider(height: 18, color: Color(0xFFF1F5F9)),
                           Row(
                             children: [
-                              const Icon(
-                                Icons.sports_score_rounded,
-                                color: Color(0xFFEA580C),
-                                size: 22,
+                              Icon(
+                                isOpponentReady
+                                    ? Icons.check_circle_rounded
+                                    : Icons.hourglass_empty_rounded,
+                                color: isOpponentReady
+                                    ? primaryGreen
+                                    : const Color(0xFFD97706),
+                                size: 20,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -3053,7 +3235,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   oppName,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 14,
+                                    fontSize: 13.5,
                                     color: Color(0xFF0F172A),
                                   ),
                                 ),
@@ -3064,15 +3246,21 @@ class _QuizScreenState extends State<QuizScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF3C7),
+                                  color: isOpponentReady
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text(
-                                  'OPPONENT',
+                                child: Text(
+                                  isOpponentReady
+                                      ? 'READY'
+                                      : 'WAITING TO CONFIRM...',
                                   style: TextStyle(
-                                    color: Color(0xFFD97706),
+                                    color: isOpponentReady
+                                        ? primaryGreen
+                                        : const Color(0xFFD97706),
                                     fontWeight: FontWeight.w900,
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                   ),
                                 ),
                               ),
@@ -3081,7 +3269,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
@@ -3094,12 +3282,14 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         SizedBox(width: 10),
-                        Text(
-                          'Get ready: Countdown will begin shortly',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF475569),
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            'Andam na ka! Naghulat sa Quiz Master nga sugdan ang pangutana...',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF475569),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -8180,13 +8370,30 @@ class _QuizScreenState extends State<QuizScreen> {
               return _buildTieBreakerSpectatorScreen(context, quizData);
             }
 
+            final currentSessionId =
+                quizData['tieBreakerSessionId']?.toString() ?? '';
+            final readyUids = List<String>.from(
+              quizData['tieBreakerReadyUids'] ?? const [],
+            );
+            final isMyUidReadyInFirestore = readyUids.contains(currentUid);
+
+            if (currentSessionId.isNotEmpty &&
+                _confirmedTieBreakerSessionId != null &&
+                _confirmedTieBreakerSessionId != currentSessionId) {
+              _tieBreakerInviteConfirmed = false;
+              _confirmedTieBreakerSessionId = null;
+            }
+
+            final isInviteConfirmed =
+                _tieBreakerInviteConfirmed || isMyUidReadyInFirestore;
+
             final oppName = _getTieBreakerOpponentName(quizData, currentUid);
 
             if (!countdownActive &&
                 status != 'countdown' &&
                 status != 'active' &&
                 !(answered && resultRevealed)) {
-              if (!_tieBreakerInviteConfirmed) {
+              if (!isInviteConfirmed) {
                 return _buildTieBreakerInvitationScreen(
                   context,
                   quizData,

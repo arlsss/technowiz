@@ -804,8 +804,26 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   ]) async {
     final List<String> tiedUids = [];
     final List<String> tiedNames = [];
+    int tiedRank = 1;
+    String tieBreakerFor = '';
 
     if (tiedEntries != null && tiedEntries.isNotEmpty) {
+      final ranks = tiedEntries
+          .map((e) => e.value.first.rank)
+          .toSet()
+          .toList()
+        ..sort();
+      if (ranks.isNotEmpty) {
+        tiedRank = ranks.first;
+        final rankStrings = ranks.map((r) {
+          if (r == 1) return '1st Place';
+          if (r == 2) return '2nd Place';
+          if (r == 3) return '3rd Place';
+          return 'Rank $r';
+        }).toList();
+        tieBreakerFor = rankStrings.join(' & ');
+      }
+
       for (final entry in tiedEntries) {
         for (final c in entry.value) {
           if (!tiedUids.contains(c.uid)) {
@@ -817,19 +835,30 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     }
 
     try {
+      final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
       final batch = FirebaseFirestore.instance.batch();
       final updateData = <String, dynamic>{
         'tieBreakerActive': true,
         'tieBreakerResolved': false,
+        'tieBreakerEnded': false,
+        'showTieBreakerResult': false,
         'status': 'tie_breaker_invite',
+        'eventStatus': 'tie_breaker_invite',
         'questionState': 'waiting',
         'isFinished': false,
         'finished': false,
         'currentQuestion': 0,
         'tieBreakerQuestionIndex': 0,
         'tieBreakerReadyUids': <String>[],
+        'tieBreakerSessionId': sessionId,
         'updatedAt': FieldValue.serverTimestamp(),
       };
+      if (tiedRank > 0) {
+        updateData['tieBreakerRank'] = tiedRank;
+      }
+      if (tieBreakerFor.isNotEmpty) {
+        updateData['tieBreakerFor'] = tieBreakerFor;
+      }
       if (tiedUids.isNotEmpty) {
         updateData['tieBreakerContestantUids'] = tiedUids;
         updateData['tieBreakerContestantNames'] = tiedNames;
