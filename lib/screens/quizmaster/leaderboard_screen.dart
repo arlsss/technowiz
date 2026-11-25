@@ -3207,100 +3207,7 @@ class LeaderboardHistoryScreen extends StatefulWidget {
 }
 
 class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
-  bool _selectionMode = false;
-
-  final Set<String> _selectedQuizIds = <String>{};
-
   List<QueryDocumentSnapshot> _currentQuizzes = <QueryDocumentSnapshot>[];
-
-  void _toggleSelected(String quizId) {
-    setState(() {
-      if (!_selectedQuizIds.add(quizId)) {
-        _selectedQuizIds.remove(quizId);
-      }
-    });
-  }
-
-  Future<void> _deleteSelectedQuizzes() async {
-    if (_selectedQuizIds.isEmpty) {
-      if (!mounted) return;
-      showQuizMasterTopNotification(
-        context,
-        'Select at least one quiz first.',
-        isWarning: true,
-      );
-
-      return;
-    }
-
-    final count = _selectedQuizIds.length;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete selected quizzes?'),
-
-        content: Text(
-          'Are you sure you want to delete $count selected quiz session(s)?',
-        ),
-
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-
-            child: const Text('Cancel'),
-          ),
-
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-
-            onPressed: () => Navigator.pop(dialogContext, true),
-
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (final quiz in _currentQuizzes) {
-        if (_selectedQuizIds.contains(quiz.id)) {
-          batch.delete(
-            FirebaseFirestore.instance.collection('quiz_sessions').doc(quiz.id),
-          );
-        }
-      }
-
-      await batch.commit();
-
-      if (!mounted) return;
-
-      setState(() {
-        _selectedQuizIds.clear();
-
-        _selectionMode = false;
-      });
-
-      showQuizMasterTopNotification(
-        context,
-        '$count quiz session(s) deleted.',
-        isSuccess: true,
-      );
-    } catch (error) {
-      if (!mounted) return;
-
-      showQuizMasterTopNotification(
-        context,
-        'Unable to delete selected quizzes: $error',
-        isError: true,
-      );
-    }
-  }
 
   static const Color primaryPurple = Color(0xFF1689E8);
 
@@ -3360,13 +3267,6 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
           icon: const Icon(Icons.arrow_back_rounded, color: textDark),
 
           onPressed: () {
-            if (_selectionMode) {
-              setState(() {
-                _selectionMode = false;
-                _selectedQuizIds.clear();
-              });
-              return;
-            }
             if (widget.onBack != null) {
               widget.onBack!();
             } else if (widget.onOpenNavigation != null) {
@@ -3385,12 +3285,10 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
 
         titleSpacing: 0,
 
-        title: Text(
-          _selectionMode
-              ? '${_selectedQuizIds.length} selected'
-              : 'Leaderboard History',
+        title: const Text(
+          'Leaderboard History',
 
-          style: const TextStyle(
+          style: TextStyle(
             color: textDark,
 
             fontSize: 18,
@@ -3398,58 +3296,6 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
-
-        actions: [
-          if (!_selectionMode)
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _selectionMode = true;
-
-                  _selectedQuizIds.clear();
-                });
-              },
-
-              icon: const Icon(Icons.delete_outline_rounded, size: 18),
-
-              label: const Text('Delete'),
-
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.redAccent,
-
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-              ),
-            )
-          else ...[
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _selectionMode = false;
-
-                  _selectedQuizIds.clear();
-                });
-              },
-
-              child: const Text('Cancel'),
-            ),
-
-            TextButton.icon(
-              onPressed: _selectedQuizIds.isEmpty
-                  ? null
-                  : () => _deleteSelectedQuizzes(),
-
-              icon: const Icon(Icons.delete_rounded, size: 18),
-
-              label: Text('Delete (${_selectedQuizIds.length})'),
-
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.redAccent,
-
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-              ),
-            ),
-          ],
-        ],
 
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
@@ -3614,26 +3460,14 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
                       style: const TextStyle(color: textMuted, fontSize: 10),
                     ),
 
-                    trailing: _selectionMode
-                        ? Checkbox(
-                            value: _selectedQuizIds.contains(quiz.id),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
 
-                            activeColor: primaryPurple,
-
-                            onChanged: (_) => _toggleSelected(quiz.id),
-                          )
-                        : const Icon(
-                            Icons.chevron_right_rounded,
-
-                            color: primaryPurple,
-                          ),
+                      color: primaryPurple,
+                    ),
 
                     onTap: () {
-                      if (_selectionMode) {
-                        _toggleSelected(quiz.id);
-                      } else {
-                        widget.onOverview?.call(quizCode);
-                      }
+                      widget.onOverview?.call(quizCode);
                     },
                   ),
                 );

@@ -3467,65 +3467,19 @@ class QuizHistoryScreen extends StatelessWidget {
 
             // ============================
 
-            // DELETE + OPEN BUTTONS
+            // OPEN BUTTON
 
             // ============================
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            Container(
+              width: 36,
 
-              children: [
-                // ============================
+              height: 36,
 
-                // DELETE
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
 
-                // ============================
-                Container(
-                  width: 36,
-
-                  height: 36,
-
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-
-                    shape: BoxShape.circle,
-                  ),
-
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-
-                    tooltip: 'Delete Quiz',
-
-                    onPressed: () {
-                      deleteQuiz(context, quiz, title);
-                    },
-
-                    icon: const Icon(
-                      Icons.delete_outline_rounded,
-
-                      size: 18,
-
-                      color: Colors.red,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 7),
-
-                // ============================
-
-                // OPEN
-
-                // ============================
-                Container(
-                  width: 36,
-
-                  height: 36,
-
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-
-                    shape: BoxShape.circle,
-                  ),
+                shape: BoxShape.circle,
+              ),
 
                   child: IconButton(
                     padding: EdgeInsets.zero,
@@ -3545,8 +3499,6 @@ class QuizHistoryScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
           ],
         ),
       ),
