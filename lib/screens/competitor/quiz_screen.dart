@@ -3118,6 +3118,7 @@ class _QuizScreenState extends State<QuizScreen> {
     BuildContext context,
     Map<String, dynamic> quizData,
   ) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final rawNames = quizData['tieBreakerContestantNames'];
     final namesList = rawNames is List
         ? rawNames
@@ -3328,6 +3329,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       levelScores: cLevelScores,
                       tieBreakerScore: tbPts,
                       totalScore: totalPoints,
+                      isMe: cUid == currentUid,
                     ));
                   }
 
@@ -12200,7 +12202,7 @@ class _FinishedTallyRowData {
     required this.tieBreakerScore,
     required this.totalScore,
     this.explicitRank,
-    required this.isMe,
+    this.isMe = false,
   });
 }
 
