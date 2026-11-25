@@ -3207,8 +3207,6 @@ class LeaderboardHistoryScreen extends StatefulWidget {
 }
 
 class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
-  List<QueryDocumentSnapshot> _currentQuizzes = <QueryDocumentSnapshot>[];
-
   static const Color primaryPurple = Color(0xFF1689E8);
 
   static const Color textDark = Color(0xFF17245A);
@@ -3343,8 +3341,6 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
               }
               return true;
             }).toList();
-
-            _currentQuizzes = quizzes;
 
             if (quizzes.isEmpty) {
               return const Center(
