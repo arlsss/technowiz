@@ -674,7 +674,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         restoredTimer = await _getLevelTimerSeconds(
           restoredLevel,
           questionData: sortedQuestions.length > restoredQuestion
-              ? sortedQuestions[restoredQuestion].data()
+              ? (sortedQuestions[restoredQuestion].data()
+                  as Map<String, dynamic>?)
               : null,
         );
       }
@@ -682,7 +683,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       final configuredTimerSeconds = await _getLevelTimerSeconds(
         restoredLevel,
         questionData: sortedQuestions.length > restoredQuestion
-            ? sortedQuestions[restoredQuestion].data()
+            ? (sortedQuestions[restoredQuestion].data()
+                as Map<String, dynamic>?)
             : null,
       );
       if (!mounted) return;
@@ -1151,7 +1153,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     final configuredSeconds = await _getLevelTimerSeconds(
       level,
       questionData: _questions.length > questionIndex
-          ? _questions[questionIndex].data()
+          ? (_questions[questionIndex].data() as Map<String, dynamic>?)
           : null,
     );
 
@@ -1560,7 +1562,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             : await _getLevelTimerSeconds(
                 _currentLevel,
                 questionData: _questions.length > _currentQuestion
-                    ? _questions[_currentQuestion].data()
+                    ? (_questions[_currentQuestion].data()
+                        as Map<String, dynamic>?)
                     : null,
               );
       }
@@ -2437,10 +2440,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
   Future<int> _getLevelTimerSeconds(
     int level, {
-    Map<String, dynamic>? questionData,
+    dynamic questionData,
   }) async {
     try {
-      if (questionData != null) {
+      if (questionData != null && questionData is Map) {
         final qTimer = _asInt(
           questionData['timerSeconds'] ??
               questionData['timer'] ??
