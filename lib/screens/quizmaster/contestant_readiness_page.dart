@@ -11,6 +11,9 @@ class ContestantReadinessPage extends StatefulWidget {
   final bool closeParentPagesOnStart;
   final Future<void> Function() onStartQuiz;
   final Future<void> Function()? onReturnToSessions;
+  final bool isTieBreaker;
+  final List<String>? tiedContestantUids;
+  final String? tieBreakerFor;
 
   const ContestantReadinessPage({
     super.key,
@@ -19,6 +22,9 @@ class ContestantReadinessPage extends StatefulWidget {
     this.closeParentPagesOnStart = true,
     required this.onStartQuiz,
     this.onReturnToSessions,
+    this.isTieBreaker = false,
+    this.tiedContestantUids,
+    this.tieBreakerFor,
   });
 
   @override
@@ -93,6 +99,7 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
   }
 
   Future<void> _saveCurrentPage() async {
+    if (widget.isTieBreaker) return;
     await QuizMasterNavPersistence.savePage(
       'participant_readiness',
       quizCode: widget.quizCode,
@@ -348,10 +355,20 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: QuizMasterAppBar(
-          title: 'Contestant Readiness',
-          subtitle: 'Code: $quizCode',
-          badgeText: 'TECHNOWIZ • ARENA READINESS',
-          badgeIcon: Icons.how_to_reg_rounded,
+          title: widget.isTieBreaker
+              ? 'Tie Breaker Readiness'
+              : 'Contestant Readiness',
+          subtitle: widget.isTieBreaker
+              ? (widget.tieBreakerFor != null && widget.tieBreakerFor!.isNotEmpty
+                  ? 'Competing for ${widget.tieBreakerFor}'
+                  : 'Code: $quizCode')
+              : 'Code: $quizCode',
+          badgeText: widget.isTieBreaker
+              ? 'TECHNOWIZ • TIE BREAKER'
+              : 'TECHNOWIZ • ARENA READINESS',
+          badgeIcon: widget.isTieBreaker
+              ? Icons.balance_rounded
+              : Icons.how_to_reg_rounded,
           showBackButton: false,
         ),
         body: QuizMasterCircuitBackground(
@@ -379,6 +396,15 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
             // - Makita ang tanang maka-proceed o approved nga mga contestant
             final participants = (snapshot.data?.docs ?? []).where((doc) {
               final data = doc.data();
+              final uid = (data['uid'] ?? doc.id).toString();
+
+              if (widget.isTieBreaker) {
+                final tiedUids = widget.tiedContestantUids;
+                if (tiedUids != null && tiedUids.isNotEmpty) {
+                  return tiedUids.contains(uid) || tiedUids.contains(doc.id);
+                }
+              }
+
               final status =
                   (data['status'] ?? '').toString().trim().toLowerCase();
               final decision = (data['contestantDecision'] ?? '')
@@ -417,13 +443,16 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
               return status == 'approved' || status.isEmpty;
             }).toList();
 
-            // Readiness is level-specific. A contestant who was READY for
-            // the previous level must remain WAITING for this level until they
-            // press NEXT LEVEL and save readyForLevel == startLevel.
+            // Readiness is level-specific or tie-breaker specific.
             bool isReadyForThisLevel(
               QueryDocumentSnapshot<Map<String, dynamic>> doc,
             ) {
               final data = doc.data();
+              if (widget.isTieBreaker) {
+                return data['tieBreakerReady'] == true ||
+                    data['ready'] == true;
+              }
+
               if (data['ready'] != true) return false;
 
               final rawReadyForLevel = data['readyForLevel'];
@@ -467,20 +496,26 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
+                                color: widget.isTieBreaker
+                                    ? const Color(0xFFFEF3C7)
+                                    : const Color(0xFFEFF6FF),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(
-                                Icons.groups_rounded,
-                                color: _primaryBlue,
+                              child: Icon(
+                                widget.isTieBreaker
+                                    ? Icons.balance_rounded
+                                    : Icons.groups_rounded,
+                                color: widget.isTieBreaker
+                                    ? const Color(0xFFD97706)
+                                    : _primaryBlue,
                                 size: 22,
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'CONTESTANT',
-                                style: TextStyle(
+                                widget.isTieBreaker ? 'TIED CONTESTANTS' : 'CONTESTANT',
+                                style: const TextStyle(
                                   color: _darkBlue,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 15,
@@ -520,10 +555,12 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: const Color(0xFFDCEAF5)),
                           ),
-                          child: const Text(
-                            'No approved contestant yet.',
+                          child: Text(
+                            widget.isTieBreaker
+                                ? 'Waiting for tied contestants to connect...'
+                                : 'No approved contestant yet.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.black54),
+                            style: const TextStyle(color: Colors.black54),
                           ),
                         )
                       else
@@ -542,6 +579,24 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
                     child: ElevatedButton(
                       onPressed: allReady
                           ? () async {
+                              if (widget.isTieBreaker) {
+                                await quizRef.set({
+                                  'status': 'tie_breaker_preparation',
+                                  'eventStatus': 'tie_breaker_preparation',
+                                  'tieBreakerStarted': true,
+                                  'questionState': 'waiting',
+                                  'updatedAt': FieldValue.serverTimestamp(),
+                                }, SetOptions(merge: true));
+
+                                if (!context.mounted) return;
+                                await QuizMasterNavPersistence.savePage(
+                                  'quiz_control',
+                                  quizCode: widget.quizCode,
+                                );
+                                await onStartQuiz();
+                                return;
+                              }
+
                               // Notify the contestant screen that preparation has begun for this level.
                               // Do not start the countdown here; Quiz Control owns that step.
                               await quizRef.set({
@@ -577,18 +632,26 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryBlue,
+                        backgroundColor: widget.isTieBreaker
+                            ? const Color(0xFF15803D)
+                            : _primaryBlue,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFFB8D9F3),
+                        disabledBackgroundColor: widget.isTieBreaker
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFFB8D9F3),
                         disabledForegroundColor: Colors.white,
                         elevation: allReady ? 3 : 0,
-                        shadowColor: const Color(0x401E88E5),
+                        shadowColor: widget.isTieBreaker
+                            ? const Color(0x4015803D)
+                            : const Color(0x401E88E5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: Text(
-                        'START LEVEL $startLevel',
+                        widget.isTieBreaker
+                            ? 'START TIE BREAKER'
+                            : 'START LEVEL $startLevel',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -602,7 +665,9 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                     child: Text(
-                      'START LEVEL $startLevel becomes available when all eligible contestants are READY.',
+                      widget.isTieBreaker
+                          ? 'START TIE BREAKER becomes available when all tied contestants are READY.'
+                          : 'START LEVEL $startLevel becomes available when all eligible contestants are READY.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 11,

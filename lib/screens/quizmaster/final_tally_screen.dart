@@ -6,6 +6,7 @@ import 'quizmaster_theme.dart';
 import 'quizmaster_dashboard.dart';
 import 'final_ranking_screen.dart';
 import 'quiz_control_screen.dart';
+import 'contestant_readiness_page.dart';
 import '../../navigation_persistence.dart';
 
 /// Contestant Tally Model
@@ -841,6 +842,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         'tieBreakerActive': true,
         'tieBreakerResolved': false,
         'tieBreakerEnded': false,
+        'tieBreakerStarted': false,
         'showTieBreakerResult': false,
         'status': 'tie_breaker_invite',
         'eventStatus': 'tie_breaker_invite',
@@ -883,9 +885,22 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => QuizControlScreen(
+        builder: (_) => ContestantReadinessPage(
           quizCode: widget.quizCode,
           isTieBreaker: true,
+          tiedContestantUids: tiedUids,
+          tieBreakerFor: tieBreakerFor,
+          onStartQuiz: () async {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => QuizControlScreen(
+                  quizCode: widget.quizCode,
+                  isTieBreaker: true,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
