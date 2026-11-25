@@ -218,7 +218,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     if (isTimerActive) {
       _showMessage(
         'Cannot end tie breaker while the question timer is running.',
-        error: true,
+        isError: true,
       );
       return;
     }
@@ -5205,7 +5205,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     if (isTimerActive) {
       _showMessage(
         'Cannot end level while the question timer is running.',
-        error: true,
+        isError: true,
       );
       return;
     }
