@@ -2739,7 +2739,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      "You'll need to take a tie breaker for\n$forText",
+                      "You will be going to take a tie breaker for\n$forText",
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 22,
@@ -2943,267 +2943,6 @@ class _QuizScreenState extends State<QuizScreen> {
                                 debugPrint('Error confirming tie breaker: $e');
                               }
                             },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTieBreakerConfirmedWaitingScreen(
-    BuildContext context,
-    Map<String, dynamic> quizData, [
-    String? opponentName,
-  ]) {
-    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final oppName = opponentName ??
-        _getTieBreakerOpponentName(quizData, myUid);
-    final forText = (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
-        ? quizData['tieBreakerFor'].toString().trim()
-        : ((quizData['tieBreakerRank'] != null)
-            ? (quizData['tieBreakerRank'] == 1
-                ? '1st Place'
-                : quizData['tieBreakerRank'] == 2
-                    ? '2nd Place'
-                    : quizData['tieBreakerRank'] == 3
-                        ? '3rd Place'
-                        : 'Rank ${quizData['tieBreakerRank']}')
-            : 'the Tied Rank');
-
-    final readyUids = List<String>.from(quizData['tieBreakerReadyUids'] ?? const []);
-    final oppUids = _getTieBreakerOpponentUids(quizData, myUid);
-    final isOpponentReady = oppUids.isNotEmpty && oppUids.every((u) => readyUids.contains(u));
-
-    return TechCircuitBackground(
-      baseColor: lightGreen,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: primaryGreen,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            color: primaryGreen,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'TIE BREAKER • CONFIRMED',
-                            style: TextStyle(
-                              color: darkGreen,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 12.5,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      width: 86,
-                      height: 86,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: primaryGreen.withValues(alpha: 0.4),
-                          width: 3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryGreen.withValues(alpha: 0.25),
-                            blurRadius: 18,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.how_to_reg_rounded,
-                          color: primaryGreen,
-                          size: 46,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    const Text(
-                      'Confirmed & Ready!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Competing for $forText\nWaiting for the Quiz Master to start the tie breaker...',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderGreen, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: primaryGreen,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              const Expanded(
-                                child: Text(
-                                  'YOU',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'READY',
-                                  style: TextStyle(
-                                    color: primaryGreen,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 18, color: Color(0xFFF1F5F9)),
-                          Row(
-                            children: [
-                              Icon(
-                                isOpponentReady
-                                    ? Icons.check_circle_rounded
-                                    : Icons.hourglass_empty_rounded,
-                                color: isOpponentReady
-                                    ? primaryGreen
-                                    : const Color(0xFFD97706),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  oppName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isOpponentReady
-                                      ? const Color(0xFFDCFCE7)
-                                      : const Color(0xFFFEF3C7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  isOpponentReady ? 'READY' : 'WAITING TO CONFIRM...',
-                                  style: TextStyle(
-                                    color: isOpponentReady
-                                        ? primaryGreen
-                                        : const Color(0xFFD97706),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: primaryGreen,
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
-                            'Please standby. Mapunta ka sa tie breaker instructions sa dihang sugdan na sa Quiz Master.',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: Color(0xFF475569),
-                              fontWeight: FontWeight.w600,
-                            ),
                           ),
                         ),
                       ],
@@ -4781,8 +4520,15 @@ class _QuizScreenState extends State<QuizScreen> {
         (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
             'tie_breaker_ended';
 
-    if (_quizFinishedForContestant) {
-      final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
+    final List<String> tieBreakerContestantUids = rawTieUids is List
+        ? rawTieUids.map((e) => e.toString()).toList()
+        : <String>[];
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final bool isTiedContestant = tieBreakerContestantUids.contains(currentUid);
+
+    if (_quizFinishedForContestant &&
+        (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant)) {
       return _buildFinishedCongratulationsScreen(context, currentUid);
     }
 
@@ -8885,16 +8631,6 @@ class _QuizScreenState extends State<QuizScreen> {
               (!isTieBreakerEnded || publishedWinners);
 
           final isTieBreakerActive = quizData['tieBreakerActive'] == true;
-
-          if (_quizFinishedForContestant ||
-              (((isQuizFinished && (!isTieBreakerEnded || publishedWinners)) ||
-                      _quizFinishedForContestant) &&
-                  !isTieBreakerActive)) {
-            timer?.cancel();
-            final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-            return _buildFinishedCongratulationsScreen(context, currentUid);
-          }
-
           final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
           final rawTieUids = quizData['tieBreakerContestantUids'];
           final List<String> tieBreakerContestantUids = rawTieUids is List
@@ -8902,6 +8638,19 @@ class _QuizScreenState extends State<QuizScreen> {
               : <String>[];
           final bool isTiedContestant =
               tieBreakerContestantUids.contains(currentUid);
+
+          // Reset finished state if Quiz Master started or resumed a Tie Breaker for this tied contestant!
+          if (isTieBreakerActive && !isTieBreakerEnded && isTiedContestant) {
+            _quizFinishedForContestant = false;
+          }
+
+          if (_quizFinishedForContestant ||
+              (((isQuizFinished && (!isTieBreakerEnded || publishedWinners)) ||
+                      _quizFinishedForContestant) &&
+                  (!isTieBreakerActive || !isTiedContestant))) {
+            timer?.cancel();
+            return _buildFinishedCongratulationsScreen(context, currentUid);
+          }
 
           final status = quizData['status']?.toString() ?? 'waiting';
 
@@ -8916,7 +8665,7 @@ class _QuizScreenState extends State<QuizScreen> {
           final countdownActive = quizData['countdownActive'] == true;
 
           if (isTieBreakerActive) {
-            if (_quizFinishedForContestant) {
+            if (_quizFinishedForContestant && !isTiedContestant) {
               timer?.cancel();
               return _buildFinishedCongratulationsScreen(context, currentUid);
             }
@@ -8941,37 +8690,33 @@ class _QuizScreenState extends State<QuizScreen> {
             final isMyUidReadyInFirestore = readyUids.contains(currentUid);
 
             if (currentSessionId.isNotEmpty &&
-                _confirmedTieBreakerSessionId != null &&
                 _confirmedTieBreakerSessionId != currentSessionId) {
               _tieBreakerInviteConfirmed = false;
               _confirmedTieBreakerSessionId = null;
+              answered = false;
+              resultRevealed = false;
+              submitting = false;
+              _showLocalLevelResults = false;
             }
 
             final isInviteConfirmed =
-                _tieBreakerInviteConfirmed || isMyUidReadyInFirestore;
+                (_confirmedTieBreakerSessionId == currentSessionId &&
+                    _tieBreakerInviteConfirmed) ||
+                isMyUidReadyInFirestore;
 
             final oppName = _getTieBreakerOpponentName(quizData, currentUid);
-            final tieBreakerStarted =
-                quizData['tieBreakerStarted'] == true ||
-                status == 'tie_breaker_preparation';
 
             if (!countdownActive &&
                 status != 'countdown' &&
-                status != 'active' &&
-                !(answered && resultRevealed)) {
+                status != 'active') {
               if (!isInviteConfirmed) {
                 return _buildTieBreakerInvitationScreen(
                   context,
                   quizData,
                   oppName,
                 );
-              } else if (!tieBreakerStarted) {
-                return _buildTieBreakerConfirmedWaitingScreen(
-                  context,
-                  quizData,
-                  oppName,
-                );
               } else {
+                // When CONFIRM is pressed, go directly to Tie Breaker Instructions!
                 return _buildTieBreakerPreparationScreen(
                   context,
                   quizData,
@@ -9310,9 +9055,9 @@ class _QuizScreenState extends State<QuizScreen> {
           // Once the contestant submits (or time runs out), show the
           // result immediately. Do not let Ready Check or Countdown
           // hide it.
-          if (_quizFinishedForContestant) {
+          if (_quizFinishedForContestant &&
+              (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant)) {
             timer?.cancel();
-            final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
 

@@ -109,6 +109,26 @@ class _ContestantOverallTallyScreenState
             builder: (context, sessionSnap) {
               final sessionData = sessionSnap.data?.data() ?? {};
 
+              // If Quiz Master starts a Tie Breaker for this contestant, immediately return to Quiz Screen
+              final isTieBreakerActive =
+                  sessionData['tieBreakerActive'] == true;
+              final isTieBreakerEnded =
+                  sessionData['tieBreakerEnded'] == true;
+              final rawTieUids = sessionData['tieBreakerContestantUids'];
+              final List<String> tieBreakerContestantUids = rawTieUids is List
+                  ? rawTieUids.map((e) => e.toString()).toList()
+                  : <String>[];
+              final bool isTiedContestant =
+                  tieBreakerContestantUids.contains(_currentUid);
+
+              if (isTieBreakerActive && !isTieBreakerEnded && isTiedContestant) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                });
+              }
+
               // Determine active levels configured in session
               final Set<int> allLevels = {};
               final rawLevelQuestions = sessionData['levelQuestions'];
