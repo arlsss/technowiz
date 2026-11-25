@@ -8741,9 +8741,6 @@ class _QuizScreenState extends State<QuizScreen> {
                 isMyUidReadyInFirestore;
 
             final oppName = _getTieBreakerOpponentName(quizData, currentUid);
-            final tieBreakerStarted =
-                quizData['tieBreakerStarted'] == true ||
-                status == 'tie_breaker_preparation';
 
             if (!countdownActive &&
                 status != 'countdown' &&
