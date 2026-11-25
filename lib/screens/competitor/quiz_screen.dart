@@ -2909,9 +2909,6 @@ class _QuizScreenState extends State<QuizScreen> {
                         : 'Rank ${quizData['tieBreakerRank']}')
             : 'the Tied Rank');
 
-    final readyUids = List<String>.from(quizData['tieBreakerReadyUids'] ?? const []);
-    final oppUids = _getTieBreakerOpponentUids(quizData, myUid);
-    final isOpponentReady = oppUids.isNotEmpty && oppUids.every((u) => readyUids.contains(u));
     final tieBreakerStarted = quizData['tieBreakerStarted'] == true ||
         quizData['status'] == 'tie_breaker_preparation';
 
@@ -2924,7 +2921,7 @@ class _QuizScreenState extends State<QuizScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 580),
+                constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -2951,7 +2948,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                           SizedBox(width: 8),
                           Text(
-                            'TIE BREAKER • PREPARATION',
+                            'TIE BREAKER • GET READY',
                             style: TextStyle(
                               color: Color(0xFF92400E),
                               fontWeight: FontWeight.w900,
@@ -2962,36 +2959,36 @@ class _QuizScreenState extends State<QuizScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     Container(
-                      width: 82,
-                      height: 82,
+                      width: 90,
+                      height: 90,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF0D9488), primaryGreen],
+                          colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: primaryGreen.withValues(alpha: 0.3),
-                            blurRadius: 16,
+                            color: const Color(0xFFEA580C).withValues(alpha: 0.35),
+                            blurRadius: 20,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: const Center(
                         child: Icon(
-                          Icons.assignment_turned_in_rounded,
+                          Icons.bolt_rounded,
                           color: Colors.white,
-                          size: 42,
+                          size: 48,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 22),
                     const Text(
-                      'Preparation for Tie Breaker',
+                      'Prepare for Tie Breaker Question',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 24,
@@ -3000,275 +2997,72 @@ class _QuizScreenState extends State<QuizScreen> {
                         letterSpacing: -0.4,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       'Competing for $forText • Showdown with $oppName',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 14.5,
                         color: Color(0xFF64748B),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: const Color(0xFFF59E0B),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(
-                                Icons.flash_on_rounded,
-                                color: Color(0xFFD97706),
-                                size: 22,
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'SUDDEN-DEATH RULE:',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 13.5,
-                                    color: Color(0xFFB45309),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'First to score a point wins immediately!',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF92400E),
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'If a contestant scores a point (answers correctly while the opponent is incorrect or runs out of time), the tie breaker concludes immediately and they officially win the contested rank!',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF78350F),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: const Color(0xFFE2E8F0),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            children: const [
-                              Icon(
-                                Icons.rule_rounded,
-                                color: Color(0xFF2563EB),
-                                size: 18,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Official Rules & Guidelines:',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF1E293B),
-                                ),
-                              ),
-                            ],
+                          const SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3.5,
+                              color: primaryGreen,
+                            ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 20),
                           const Text(
-                            '• 1 Point for each correct answer.\n'
-                            '• Answer each question within the allotted timer.\n'
-                            '• If both contestants answer correctly (or both are incorrect / out of time), the tie remains and proceeds to the next tie-breaker question.\n'
-                            '• If one contestant scores while the other does not, the tie breaker ends immediately.',
+                            'Be ready!',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 12.5,
-                              color: Color(0xFF334155),
-                              height: 1.45,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: primaryGreen,
+                              letterSpacing: 0.2,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderGreen, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: primaryGreen,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              const Expanded(
-                                child: Text(
-                                  'YOU',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13.5,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'CONFIRMED & READY',
-                                  style: TextStyle(
-                                    color: primaryGreen,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 18, color: Color(0xFFF1F5F9)),
-                          Row(
-                            children: [
-                              Icon(
-                                isOpponentReady
-                                    ? Icons.check_circle_rounded
-                                    : Icons.hourglass_empty_rounded,
-                                color: isOpponentReady
-                                    ? primaryGreen
-                                    : const Color(0xFFD97706),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  oppName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13.5,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isOpponentReady
-                                      ? const Color(0xFFDCFCE7)
-                                      : const Color(0xFFFEF3C7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  isOpponentReady
-                                      ? 'READY'
-                                      : 'WAITING TO CONFIRM...',
-                                  style: TextStyle(
-                                    color: isOpponentReady
-                                        ? primaryGreen
-                                        : const Color(0xFFD97706),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: primaryGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
+                          const SizedBox(height: 8),
+                          Text(
                             tieBreakerStarted
-                                ? 'You are ready! Waiting for the Quiz Master to start the question...'
-                                : 'You are ready! Waiting for the Quiz Master to start...',
+                                ? 'Waiting for the Quiz Master to start the question...'
+                                : 'Waiting for the Quiz Master to start...',
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF475569),
+                              fontSize: 14,
+                              color: Color(0xFF64748B),
                               fontWeight: FontWeight.w600,
+                              height: 1.35,
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
