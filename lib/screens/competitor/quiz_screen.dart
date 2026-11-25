@@ -7269,6 +7269,55 @@ class _QuizScreenState extends State<QuizScreen> {
                                 sessionStatus == 'ended' ||
                                 sessionData['isFinished'] == true;
 
+                        // Determine highest / last regular level configured by admin
+                        final Set<int> allConfiguredLevels = {};
+                        final rawLQ = sessionData['levelQuestions'] ??
+                            _latestQuizData['levelQuestions'];
+                        if (rawLQ is Map) {
+                          for (final key in rawLQ.keys) {
+                            if (key.toString().toLowerCase().contains('tie')) continue;
+                            final m = RegExp(r'(\d+)').firstMatch(key.toString());
+                            if (m != null) {
+                              final l = int.tryParse(m.group(1)!);
+                              if (l != null && l > 0) allConfiguredLevels.add(l);
+                            }
+                          }
+                        }
+                        final rawLvls = sessionData['levels'] ?? _latestQuizData['levels'];
+                        if (rawLvls is List) {
+                          for (final lvl in rawLvls) {
+                            if (lvl.toString().toLowerCase().contains('tie')) continue;
+                            final m = RegExp(r'(\d+)').firstMatch(lvl.toString());
+                            if (m != null) {
+                              final l = int.tryParse(m.group(1)!);
+                              if (l != null && l > 0) allConfiguredLevels.add(l);
+                            }
+                          }
+                        }
+                        final expTotal = sessionData['totalLevels'] ??
+                            sessionData['maxLevel'] ??
+                            sessionData['numberOfLevels'] ??
+                            sessionData['total_levels'];
+                        if (expTotal is num && expTotal.toInt() > 0) {
+                          allConfiguredLevels.add(expTotal.toInt());
+                        }
+                        if (_sortedSessionQuestions.isNotEmpty) {
+                          for (var i = 0; i < _sortedSessionQuestions.length; i++) {
+                            final qData = _sortedSessionQuestions[i].data() as Map<String, dynamic>?;
+                            if (qData == null) continue;
+                            final qLvl = getLevelFromSessionQuestion(
+                              qData,
+                              fallbackQuestionNumber: i + 1,
+                            );
+                            if (qLvl > 0) allConfiguredLevels.add(qLvl);
+                          }
+                        }
+                        if (allConfiguredLevels.isEmpty) {
+                          allConfiguredLevels.addAll([1, 2, 3]);
+                        }
+                        final int maxQuizLevel = allConfiguredLevels.reduce((a, b) => a > b ? a : b);
+                        final bool isLastLevel = currentLevel >= maxQuizLevel || isQuizFinished;
+
                         return StreamBuilder<
                             QuerySnapshot<Map<String, dynamic>>>(
                           stream: FirebaseAuth.instance.currentUser != null
@@ -7872,11 +7921,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 ),
                                               ],
                                             ),
-                                            child: const Row(
+                                            child: Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment.center,
                                               children: [
-                                                SizedBox(
+                                                const SizedBox(
                                                   width: 18,
                                                   height: 18,
                                                   child:
@@ -7885,13 +7934,15 @@ class _QuizScreenState extends State<QuizScreen> {
                                                     color: primaryGreen,
                                                   ),
                                                 ),
-                                                SizedBox(width: 12),
+                                                const SizedBox(width: 12),
                                                 Flexible(
                                                   child: Text(
-                                                    "Waiting for Quiz Master to start next round...",
+                                                    isLastLevel
+                                                        ? "Waiting for Quiz Master to review final results..."
+                                                        : "Waiting for Quiz Master to start next round...",
                                                     textAlign:
                                                         TextAlign.center,
-                                                    style: TextStyle(
+                                                    style: const TextStyle(
                                                       color:
                                                           Color(0xFF14532D),
                                                       fontSize: 13,
@@ -7903,47 +7954,50 @@ class _QuizScreenState extends State<QuizScreen> {
                                               ],
                                             ),
                                           ),
-                                          const SizedBox(height: 14),
-                                          SizedBox(
-                                            width: double.infinity,
-                                            height: 54,
-                                            child: ElevatedButton.icon(
-                                              icon: const Icon(
-                                                Icons.analytics_rounded,
-                                                size: 22,
-                                              ),
-                                              label: const Text(
-                                                "OVERALL TALLY",
-                                                style: TextStyle(
-                                                  fontSize: 15.5,
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: 0.8,
+                                          if (isLastLevel) ...[
+                                            const SizedBox(height: 14),
+                                            SizedBox(
+                                              width: double.infinity,
+                                              height: 54,
+                                              child: ElevatedButton.icon(
+                                                icon: const Icon(
+                                                  Icons.analytics_rounded,
+                                                  size: 22,
                                                 ),
-                                              ),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: primaryGreen,
-                                                foregroundColor: Colors.white,
-                                                elevation: 3,
-                                                shadowColor: primaryGreen
-                                                    .withValues(alpha: 0.35),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(16),
-                                                ),
-                                              ),
-                                              onPressed: () async {
-                                                await Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        ContestantOverallTallyScreen(
-                                                      quizCode: widget.quizCode,
-                                                      currentLevel: currentLevel,
-                                                    ),
+                                                label: const Text(
+                                                  "OVERALL TALLY",
+                                                  style: TextStyle(
+                                                    fontSize: 15.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.8,
                                                   ),
-                                                );
-                                              },
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: primaryGreen,
+                                                  foregroundColor: Colors.white,
+                                                  elevation: 3,
+                                                  shadowColor: primaryGreen
+                                                      .withValues(alpha: 0.35),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(16),
+                                                  ),
+                                                ),
+                                                onPressed: () async {
+                                                  await Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          ContestantOverallTallyScreen(
+                                                        quizCode: widget.quizCode,
+                                                        currentLevel: currentLevel,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
                                             ),
+                                          ],
                                           ),
                                         ],
                                       ),
