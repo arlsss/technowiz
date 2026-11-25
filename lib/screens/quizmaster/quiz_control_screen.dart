@@ -368,10 +368,37 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   int _getQuestionLevel(QueryDocumentSnapshot question) {
     final data = question.data() as Map<String, dynamic>;
 
-    final value = data['sessionLevel'] ?? data['level'] ?? 1;
+    // 1. Check if the question is assigned to a specific level in levelQuestions mapping
+    final qId = question.id;
+    final rawLevelQuestions = _quizData?['levelQuestions'];
+    if (rawLevelQuestions is Map) {
+      for (final entry in rawLevelQuestions.entries) {
+        if (entry.value is List && (entry.value as List).contains(qId)) {
+          final m = RegExp(r'(\d+)').firstMatch(entry.key.toString());
+          if (m != null) {
+            final parsed = int.tryParse(m.group(1)!);
+            if (parsed != null && parsed > 0) return parsed;
+          }
+        }
+      }
+    }
 
-    // Read any configured level number (Level 1, Level 2, Level 10, etc.).
-    // Do not hard-code the flow to only Levels 1–3.
+    // 2. Check sessionLevel explicitly
+    final rawSessionLevel = data['sessionLevel'];
+    if (rawSessionLevel is num && rawSessionLevel.toInt() > 0) {
+      return rawSessionLevel.toInt();
+    }
+    if (rawSessionLevel != null) {
+      final text = rawSessionLevel.toString().trim();
+      final m = RegExp(r'(\d+)').firstMatch(text);
+      if (m != null) {
+        final parsed = int.tryParse(m.group(1)!);
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+
+    // 3. Fallback to question's level
+    final value = data['level'] ?? _currentLevel;
     if (value is num) {
       final numericLevel = value.toInt();
       return numericLevel > 0 ? numericLevel : 1;
@@ -4222,14 +4249,27 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           int totalRespPoints = 0;
           for (final r in responsesSnap.docs) {
             final rData = r.data();
-            final rawLvl = rData['level'] ?? rData['sessionLevel'];
-            int lvl = 1;
-            if (rawLvl is num) {
-              lvl = rawLvl.toInt();
-            } else if (rawLvl != null) {
-              final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
-              if (m != null) lvl = int.tryParse(m.group(1)!) ?? 1;
+
+            // Match question index from doc ID (question_0, question_1) or questionNumber
+            final matchQ = RegExp(r'question_(\d+)').firstMatch(r.id);
+            int qIndex = matchQ != null ? (int.tryParse(matchQ.group(1)!) ?? -1) : -1;
+            if (qIndex < 0 && rData['questionNumber'] is num) {
+              qIndex = (rData['questionNumber'] as num).toInt() - 1;
             }
+
+            int lvl = 1;
+            if (qIndex >= 0 && qIndex < _questions.length) {
+              lvl = _getLevel(qIndex);
+            } else {
+              final rawLvl = rData['level'] ?? rData['sessionLevel'];
+              if (rawLvl is num) {
+                lvl = rawLvl.toInt();
+              } else if (rawLvl != null) {
+                final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+                if (m != null) lvl = int.tryParse(m.group(1)!) ?? 1;
+              }
+            }
+
             final rawPts = rData['points'] ?? rData['score'];
             final isCorrect = rData['isCorrect'] == true ||
                 (rData['answerStatus'] ?? '').toString().toLowerCase() ==

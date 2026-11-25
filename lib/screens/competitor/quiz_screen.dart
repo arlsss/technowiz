@@ -828,8 +828,45 @@ class _QuizScreenState extends State<QuizScreen> {
     Map<String, dynamic> question, {
     int fallbackQuestionNumber = 1,
   }) {
-    final raw = question['sessionLevel'] ?? question['level'];
+    // 1. Check if the question is assigned to a specific level in levelQuestions mapping
+    final qId =
+        (question['questionId'] ?? question['id'] ?? '').toString().trim();
+    final rawLevelQuestions = _latestQuizData['levelQuestions'];
+    if (qId.isNotEmpty && rawLevelQuestions is Map) {
+      for (final entry in rawLevelQuestions.entries) {
+        if (entry.value is List && (entry.value as List).contains(qId)) {
+          final m = RegExp(r'(\d+)').firstMatch(entry.key.toString());
+          if (m != null) {
+            final parsed = int.tryParse(m.group(1)!);
+            if (parsed != null && parsed > 0) return parsed;
+          }
+        }
+      }
+    }
 
+    // 2. Check sessionLevel explicitly (e.g. "Level 1" or 1)
+    final rawSessionLevel = question['sessionLevel'];
+    if (rawSessionLevel is num && rawSessionLevel.toInt() > 0) {
+      return rawSessionLevel.toInt();
+    }
+    if (rawSessionLevel != null) {
+      final text = rawSessionLevel.toString().trim();
+      final m = RegExp(r'(\d+)').firstMatch(text);
+      if (m != null) {
+        final parsed = int.tryParse(m.group(1)!);
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+
+    // 3. If the active quiz is currently running a specific level, use it
+    final activeLevel =
+        int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '') ?? 0;
+    if (activeLevel > 0) {
+      return activeLevel;
+    }
+
+    // 4. Fallback to question['level']
+    final raw = question['level'];
     if (raw is num) {
       final value = raw.toInt();
       if (value > 0) return value;
