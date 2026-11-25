@@ -637,8 +637,23 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                     'finished_quiz',
                   };
 
-                  // Finished/completed quizzes belong strictly in Quiz History, NOT in active Quizzes!
-                  if (isMarkedFinished || finishedStatuses.contains(status)) {
+                  final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                      status.contains('tie_breaker') ||
+                      status.contains('tiebreaker') ||
+                      status.contains('tie');
+
+                  final publishedWinners = data['publishedWinners'] == true ||
+                      data['winnersPublished'] == true ||
+                      data['isFinalized'] == true;
+
+                  final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+                  if (isDeclaredFinished || status == 'archived' || status == 'archive') {
+                    return false;
+                  }
+
+                  // Finished/completed quizzes belong strictly in Quiz History once officially finalized (winners published)
+                  if (!isTieBreakerActive && (isMarkedFinished || finishedStatuses.contains(status)) && publishedWinners) {
                     return false;
                   }
 
@@ -1621,23 +1636,28 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
             final activeSessions =
                 snapshot.data?.docs.where((doc) {
                   final data = doc.data();
-                  final status =
-                      data['status']?.toString().trim().toLowerCase() ?? '';
+                  final status = (data['status']?.toString() ?? '')
+                      .trim()
+                      .toLowerCase()
+                      .replaceAll('-', '_')
+                      .replaceAll(' ', '_');
                   if (data['deleted'] == true ||
                       data['isDeleted'] == true ||
                       status == 'deleted') {
                     return false;
                   }
-                  final isFinished =
-                      data['isFinished'] == true ||
-                      data['isCompleted'] == true ||
-                      data['completed'] == true ||
-                      data['finished'] == true ||
-                      status == 'finished' ||
-                      status == 'completed' ||
-                      status == 'closed' ||
-                      status == 'archived';
-                  if (isFinished) return false;
+                  final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                      status.contains('tie_breaker') ||
+                      status.contains('tiebreaker') ||
+                      status.contains('tie');
+
+                  final publishedWinners = data['publishedWinners'] == true ||
+                      data['winnersPublished'] == true ||
+                      data['isFinalized'] == true;
+
+                  final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+                  if (isDeclaredFinished || status == 'archived' || status == 'closed') return false;
+
                   final isPub =
                       data['published'] == true ||
                       data['isPublished'] == true ||
@@ -1650,7 +1670,7 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                           'true' ||
                       status == 'published';
 
-                  if (!isPub) return false;
+                  if (!isPub && !isTieBreakerActive) return false;
                   return true;
                 }).toList() ??
                 [];

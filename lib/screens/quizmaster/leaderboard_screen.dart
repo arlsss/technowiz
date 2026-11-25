@@ -122,8 +122,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           'ongoing',
           'paused',
           'level_pause',
+          'contest_review',
           'in_progress',
           'inprogress',
+          'tie_breaker_invite',
+          'tie_breaker_preparation',
+          'tie_breaker',
+          'tie_breaker_ended',
+          'tiebreaker',
         };
         for (final doc in snapshot.docs) {
           final data = doc.data();
@@ -132,16 +138,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               data['status'] == 'deleted') {
             continue;
           }
-          final isPub =
-              data['published'] == true ||
-              data['isPublished'] == true ||
-              data['is_published'] == true ||
-              data['published'] == 1 ||
-              data['isPublished'] == 1 ||
-              data['published']?.toString().toLowerCase() == 'true' ||
-              data['isPublished']?.toString().toLowerCase() == 'true' ||
-              (data['status'] ?? '').toString().toLowerCase() == 'published';
-          if (!isPub) continue;
 
           final status = (data['status'] ?? '')
               .toString()
@@ -149,7 +145,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               .toLowerCase()
               .replaceAll('-', '_')
               .replaceAll(' ', '_');
-          if (activeStatuses.contains(status)) {
+
+          final isTieBreakerActive = data['tieBreakerActive'] == true ||
+              status.contains('tie_breaker') ||
+              status.contains('tiebreaker') ||
+              status.contains('tie');
+
+          final publishedWinners = data['publishedWinners'] == true ||
+              data['winnersPublished'] == true ||
+              data['isFinalized'] == true;
+
+          final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+          if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+            continue;
+          }
+
+          if (isTieBreakerActive || !publishedWinners || activeStatuses.contains(status)) {
             activeDoc = doc;
             break;
           }
@@ -290,6 +301,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       'contest_review',
                       'in_progress',
                       'inprogress',
+                      'tie_breaker_invite',
+                      'tie_breaker_preparation',
+                      'tie_breaker',
+                      'tie_breaker_ended',
+                      'tiebreaker',
                     };
 
                     const finishedStatuses = {
@@ -306,6 +322,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
                     final activeSessions = allSessions.where((doc) {
                       final data = doc.data();
+                      final status = (data['status'] ?? '')
+                          .toString()
+                          .trim()
+                          .toLowerCase()
+                          .replaceAll('-', '_')
+                          .replaceAll(' ', '_');
+
+                      final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                          status.contains('tie_breaker') ||
+                          status.contains('tiebreaker') ||
+                          status.contains('tie');
+
+                      final publishedWinners = data['publishedWinners'] == true ||
+                          data['winnersPublished'] == true ||
+                          data['isFinalized'] == true;
+
+                      // Live ranking stays active until Quiz Master officially declares it finished (publishes winners)
+                      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+                      if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+                        return false;
+                      }
+
+                      // If tie breaker is active, it MUST be in live ranking
+                      if (isTieBreakerActive) {
+                        return true;
+                      }
+
+                      // If quiz master has not published winners yet, keep in live ranking
+                      if (!publishedWinners && (finishedStatuses.contains(status) || status == 'finished')) {
+                        return true;
+                      }
+
                       final isPub =
                           data['published'] == true ||
                           data['isPublished'] == true ||
@@ -316,17 +365,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                               'true' ||
                           data['isPublished']?.toString().toLowerCase() ==
                               'true' ||
-                          (data['status'] ?? '').toString().toLowerCase() ==
-                              'published';
+                          status == 'published' ||
+                          status == 'active' ||
+                          status == 'waiting' ||
+                          status == 'level_pause' ||
+                          status.contains('tie');
                       if (!isPub) return false;
 
-                      final status = (data['status'] ?? '')
-                          .toString()
-                          .trim()
-                          .toLowerCase()
-                          .replaceAll('-', '_')
-                          .replaceAll(' ', '_');
-                      return activeStatuses.contains(status) &&
+                      return activeStatuses.contains(status) ||
                           !finishedStatuses.contains(status);
                     }).toList();
 
@@ -1499,6 +1545,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       }
     }
 
+    final bool hasTieBreaker = data?['tieBreakerActive'] == true ||
+        (data?['status'] ?? '').toString().toLowerCase().contains('tie') ||
+        data?['tieBreakerRank'] != null;
+    if (hasTieBreaker && !configuredLevels.contains('Tie Breaker')) {
+      configuredLevels.add('Tie Breaker');
+    }
+
     return configuredLevels;
   }
 
@@ -1511,6 +1564,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final cleanLevels = configuredLevels
         .where((l) => l.trim().toLowerCase() != 'overall')
         .toList();
+
+    final bool hasTieTab = cleanLevels.remove('Tie Breaker');
 
     if (!cleanLevels.contains('Level 1')) {
       cleanLevels.insert(0, 'Level 1');
@@ -1525,6 +1580,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       if (numA != numB) return numA.compareTo(numB);
       return a.compareTo(b);
     });
+
+    if (hasTieTab) {
+      cleanLevels.add('Tie Breaker');
+    }
 
     final levels = <String>['Overall', ...cleanLevels];
     if (!levels.contains(selectedLevel)) {
@@ -2973,11 +3032,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final storedTotal =
           _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
 
-      if (selectedLevel == 'Overall') {
-        if (sumOfAllLevels > 0) {
-          contestantScore = sumOfAllLevels + tieBreakerExtra;
-        } else {
-          contestantScore = storedTotal;
+      if (selectedLevel == 'Tie Breaker') {
+        contestantScore = tieBreakerExtra;
+      } else if (selectedLevel == 'Overall') {
+        final totalWithTie = sumOfAllLevels + tieBreakerExtra;
+        contestantScore = totalWithTie > storedTotal ? totalWithTie : storedTotal;
+        if (contestantScore < storedTotal + tieBreakerExtra && tieBreakerExtra > 0 && storedTotal == sumOfAllLevels) {
+          contestantScore = storedTotal + tieBreakerExtra;
         }
       } else {
         final levelMatch = RegExp(r'\d+').firstMatch(selectedLevel);
@@ -3253,6 +3314,10 @@ class _LeaderboardHistoryScreenState extends State<LeaderboardHistoryScreen> {
     final status = (rawStatus?.toString() ?? 'unknown')
         .toLowerCase()
         .replaceAll(' ', '_');
+
+    if (status.contains('tie_breaker') || status.contains('tiebreaker') || status.contains('tie')) {
+      return 'TIE BREAKER';
+    }
 
     if (status.contains('pause')) return 'PAUSED';
 

@@ -983,6 +983,12 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
         'standby',
         'open',
         'pending',
+        'contest_review',
+        'tie_breaker_invite',
+        'tie_breaker_preparation',
+        'tie_breaker',
+        'tie_breaker_ended',
+        'tiebreaker',
       };
 
       String? activeQuizCode;
@@ -1005,18 +1011,28 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
             data['status'] == 'deleted') {
           continue;
         }
-        final status = data['status']?.toString().trim().toLowerCase() ?? '';
-        final isFinished =
-            data['isFinished'] == true ||
-            data['isCompleted'] == true ||
-            data['completed'] == true ||
-            data['finished'] == true ||
-            status == 'finished' ||
-            status == 'completed' ||
-            status == 'closed' ||
-            status == 'archived';
+        final status = (data['status']?.toString() ?? '')
+            .trim()
+            .toLowerCase()
+            .replaceAll('-', '_')
+            .replaceAll(' ', '_');
 
-        if (isFinished) continue;
+        final isTieBreakerActive = data['tieBreakerActive'] == true ||
+            status.contains('tie_breaker') ||
+            status.contains('tiebreaker') ||
+            status.contains('tie');
+
+        final publishedWinners = data['publishedWinners'] == true ||
+            data['winnersPublished'] == true ||
+            data['isFinalized'] == true;
+
+        final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+        if (isDeclaredFinished ||
+            status == 'archived' ||
+            status == 'closed') {
+          continue;
+        }
 
         final isPub =
             data['published'] == true ||
@@ -1028,8 +1044,8 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
             data['isPublished']?.toString().toLowerCase() == 'true' ||
             status == 'published';
 
-        if (!isPub) continue;
-        if (!activeStatuses.contains(status)) continue;
+        if (!isPub && !isTieBreakerActive) continue;
+        if (!isTieBreakerActive && !activeStatuses.contains(status) && publishedWinners) continue;
 
         final code = doc.id.trim();
         if (code.isNotEmpty) {
@@ -1411,6 +1427,12 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                           'standby',
                           'open',
                           'pending',
+                          'contest_review',
+                          'tie_breaker_invite',
+                          'tie_breaker_preparation',
+                          'tie_breaker',
+                          'tie_breaker_ended',
+                          'tiebreaker',
                         };
 
                         QueryDocumentSnapshot? activeQuiz;
@@ -1439,6 +1461,24 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                               .toLowerCase()
                               .replaceAll('-', '_')
                               .replaceAll(' ', '_');
+
+                          final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                              status.contains('tie_breaker') ||
+                              status.contains('tiebreaker') ||
+                              status.contains('tie');
+
+                          final publishedWinners = data['publishedWinners'] == true ||
+                              data['winnersPublished'] == true ||
+                              data['isFinalized'] == true;
+
+                          final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+                          if (isDeclaredFinished ||
+                              status == 'archived' ||
+                              status == 'closed') {
+                            continue;
+                          }
+
                           final isPublished =
                               data['published'] == true ||
                               data['isPublished'] == true ||
@@ -1448,18 +1488,9 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                               data['isPublished']?.toString().toLowerCase() ==
                                   'true' ||
                               status == 'published';
-                          final isFinished =
-                              data['isFinished'] == true ||
-                              data['isCompleted'] == true ||
-                              data['completed'] == true ||
-                              data['finished'] == true ||
-                              status == 'finished' ||
-                              status == 'completed' ||
-                              status == 'closed' ||
-                              status == 'archived';
 
-                          if (isFinished || !isPublished) continue;
-                          if (!activeStatuses.contains(status)) continue;
+                          if (!isPublished && !isTieBreakerActive) continue;
+                          if (!isTieBreakerActive && !activeStatuses.contains(status) && publishedWinners) continue;
 
                           final candidateName =
                               (data['title'] ??
@@ -1919,6 +1950,11 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
       'paused',
       'level_pause',
       'contest_review',
+      'tie_breaker_invite',
+      'tie_breaker_preparation',
+      'tie_breaker',
+      'tie_breaker_ended',
+      'tiebreaker',
     };
 
     QueryDocumentSnapshot? targetDoc;
@@ -1938,7 +1974,6 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           data['published']?.toString().toLowerCase() == 'true' ||
           data['isPublished']?.toString().toLowerCase() == 'true' ||
           (data['status'] ?? '').toString().toLowerCase() == 'published';
-      if (!isPub) continue;
 
       final st = (data['status']?.toString() ?? '')
           .trim()
@@ -1946,7 +1981,21 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           .replaceAll('-', '_')
           .replaceAll(' ', '_');
       if (st == 'deleted') continue;
-      if (activeStatuses.contains(st)) {
+
+      final isTieBreakerActive = data['tieBreakerActive'] == true ||
+          st.contains('tie_breaker') ||
+          st.contains('tiebreaker') ||
+          st.contains('tie');
+
+      final publishedWinners = data['publishedWinners'] == true ||
+          data['winnersPublished'] == true ||
+          data['isFinalized'] == true;
+
+      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+      if (isDeclaredFinished || st == 'archived' || st == 'closed') continue;
+      if (!isPub && !isTieBreakerActive) continue;
+
+      if (isTieBreakerActive || activeStatuses.contains(st) || !publishedWinners) {
         targetDoc = doc;
         break;
       }

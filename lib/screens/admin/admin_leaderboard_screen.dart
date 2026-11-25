@@ -408,6 +408,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                       'contest_review',
                       'in_progress',
                       'inprogress',
+                      'tie_breaker_invite',
+                      'tie_breaker_preparation',
+                      'tie_breaker',
+                      'tie_breaker_ended',
+                      'tiebreaker',
                     };
 
                     const finishedStatuses = {
@@ -423,13 +428,47 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     };
 
                     final activeSessions = allSessions.where((doc) {
-                      final status = (doc.data()['status'] ?? '')
+                      final data = doc.data();
+                      if (data['deleted'] == true ||
+                          data['isDeleted'] == true ||
+                          data['status'] == 'deleted') {
+                        return false;
+                      }
+
+                      final status = (data['status'] ?? '')
                           .toString()
                           .trim()
                           .toLowerCase()
                           .replaceAll('-', '_')
                           .replaceAll(' ', '_');
-                      return activeStatuses.contains(status) &&
+
+                      final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                          status.contains('tie_breaker') ||
+                          status.contains('tiebreaker') ||
+                          status.contains('tie');
+
+                      final publishedWinners = data['publishedWinners'] == true ||
+                          data['winnersPublished'] == true ||
+                          data['isFinalized'] == true;
+
+                      // Live ranking stays active until Quiz Master officially declares it finished (publishes winners)
+                      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+                      if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+                        return false;
+                      }
+
+                      // If tie breaker is active, it MUST be in live ranking
+                      if (isTieBreakerActive) {
+                        return true;
+                      }
+
+                      // If quiz master has not published winners yet, keep in live ranking
+                      if (!publishedWinners && (finishedStatuses.contains(status) || status == 'finished')) {
+                        return true;
+                      }
+
+                      return activeStatuses.contains(status) ||
                           !finishedStatuses.contains(status);
                     }).toList();
 
@@ -1443,6 +1482,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       }
     }
 
+    final bool hasTieBreaker = data?['tieBreakerActive'] == true ||
+        (data?['status'] ?? '').toString().toLowerCase().contains('tie') ||
+        data?['tieBreakerRank'] != null;
+    if (hasTieBreaker && !configuredLevels.contains('Tie Breaker')) {
+      configuredLevels.add('Tie Breaker');
+    }
+
     return configuredLevels;
   }
 
@@ -1455,6 +1501,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     final cleanLevels = configuredLevels
         .where((l) => l.trim().toLowerCase() != 'overall')
         .toList();
+
+    final bool hasTieTab = cleanLevels.remove('Tie Breaker');
 
     if (!cleanLevels.contains('Level 1')) {
       cleanLevels.insert(0, 'Level 1');
@@ -1469,6 +1517,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       if (numA != numB) return numA.compareTo(numB);
       return a.compareTo(b);
     });
+
+    if (hasTieTab) {
+      cleanLevels.add('Tie Breaker');
+    }
 
     final levels = <String>['Overall', ...cleanLevels];
     if (!levels.contains(selectedLevel)) {
@@ -2950,11 +3002,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final storedTotal =
           _toInt(data['score'] ?? data['totalScore'] ?? data['points'] ?? 0);
 
-      if (selectedLevel == 'Overall') {
-        if (sumOfAllLevels > 0) {
-          contestantScore = sumOfAllLevels + tieBreakerExtra;
-        } else {
-          contestantScore = storedTotal;
+      if (selectedLevel == 'Tie Breaker') {
+        contestantScore = tieBreakerExtra;
+      } else if (selectedLevel == 'Overall') {
+        final totalWithTie = sumOfAllLevels + tieBreakerExtra;
+        contestantScore = totalWithTie > storedTotal ? totalWithTie : storedTotal;
+        if (contestantScore < storedTotal + tieBreakerExtra && tieBreakerExtra > 0 && storedTotal == sumOfAllLevels) {
+          contestantScore = storedTotal + tieBreakerExtra;
         }
       } else {
         final levelMatch = RegExp(r'\d+').firstMatch(selectedLevel);
@@ -3116,6 +3170,10 @@ class _AdminLeaderboardHistoryViewState
     final status = (rawStatus?.toString() ?? 'unknown')
         .toLowerCase()
         .replaceAll(' ', '_');
+
+    if (status.contains('tie_breaker') || status.contains('tiebreaker') || status.contains('tie')) {
+      return 'TIE BREAKER';
+    }
 
     if (status.contains('pause')) return 'PAUSED';
     if (status == 'finished' || status == 'completed' || status == 'complete') {

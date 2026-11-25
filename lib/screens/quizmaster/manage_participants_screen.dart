@@ -894,6 +894,11 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
               'contest_review',
               'in_progress',
               'inprogress',
+              'tie_breaker_invite',
+              'tie_breaker_preparation',
+              'tie_breaker',
+              'tie_breaker_ended',
+              'tiebreaker',
             };
 
             const finishedStatuses = {
@@ -915,15 +920,6 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                   data['status'] == 'deleted') {
                 return false;
               }
-              final isPub = data['published'] == true ||
-                  data['isPublished'] == true ||
-                  data['is_published'] == true ||
-                  data['published'] == 1 ||
-                  data['isPublished'] == 1 ||
-                  data['published']?.toString().toLowerCase() == 'true' ||
-                  data['isPublished']?.toString().toLowerCase() == 'true' ||
-                  (data['status'] ?? '').toString().toLowerCase() == 'published';
-              if (!isPub) return false;
 
               final status = (data['status'] ?? '')
                   .toString()
@@ -931,7 +927,45 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                   .toLowerCase()
                   .replaceAll('-', '_')
                   .replaceAll(' ', '_');
-              return activeStatuses.contains(status) &&
+
+              final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                  status.contains('tie_breaker') ||
+                  status.contains('tiebreaker') ||
+                  status.contains('tie');
+
+              final publishedWinners = data['publishedWinners'] == true ||
+                  data['winnersPublished'] == true ||
+                  data['isFinalized'] == true;
+
+              final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+              if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+                return false;
+              }
+
+              if (isTieBreakerActive) {
+                return true;
+              }
+
+              if (!publishedWinners && (finishedStatuses.contains(status) || status == 'finished')) {
+                return true;
+              }
+
+              final isPub = data['published'] == true ||
+                  data['isPublished'] == true ||
+                  data['is_published'] == true ||
+                  data['published'] == 1 ||
+                  data['isPublished'] == 1 ||
+                  data['published']?.toString().toLowerCase() == 'true' ||
+                  data['isPublished']?.toString().toLowerCase() == 'true' ||
+                  status == 'published' ||
+                  status == 'active' ||
+                  status == 'waiting' ||
+                  status == 'level_pause' ||
+                  status.contains('tie');
+              if (!isPub) return false;
+
+              return activeStatuses.contains(status) ||
                   !finishedStatuses.contains(status);
             }).toList();
 

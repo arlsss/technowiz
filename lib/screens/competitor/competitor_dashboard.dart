@@ -1886,19 +1886,33 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           final published =
               data['published'] == true || data['isPublished'] == true;
 
-          final status = data['status']?.toString().trim().toLowerCase() ?? '';
+          final status = (data['status']?.toString() ?? '')
+              .trim()
+              .toLowerCase()
+              .replaceAll('-', '_')
+              .replaceAll(' ', '_');
 
-          // Dili na ipakita kon ang quiz opisyal na nga nahuman o na-archive
-          if (status == 'finished' ||
-              status == 'completed' ||
-              status == 'closed' ||
-              status == 'archived') {
+          final isTieBreakerActive = data['tieBreakerActive'] == true ||
+              status.contains('tie_breaker') ||
+              status.contains('tiebreaker') ||
+              status.contains('tie');
+
+          final publishedWinners = data['publishedWinners'] == true ||
+              data['winnersPublished'] == true ||
+              data['isFinalized'] == true;
+
+          final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+
+          // Dili na ipakita kon ang quiz opisyal na nga gi-declare nga nahuman (published winners) o na-archive
+          if (isDeclaredFinished ||
+              status == 'archived' ||
+              status == 'closed') {
             return false;
           }
 
-          // Ipakita ang published quiz sa dashboard samtang nagpadayon pa kini,
+          // Ipakita ang published quiz sa dashboard samtang nagpadayon pa kini (apil tie breaker),
           // aron makita gihapon kini sa mga contestant bisan na-eliminate na sila
-          return published;
+          return published || isTieBreakerActive;
         }).toList();
 
         if (quizzes.isEmpty) {

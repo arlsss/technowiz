@@ -611,6 +611,12 @@ class QuizMasterBrandTitle extends StatelessWidget {
                       'countdown',
                       'paused',
                       'level_pause',
+                      'contest_review',
+                      'tie_breaker_invite',
+                      'tie_breaker_preparation',
+                      'tie_breaker',
+                      'tie_breaker_ended',
+                      'tiebreaker',
                     };
                     for (final doc in snapshot.data!.docs) {
                       final data = doc.data() as Map<String, dynamic>;
@@ -628,23 +634,26 @@ class QuizMasterBrandTitle extends StatelessWidget {
                               'true' ||
                           (data['status'] ?? '').toString().toLowerCase() ==
                               'published';
-                      if (!isPublished) continue;
 
                       final status = (data['status']?.toString() ?? '')
                           .trim()
                           .toLowerCase()
                           .replaceAll('-', '_')
                           .replaceAll(' ', '_');
-                      final isFinished = data['isFinished'] == true ||
-                          data['isCompleted'] == true ||
-                          data['completed'] == true ||
-                          data['finished'] == true ||
-                          status == 'finished' ||
-                          status == 'completed' ||
-                          status == 'closed' ||
-                          status == 'archived';
-                      if (isFinished) continue;
-                      if (!activeStatuses.contains(status)) continue;
+
+                      final isTieBreakerActive = data['tieBreakerActive'] == true ||
+                          status.contains('tie_breaker') ||
+                          status.contains('tiebreaker') ||
+                          status.contains('tie');
+
+                      final publishedWinners = data['publishedWinners'] == true ||
+                          data['winnersPublished'] == true ||
+                          data['isFinalized'] == true;
+
+                      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
+                      if (isDeclaredFinished || status == 'archived' || status == 'closed') continue;
+                      if (!isPublished && !isTieBreakerActive) continue;
+                      if (!isTieBreakerActive && !activeStatuses.contains(status) && publishedWinners) continue;
                       final quizName = (data['title'] ??
                               data['quizTitle'] ??
                               data['name'] ??

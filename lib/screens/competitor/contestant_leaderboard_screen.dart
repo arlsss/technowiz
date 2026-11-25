@@ -78,23 +78,38 @@ class _ContestantLeaderboardScreenState
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-  bool _isFinished(String status) {
-    final normalized = status.trim().toLowerCase();
+  bool _isFinished(String status, [Map<String, dynamic>? data]) {
+    final normalized = status.trim().toLowerCase().replaceAll('-', '_');
 
-    // These statuses mean the quiz is already over.
+    final isTieBreakerActive = data?['tieBreakerActive'] == true ||
+        normalized.contains('tie_breaker') ||
+        normalized.contains('tiebreaker') ||
+        normalized.contains('tie');
+
+    final publishedWinners = data?['publishedWinners'] == true ||
+        data?['winnersPublished'] == true ||
+        data?['isFinalized'] == true;
+
+    // Official declared finish requires winners to be published and no active tie breaker
+    if (isTieBreakerActive) return false;
+    if (data != null && !publishedWinners) return false;
+
     return normalized == 'finished' ||
         normalized == 'completed' ||
         normalized == 'ended';
   }
 
   bool _isLiveStatus(String status) {
-    final normalized = status.trim().toLowerCase();
+    final normalized = status.trim().toLowerCase().replaceAll('-', '_');
 
-    // LIVE RANKING is available only while the quiz is actually running.
-    // A "waiting" quiz must not expose old/current score documents.
+    // LIVE RANKING is available while the quiz is running or in tie breaker
     return normalized == 'active' ||
         normalized == 'ongoing' ||
-        normalized == 'started';
+        normalized == 'started' ||
+        normalized == 'in_progress' ||
+        normalized.contains('tie_breaker') ||
+        normalized.contains('tiebreaker') ||
+        normalized.contains('tie');
   }
 
   bool _isApproved(dynamic value) {
@@ -777,7 +792,7 @@ class _ContestantLeaderboardScreenState
 
         final sessionData = session.data();
         final status = sessionData['status']?.toString() ?? '';
-        final finished = _isFinished(status);
+        final finished = _isFinished(status, sessionData);
 
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
