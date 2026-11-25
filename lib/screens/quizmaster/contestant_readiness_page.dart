@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'quizmaster_theme.dart';
 import 'quizmaster_dashboard.dart';
+import 'quiz_control_screen.dart';
 import '../../navigation_persistence.dart';
 
 class ContestantReadinessPage extends StatefulWidget {
@@ -42,6 +43,7 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
       _sessionDeletionSubscription;
   bool _isExitingDueToDeletion = false;
+  bool _isStarting = false;
 
   @override
   void initState() {
@@ -577,58 +579,88 @@ class _ContestantReadinessPageState extends State<ContestantReadinessPage> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: allReady
+                      onPressed: (allReady && !_isStarting)
                           ? () async {
-                              if (widget.isTieBreaker) {
+                              if (_isStarting) return;
+                              setState(() {
+                                _isStarting = true;
+                              });
+
+                              try {
+                                if (widget.isTieBreaker) {
+                                  await quizRef.set({
+                                    'tieBreakerActive': true,
+                                    'status': 'tie_breaker_preparation',
+                                    'eventStatus': 'tie_breaker_preparation',
+                                    'tieBreakerStarted': true,
+                                    'questionState': 'waiting',
+                                    'updatedAt': FieldValue.serverTimestamp(),
+                                  }, SetOptions(merge: true));
+
+                                  if (!context.mounted) return;
+                                  await QuizMasterNavPersistence.savePage(
+                                    'quiz_control',
+                                    quizCode: widget.quizCode,
+                                  );
+
+                                  try {
+                                    await onStartQuiz();
+                                  } catch (e) {
+                                    debugPrint('onStartQuiz error: $e');
+                                  }
+
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(
+                                      builder: (_) => QuizControlScreen(
+                                        quizCode: widget.quizCode,
+                                        isTieBreaker: true,
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // Notify the contestant screen that preparation has begun for this level.
+                                // Do not start the countdown here; Quiz Control owns that step.
                                 await quizRef.set({
-                                  'status': 'tie_breaker_preparation',
-                                  'eventStatus': 'tie_breaker_preparation',
-                                  'tieBreakerStarted': true,
-                                  'questionState': 'waiting',
-                                  'updatedAt': FieldValue.serverTimestamp(),
+                                  'status': 'waiting',
+                                  'eventStatus': 'preparing_to_begin',
+                                  'preparedLevel': startLevel,
+                                  'preparationStartedAt':
+                                      FieldValue.serverTimestamp(),
+                                  'levelStartedAt':
+                                      FieldValue.serverTimestamp(),
+                                  'readyCheckActive': false,
+                                  'readyCheckType': 'level',
+                                  'readyCheckTitle':
+                                      'Level $startLevel is about to begin',
+                                  'readyCheckMessage':
+                                      'Please get ready. Level $startLevel will begin shortly.',
+                                  'countdownActive': false,
+                                  'countdown': 0,
+                                  'timer': 0,
+                                  'currentLevel': startLevel,
+                                  'level': startLevel,
                                 }, SetOptions(merge: true));
 
                                 if (!context.mounted) return;
+
+                                // The callback handles navigation to Quiz Control.
+                                // Keep the readiness page in place until it succeeds.
                                 await QuizMasterNavPersistence.savePage(
                                   'quiz_control',
                                   quizCode: widget.quizCode,
                                 );
                                 await onStartQuiz();
-                                return;
+                              } catch (e) {
+                                debugPrint('Error starting quiz: $e');
+                                if (mounted) {
+                                  setState(() {
+                                    _isStarting = false;
+                                  });
+                                }
                               }
-
-                              // Notify the contestant screen that preparation has begun for this level.
-                              // Do not start the countdown here; Quiz Control owns that step.
-                              await quizRef.set({
-                                'status': 'waiting',
-                                'eventStatus': 'preparing_to_begin',
-                                'preparedLevel': startLevel,
-                                'preparationStartedAt':
-                                    FieldValue.serverTimestamp(),
-                                'levelStartedAt':
-                                    FieldValue.serverTimestamp(),
-                                'readyCheckActive': false,
-                                'readyCheckType': 'level',
-                                'readyCheckTitle':
-                                    'Level $startLevel is about to begin',
-                                'readyCheckMessage':
-                                    'Please get ready. Level $startLevel will begin shortly.',
-                                'countdownActive': false,
-                                'countdown': 0,
-                                'timer': 0,
-                                'currentLevel': startLevel,
-                                'level': startLevel,
-                              }, SetOptions(merge: true));
-
-                              if (!context.mounted) return;
-
-                              // The callback handles navigation to Quiz Control.
-                              // Keep the readiness page in place until it succeeds.
-                              await QuizMasterNavPersistence.savePage(
-                                'quiz_control',
-                                quizCode: widget.quizCode,
-                              );
-                              await onStartQuiz();
                             }
                           : null,
                       style: ElevatedButton.styleFrom(

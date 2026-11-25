@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'quizmaster_theme.dart';
 import 'quizmaster_dashboard.dart';
 import 'final_ranking_screen.dart';
-import 'quiz_control_screen.dart';
 import 'contestant_readiness_page.dart';
 import '../../navigation_persistence.dart';
 
@@ -890,17 +889,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
           isTieBreaker: true,
           tiedContestantUids: tiedUids,
           tieBreakerFor: tieBreakerFor,
-          onStartQuiz: () async {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => QuizControlScreen(
-                  quizCode: widget.quizCode,
-                  isTieBreaker: true,
-                ),
-              ),
-            );
-          },
+          onStartQuiz: () async {},
         ),
       ),
     );
