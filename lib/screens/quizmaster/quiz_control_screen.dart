@@ -209,6 +209,19 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   }
 
   Future<void> _endTieBreakerAndOpenFinalTally() async {
+    final bool isTimerActive = _isRunning ||
+        _status == 'countdown' ||
+        (_secondsLeft > 0 &&
+            (_status == 'active' ||
+                _status == 'paused' ||
+                _status == 'tie_breaker_active'));
+    if (isTimerActive) {
+      _showMessage(
+        'Cannot end tie breaker while the question timer is running.',
+        error: true,
+      );
+      return;
+    }
     if (_isFinishingQuiz) return;
     _isFinishingQuiz = true;
 
@@ -5183,6 +5196,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   }
 
   void _confirmFinishQuiz() {
+    final bool isTimerActive = _isRunning ||
+        _status == 'countdown' ||
+        (_secondsLeft > 0 &&
+            (_status == 'active' ||
+                _status == 'paused' ||
+                _status == 'tie_breaker_active'));
+    if (isTimerActive) {
+      _showMessage(
+        'Cannot end level while the question timer is running.',
+        error: true,
+      );
+      return;
+    }
+
     final currentLevel = _getLevel(_currentQuestion);
     final isLastQuestionOfLevel =
         _getLastQuestionIndexForLevel(currentLevel) == _currentQuestion;
@@ -7516,7 +7543,16 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                         ? 'END TIE BREAKER'
                                         : 'END LEVEL',
                                     color: Colors.red,
-                                    enabled: !_isFinished && !_isFinishingQuiz,
+                                    enabled: !_isFinished &&
+                                        !_isFinishingQuiz &&
+                                        !_isRunning &&
+                                        !isCountdown &&
+                                        !(_secondsLeft > 0 &&
+                                            (_status == 'active' ||
+                                                _status == 'countdown' ||
+                                                _status == 'paused' ||
+                                                _status ==
+                                                    'tie_breaker_active')),
                                     onTap: _isTieBreakerActive
                                         ? _endTieBreakerAndOpenFinalTally
                                         : _confirmFinishQuiz,
