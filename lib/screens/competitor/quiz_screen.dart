@@ -2486,12 +2486,17 @@ class _QuizScreenState extends State<QuizScreen> {
       final bool correct =
           hasAnswer && isAnswerCorrect(question, effectiveAnswer);
 
+      final bool isTieBreakerActive =
+          _latestQuizData['tieBreakerActive'] == true;
       final sessionLevel = getLevelFromSessionQuestion(
         question,
         fallbackQuestionNumber: questionNumber,
       );
-      final earnedPoints =
-          correct ? getPointsForLevel(sessionLevel, question: question) : 0;
+      final earnedPoints = correct
+          ? (isTieBreakerActive
+              ? 1
+              : getPointsForLevel(sessionLevel, question: question))
+          : 0;
 
       await answerDoc.set({
         'uid': uid,
@@ -2517,8 +2522,10 @@ class _QuizScreenState extends State<QuizScreen> {
       });
 
       if (correct) {
-        _localLevelPoints[sessionLevel] =
-            (_localLevelPoints[sessionLevel] ?? 0) + earnedPoints;
+        if (!isTieBreakerActive) {
+          _localLevelPoints[sessionLevel] =
+              (_localLevelPoints[sessionLevel] ?? 0) + earnedPoints;
+        }
         await updateScore(uid, earnedPoints, questionNumber, level: sessionLevel);
       }
 
@@ -4753,7 +4760,12 @@ class _QuizScreenState extends State<QuizScreen> {
         (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
             'tie_breaker_ended';
 
-    if (isTieBreakerActive && isThisQuestionConfirmed) {
+    if (_quizFinishedForContestant) {
+      final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      return _buildFinishedCongratulationsScreen(context, currentUid);
+    }
+
+    if (isTieBreakerActive && isThisQuestionConfirmed && !isTieBreakerEnded) {
       return _buildTieBreakerPreparationScreen(
         context,
         _latestQuizData,
@@ -5252,90 +5264,270 @@ class _QuizScreenState extends State<QuizScreen> {
       return const SizedBox.shrink();
     }
 
+    final bool isTieBreakerActive =
+        _latestQuizData['tieBreakerActive'] == true;
     final bool isTieBreakerEnded = _latestQuizData['tieBreakerEnded'] == true ||
         (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
-            'tie_breaker_ended';
+            'tie_breaker_ended' ||
+        _latestQuizData['tieBreakerResolved'] == true;
 
-    if (isTieBreakerEnded) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(top: 15),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: borderGreen,
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                color: softGreen,
-                shape: BoxShape.circle,
+    if (isTieBreakerActive || isTieBreakerEnded) {
+      final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
+      final List<String> tiedUids = rawTieUids is List
+          ? rawTieUids
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
+          : <String>[];
+      final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _sessionRef.collection('scores').snapshots(),
+        builder: (context, scoreSnap) {
+          final scoreDocs = scoreSnap.data?.docs ?? [];
+          final Map<String, int> tieScores = {};
+          final Map<String, String> namesMap = {};
+
+          for (final doc in scoreDocs) {
+            if (tiedUids.isEmpty || tiedUids.contains(doc.id)) {
+              final sData = doc.data();
+              final int tb =
+                  int.tryParse(sData['tieBreakerScore']?.toString() ?? '') ?? 0;
+              tieScores[doc.id] = tb;
+              final String name = (sData['teamName'] ?? sData['name'] ?? doc.id)
+                  .toString()
+                  .trim();
+              namesMap[doc.id] = name.isNotEmpty ? name : 'Contestant';
+            }
+          }
+
+          int maxTb = -1;
+          int minTb = 999999;
+          String? leadName;
+          for (final uid in tiedUids) {
+            final tb = tieScores[uid] ?? 0;
+            if (tb > maxTb) {
+              maxTb = tb;
+              leadName = namesMap[uid];
+            }
+            if (tb < minTb) {
+              minTb = tb;
+            }
+          }
+
+          // Notice if one contestant got the check/point and the other got wrong,
+          // or tie breaker ended:
+          final bool isNoticeCheckOneWrongOther =
+              (tiedUids.length >= 2 && maxTb > minTb && maxTb > 0) ||
+              isTieBreakerEnded ||
+              _latestQuizData['tieBreakerResolved'] == true;
+
+          if (isNoticeCheckOneWrongOther) {
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 15),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: primaryGreen,
+                  width: 1.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryGreen.withValues(alpha: 0.08),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.military_tech_rounded,
-                color: primaryGreen,
-                size: 32,
+              child: Column(
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: const BoxDecoration(
+                      color: softGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.emoji_events_rounded,
+                      color: primaryGreen,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "THE TIE BREAKER ENDS",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: darkGreen,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    leadName != null && leadName.isNotEmpty
+                        ? "$leadName scored the winning tie breaker point!"
+                        : "The sudden-death tie breaker has ended!",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    "Click CONFIRM to view your overall points from each level plus your tie breaker points.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _quizFinishedForContestant = true;
+                          _finishedCongratulationsTabIndex = 0;
+                        });
+                      },
+                      icon: const Icon(Icons.check_circle_rounded, size: 22),
+                      label: const Text(
+                        "CONFIRM",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 3,
+                        minimumSize: const Size.fromHeight(54),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "TIE BREAKER CONCLUDED",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: darkGreen,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            );
+          }
+
+          // If still tied:
+          final isConfirmed =
+              nextReadyConfirmed && (confirmedQuestionIndex == currentQuestion);
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 15),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.amber.shade400,
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amber.withValues(alpha: 0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "Your tie breaker points have been recorded.\nPlease stay on this screen while the Quiz Master reviews scores and prepares to publish the final results.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.black54,
-                fontSize: 13.5,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: primaryGreen,
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.balance_rounded,
+                    color: Colors.amber.shade800,
+                    size: 28,
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(height: 12),
                 Text(
-                  "Waiting for Quiz Master to publish results...",
+                  isConfirmed ? "ANDAM NA PARA SA SUNOD!" : "TIE BREAKER CONTINUES",
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: darkGreen,
-                    fontWeight: FontWeight.w600,
+                    color: isConfirmed ? darkGreen : Colors.amber.shade900,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isConfirmed
+                      ? "Waiting for the Quiz Master to start the next tie breaker question..."
+                      : "Both contestants are still tied! Click CONFIRM when you are ready for the next tie breaker question.",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: isConfirmed
+                        ? null
+                        : () {
+                            setNextQuestionReady(true);
+                            if (myUid.isNotEmpty) {
+                              _sessionRef
+                                  .collection('join_requests')
+                                  .doc(myUid)
+                                  .set({
+                                'tieBreakerReady': true,
+                              }, SetOptions(merge: true));
+                            }
+                          },
+                    icon: Icon(
+                      isConfirmed ? Icons.check_circle_rounded : Icons.check,
+                      size: 20,
+                    ),
+                    label: Text(
+                      isConfirmed ? "READY" : "CONFIRM",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFB7D8C0),
+                      disabledForegroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(54),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          );
+        },
       );
     }
 
@@ -6280,9 +6472,13 @@ class _QuizScreenState extends State<QuizScreen> {
         .collection('scores')
         .doc(uid);
 
+    final bool isTieBreakerActive =
+        _latestQuizData['tieBreakerActive'] == true;
     final int targetLevel = level ?? getLevelFromQuestionNumber(questionNumber);
-    _localLevelPoints[targetLevel] =
-        ((_localLevelPoints[targetLevel] ?? 0) + points).clamp(0, 999999);
+    if (!isTieBreakerActive) {
+      _localLevelPoints[targetLevel] =
+          ((_localLevelPoints[targetLevel] ?? 0) + points).clamp(0, 999999);
+    }
     final String levelKey = 'level${targetLevel}Score';
 
     await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -6302,8 +6498,9 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
 
-      final newLevelScore =
-          (oldLevelScore + points) < 0 ? 0 : (oldLevelScore + points);
+      final newLevelScore = isTieBreakerActive
+          ? oldLevelScore
+          : ((oldLevelScore + points) < 0 ? 0 : (oldLevelScore + points));
 
       final Map<String, dynamic> mergedLevelScores = {};
       if (scoreData['levelScores'] is Map) {
@@ -6311,11 +6508,13 @@ class _QuizScreenState extends State<QuizScreen> {
           mergedLevelScores[k.toString()] = v;
         });
       }
-      mergedLevelScores['Level $targetLevel'] = newLevelScore;
+      if (!isTieBreakerActive) {
+        mergedLevelScores['Level $targetLevel'] = newLevelScore;
+      }
 
       int sumOfLevels = 0;
       for (int l = 1; l <= 20; l++) {
-        if (l == targetLevel) {
+        if (!isTieBreakerActive && l == targetLevel) {
           sumOfLevels += newLevelScore;
         } else {
           final dynamic r = scoreData['level${l}Score'] ??
@@ -6325,11 +6524,15 @@ class _QuizScreenState extends State<QuizScreen> {
           if (r != null) sumOfLevels += int.tryParse(r.toString()) ?? 0;
         }
       }
-      final int tieBreaker =
-          int.tryParse(scoreData['tieBreakerScore']?.toString() ?? '') ?? 0;
-      final effectiveScore = sumOfLevels + tieBreaker;
 
-      transaction.set(scoreRef, {
+      final int oldTieBreaker =
+          int.tryParse(scoreData['tieBreakerScore']?.toString() ?? '') ?? 0;
+      final int newTieBreaker = isTieBreakerActive
+          ? (oldTieBreaker + points).clamp(0, 999999)
+          : oldTieBreaker;
+      final effectiveScore = sumOfLevels + newTieBreaker;
+
+      final Map<String, dynamic> scoreUpdate = {
         'uid': uid,
         'name': name,
         'teamName': teamName,
@@ -6337,13 +6540,18 @@ class _QuizScreenState extends State<QuizScreen> {
         'members': teamMembers,
         'score': effectiveScore,
         'totalScore': effectiveScore,
-        levelKey: newLevelScore,
-        'levelScores': mergedLevelScores,
+        'tieBreakerScore': newTieBreaker,
         'currentLevel': targetLevel,
         'lastQuestion': questionNumber,
         'lastPoints': points,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      if (!isTieBreakerActive) {
+        scoreUpdate[levelKey] = newLevelScore;
+        scoreUpdate['levelScores'] = mergedLevelScores;
+      }
+
+      transaction.set(scoreRef, scoreUpdate, SetOptions(merge: true));
     });
 
     if (mounted) {
@@ -8610,9 +8818,10 @@ class _QuizScreenState extends State<QuizScreen> {
 
           final isTieBreakerActive = quizData['tieBreakerActive'] == true;
 
-          if (((isQuizFinished && (!isTieBreakerEnded || publishedWinners)) ||
-                  _quizFinishedForContestant) &&
-              !isTieBreakerActive) {
+          if (_quizFinishedForContestant ||
+              (((isQuizFinished && (!isTieBreakerEnded || publishedWinners)) ||
+                      _quizFinishedForContestant) &&
+                  !isTieBreakerActive)) {
             timer?.cancel();
             final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
             return _buildFinishedCongratulationsScreen(context, currentUid);
@@ -8639,6 +8848,10 @@ class _QuizScreenState extends State<QuizScreen> {
           final countdownActive = quizData['countdownActive'] == true;
 
           if (isTieBreakerActive) {
+            if (_quizFinishedForContestant) {
+              timer?.cancel();
+              return _buildFinishedCongratulationsScreen(context, currentUid);
+            }
             if (!_refreshedQuestionsForTieBreaker) {
               _refreshedQuestionsForTieBreaker = true;
               _questionsFuture = FirebaseFirestore.instance
@@ -9029,7 +9242,15 @@ class _QuizScreenState extends State<QuizScreen> {
           // Once the contestant submits (or time runs out), show the
           // result immediately. Do not let Ready Check or Countdown
           // hide it.
+          if (_quizFinishedForContestant) {
+            timer?.cancel();
+            final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+            return _buildFinishedCongratulationsScreen(context, currentUid);
+          }
+
           if (answered && resultRevealed) {
+            final isTieBreakerActive =
+                _latestQuizData['tieBreakerActive'] == true;
             final resultLevel = activeLevelMetrics.level > 0
                 ? activeLevelMetrics.level
                 : (currentQuestionData != null &&
@@ -9046,8 +9267,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     ? _sortedSessionQuestions[previousQuestion].data()
                         as Map<String, dynamic>?
                     : null);
-            final resultPoints =
-                getPointsForLevel(resultLevel, question: resultQuestionData);
+            final resultPoints = isTieBreakerActive
+                ? 1
+                : getPointsForLevel(resultLevel, question: resultQuestionData);
 
             return resultScreen(
               points: resultPoints,
