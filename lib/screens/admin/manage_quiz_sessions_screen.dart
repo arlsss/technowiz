@@ -2510,6 +2510,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
               p['description'] == n['description'] &&
               p['published'] == n['published'] &&
               p['status'] == n['status'] &&
+              p['tieBreakerTimerSeconds'] == n['tieBreakerTimerSeconds'] &&
               pLevels == nLevels;
         }),
         builder: (context, quizSnapshot) {
@@ -3522,7 +3523,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     const SizedBox(height: 30),
 
                     // TIE BREAKER QUESTIONS
-                    _buildTieBreakerSection(phone: phone),
+                    _buildTieBreakerSection(phone: phone, liveData: liveData),
 
                     const SizedBox(height: 30),
 
@@ -3629,10 +3630,245 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   }
 
   // =========================================================
-  // TIE BREAKER QUESTIONS SECTION
+  // TIE BREAKER QUESTIONS & TIMER SECTION
   // =========================================================
 
-  Widget _buildTieBreakerSection({required bool phone}) {
+  int _getTieBreakerTimerSeconds([Map<String, dynamic>? data]) {
+    final d = data ?? widget.quizData;
+    final val = d['tieBreakerTimerSeconds'] ??
+        (d['tieBreakerSettings'] is Map
+            ? d['tieBreakerSettings']['timerSeconds']
+            : null) ??
+        (d['levelSettings'] is Map && d['levelSettings']['Tie Breaker'] is Map
+            ? d['levelSettings']['Tie Breaker']['timerSeconds']
+            : null);
+    final parsed = int.tryParse(val?.toString() ?? '');
+    return (parsed != null && parsed > 0) ? parsed : 30;
+  }
+
+  Future<void> _openTieBreakerTimerDialog(int currentTimer) async {
+    final controller = TextEditingController(text: currentTimer.toString());
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.timer_outlined, color: primaryPurple, size: 24),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Set Tie Breaker Timer',
+                  style: TextStyle(
+                    color: textDark,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter how many seconds contestants have to answer each tie breaker question:',
+                style: TextStyle(color: textGrey, fontSize: 13, height: 1.3),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Time per Question (seconds)',
+                  hintText: 'e.g. 30, 20, 15',
+                  prefixIcon: const Icon(
+                    Icons.timer_outlined,
+                    color: primaryPurple,
+                  ),
+                  suffixText: 'sec',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = int.tryParse(controller.text.trim());
+                if (parsed == null || parsed <= 0) return;
+                Navigator.pop(dialogCtx, parsed);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: primaryPurple,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('SAVE'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null || result <= 0) return;
+
+    try {
+      await quizRef.set({
+        'tieBreakerTimerSeconds': result,
+        'tieBreakerSettings': {
+          'timerSeconds': result,
+        },
+        'levelSettings': {
+          'Tie Breaker': {
+            'timerSeconds': result,
+          },
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        showMessage('Tie breaker timer set to $result seconds.');
+      }
+    } catch (e) {
+      debugPrint('SAVE TIE BREAKER TIMER ERROR: $e');
+      if (mounted) {
+        showMessage('Failed to save timer: $e', error: true);
+      }
+    }
+  }
+
+  Future<void> _openQuestionTimerDialog(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+    int currentTimer,
+  ) async {
+    final data = doc.data() ?? {};
+    final existingTimer = int.tryParse(
+          (data['timerSeconds'] ?? data['timer'] ?? data['timeLimit'])
+              ?.toString() ??
+              '',
+        ) ??
+        currentTimer;
+    final controller = TextEditingController(text: existingTimer.toString());
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.timer_outlined, color: primaryPurple, size: 24),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Set Question Timer',
+                  style: TextStyle(
+                    color: textDark,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Set the time limit (in seconds) specifically for this question:',
+                style: TextStyle(color: textGrey, fontSize: 13, height: 1.3),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Seconds',
+                  hintText: 'e.g. 30, 20',
+                  prefixIcon: const Icon(
+                    Icons.timer_outlined,
+                    color: primaryPurple,
+                  ),
+                  suffixText: 'sec',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = int.tryParse(controller.text.trim());
+                if (parsed == null || parsed <= 0) return;
+                Navigator.pop(dialogCtx, parsed);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: primaryPurple,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('SAVE'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null || result <= 0) return;
+
+    try {
+      await doc.reference.update({
+        'timerSeconds': result,
+        'timer': result,
+        'timeLimit': result,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) {
+        showMessage('Question timer set to $result seconds.');
+      }
+    } catch (e) {
+      debugPrint('UPDATE QUESTION TIMER ERROR: $e');
+      if (mounted) {
+        showMessage('Failed to update timer: $e', error: true);
+      }
+    }
+  }
+
+  Widget _buildTieBreakerSection({
+    required bool phone,
+    Map<String, dynamic>? liveData,
+  }) {
+    final int tbTimerSeconds = _getTieBreakerTimerSeconds(liveData);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3654,28 +3890,56 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     style: TextStyle(color: textGrey, fontSize: 11),
                   ),
                   const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => openAddQuestions('Tie Breaker'),
-                      icon: const Icon(Icons.add_rounded, size: 17),
-                      label: const Text('ADD TIE BREAKER'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: primaryPurple,
-                        side: const BorderSide(color: primaryPurple),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              _openTieBreakerTimerDialog(tbTimerSeconds),
+                          icon: const Icon(Icons.timer_outlined, size: 16),
+                          label: Text('TIMER: ${tbTimerSeconds}s'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFB45309),
+                            side: const BorderSide(color: Color(0xFFF59E0B)),
+                            backgroundColor: const Color(0xFFFFFBEB),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => openAddQuestions('Tie Breaker'),
+                          icon: const Icon(Icons.add_rounded, size: 17),
+                          label: const Text('ADD TIE BREAKER'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primaryPurple,
+                            side: const BorderSide(color: primaryPurple),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               )
@@ -3704,6 +3968,28 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton.icon(
+                    onPressed: () => _openTieBreakerTimerDialog(tbTimerSeconds),
+                    icon: const Icon(Icons.timer_outlined, size: 16),
+                    label: Text('TIMER: ${tbTimerSeconds}s'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFB45309),
+                      side: const BorderSide(color: Color(0xFFF59E0B)),
+                      backgroundColor: const Color(0xFFFFFBEB),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
                     onPressed: () => openAddQuestions('Tie Breaker'),
                     icon: const Icon(Icons.add_rounded, size: 17),
                     label: const Text('ADD TIE BREAKER'),
@@ -3718,7 +4004,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -3792,7 +4078,15 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
             }
 
             return Column(
-              children: docs.map((doc) => _assignedQuestionTile(doc)).toList(),
+              children: docs
+                  .map(
+                    (doc) => _assignedQuestionTile(
+                      doc,
+                      isTieBreaker: true,
+                      defaultTimer: tbTimerSeconds,
+                    ),
+                  )
+                  .toList(),
             );
           },
         ),
@@ -3817,8 +4111,10 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
 
   Widget _assignedQuestionTile(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+    QueryDocumentSnapshot<Map<String, dynamic>> doc, {
+    bool isTieBreaker = false,
+    int defaultTimer = 30,
+  }) {
     final data = doc.data();
 
     final String question =
@@ -3829,6 +4125,11 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
             .toString();
 
     final String answer = _resolveQuestionAnswer(data);
+
+    final rawQTimer =
+        data['timerSeconds'] ?? data['timer'] ?? data['timeLimit'];
+    final int qTimer =
+        int.tryParse(rawQTimer?.toString() ?? '') ?? defaultTimer;
 
     return Container(
       key: ValueKey('assigned_q_${doc.id}'),
@@ -3884,6 +4185,46 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                               ),
                             ),
                           ),
+                          if (isTieBreaker) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () =>
+                                  _openQuestionTimerDialog(doc, qTimer),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFFFDE68A),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.timer_outlined,
+                                      size: 11,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${qTimer}s',
+                                      style: const TextStyle(
+                                        color: Color(0xFFB45309),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -3894,10 +4235,27 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                   onSelected: (value) {
                     if (value == 'remove') {
                       removeQuestion(doc.id);
+                    } else if (value == 'timer') {
+                      _openQuestionTimerDialog(doc, qTimer);
                     }
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
+                  itemBuilder: (_) => [
+                    if (isTieBreaker)
+                      const PopupMenuItem(
+                        value: 'timer',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              color: primaryPurple,
+                              size: 19,
+                            ),
+                            SizedBox(width: 8),
+                            Text('Set Timer'),
+                          ],
+                        ),
+                      ),
+                    const PopupMenuItem(
                       value: 'remove',
                       child: Row(
                         children: [

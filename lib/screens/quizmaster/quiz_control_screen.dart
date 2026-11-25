@@ -671,10 +671,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         restoredTimer = 0;
       } else if ((restoredStatus == 'active' || restoredStatus == 'paused') &&
           restoredTimer <= 0) {
-        restoredTimer = await _getLevelTimerSeconds(restoredLevel);
+        restoredTimer = await _getLevelTimerSeconds(
+          restoredLevel,
+          questionData: sortedQuestions.length > restoredQuestion
+              ? sortedQuestions[restoredQuestion].data()
+              : null,
+        );
       }
 
-      final configuredTimerSeconds = await _getLevelTimerSeconds(restoredLevel);
+      final configuredTimerSeconds = await _getLevelTimerSeconds(
+        restoredLevel,
+        questionData: sortedQuestions.length > restoredQuestion
+            ? sortedQuestions[restoredQuestion].data()
+            : null,
+      );
       if (!mounted) return;
 
       setState(() {
@@ -1138,7 +1148,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     _timer?.cancel();
 
-    final configuredSeconds = await _getLevelTimerSeconds(level);
+    final configuredSeconds = await _getLevelTimerSeconds(
+      level,
+      questionData: _questions.length > questionIndex
+          ? _questions[questionIndex].data()
+          : null,
+    );
 
     final quizDoc = await _getQuizSession();
 
@@ -1542,7 +1557,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       if (remaining <= 0) {
         remaining = _secondsLeft > 0
             ? _secondsLeft
-            : await _getLevelTimerSeconds(_currentLevel);
+            : await _getLevelTimerSeconds(
+                _currentLevel,
+                questionData: _questions.length > _currentQuestion
+                    ? _questions[_currentQuestion].data()
+                    : null,
+              );
       }
 
       await quizDoc.reference.update({
@@ -2415,12 +2435,35 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   // quiz_sessions/{quizCode}.levelSettings["Level X"].timerSeconds
   // ============================================================
 
-  Future<int> _getLevelTimerSeconds(int level) async {
+  Future<int> _getLevelTimerSeconds(
+    int level, {
+    Map<String, dynamic>? questionData,
+  }) async {
     try {
+      if (questionData != null) {
+        final qTimer = _asInt(
+          questionData['timerSeconds'] ??
+              questionData['timer'] ??
+              questionData['timeLimit'],
+        );
+        if (qTimer != null && qTimer > 0) return qTimer;
+      }
+
       final quizDoc = await _getQuizSession();
       if (quizDoc == null) return 30;
 
       final data = quizDoc.data() ?? {};
+
+      if (_isTieBreakerActive) {
+        final tbTimer = _asInt(
+          data['tieBreakerTimerSeconds'] ??
+              data['tieBreakerSettings']?['timerSeconds'] ??
+              data['levelSettings']?['Tie Breaker']?['timerSeconds'] ??
+              data['levelSettings']?['tie_breaker']?['timerSeconds'],
+        );
+        if (tbTimer != null && tbTimer > 0) return tbTimer;
+      }
+
       final rawSettings = data['levelSettings'];
       if (rawSettings is! Map) return 30;
 
