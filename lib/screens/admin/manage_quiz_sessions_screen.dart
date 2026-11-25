@@ -3444,7 +3444,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
                             // QUESTION TYPE
                             DropdownButtonFormField<String>(
-                              value: const [
+                              initialValue: const [
                                 'Multiple Choice',
                                 'Identification',
                                 'True/False',
