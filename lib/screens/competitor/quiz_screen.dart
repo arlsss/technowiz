@@ -49,6 +49,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _hasExitedToDashboard = false;
   bool _quizFinishedForContestant = false;
   int _finishedCongratulationsTabIndex = 0; // 0: My Result, 1: Overall Tally
+  int _tieBreakerSpectatorTabIndex = 0; // 0: Live Showdown, 1: Standings
 
   void _handleQuizFinishedAndExit() {
     if (_hasExitedToDashboard) return;
@@ -3128,59 +3129,928 @@ class _QuizScreenState extends State<QuizScreen> {
         ? namesList.join(' vs ')
         : 'Tied Contestants';
 
+    final rawTieUids = quizData['tieBreakerContestantUids'];
+    final List<String> tieBreakerContestantUids = rawTieUids is List
+        ? rawTieUids.map((e) => e.toString()).toList()
+        : <String>[];
+
     return TechCircuitBackground(
       baseColor: lightGreen,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade100,
-                        shape: BoxShape.circle,
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _sessionRef.collection('join_requests').snapshots(),
+            builder: (context, requestsSnap) {
+              final requestDocs = requestsSnap.data?.docs ?? [];
+              final Map<String, Map<String, dynamic>> contestantById = {
+                for (final d in requestDocs) d.id: d.data(),
+              };
+
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _sessionRef.collection('scores').snapshots(),
+                builder: (context, scoresSnap) {
+                  final scoreDocs = scoresSnap.data?.docs ?? [];
+                  final Map<String, Map<String, dynamic>> scoreByUid = {
+                    for (final d in scoreDocs) d.id: d.data(),
+                  };
+
+                  // 1. Compute Tied Contestants live data
+                  final List<Map<String, dynamic>> tiedContestants = [];
+                  int maxTbScore = -1;
+                  int minTbScore = 999999;
+
+                  for (final uid in tieBreakerContestantUids) {
+                    final cData =
+                        contestantById[uid] ?? const <String, dynamic>{};
+                    final sData =
+                        scoreByUid[uid] ?? const <String, dynamic>{};
+
+                    final String displayName = (cData['teamName'] ??
+                            cData['name'] ??
+                            sData['teamName'] ??
+                            sData['name'] ??
+                            uid)
+                        .toString()
+                        .trim();
+
+                    final bool isTeam = cData['isTeam'] == true ||
+                        (cData['teamMembers'] is List &&
+                            (cData['teamMembers'] as List).isNotEmpty) ||
+                        sData['teamMembers'] is List;
+
+                    final List<String> teamMembers = [];
+                    final rawMembers = cData['teamMembers'] ??
+                        sData['teamMembers'] ??
+                        cData['members'];
+                    if (rawMembers is List) {
+                      for (final m in rawMembers) {
+                        final s = m is Map
+                            ? (m['name'] ?? '').toString().trim()
+                            : m.toString().trim();
+                        if (s.isNotEmpty) teamMembers.add(s);
+                      }
+                    }
+
+                    final int tbScore = int.tryParse(
+                            (sData['tieBreakerScore'] ??
+                                    cData['tieBreakerScore'] ??
+                                    '')
+                                .toString()) ??
+                        0;
+
+                    final int totalScore = int.tryParse(
+                            (sData['totalScore'] ??
+                                    sData['score'] ??
+                                    cData['score'] ??
+                                    '')
+                                .toString()) ??
+                        0;
+
+                    if (tbScore > maxTbScore) maxTbScore = tbScore;
+                    if (tbScore < minTbScore) minTbScore = tbScore;
+
+                    tiedContestants.add({
+                      'uid': uid,
+                      'name':
+                          displayName.isNotEmpty ? displayName : 'Contestant',
+                      'isTeam': isTeam,
+                      'teamMembers': teamMembers,
+                      'tieBreakerScore': tbScore,
+                      'totalScore': totalScore,
+                      'tieBreakerWon': sData['tieBreakerWon'] == true,
+                    });
+                  }
+
+                  final bool isBroken = tiedContestants.length > 1 &&
+                      maxTbScore > minTbScore &&
+                      maxTbScore > 0;
+                  final String? leadingName = isBroken
+                      ? (tiedContestants.firstWhere(
+                          (c) => c['tieBreakerScore'] == maxTbScore,
+                          orElse: () => tiedContestants.first,
+                        )['name'] as String)
+                      : null;
+
+                  // 2. Compute Full Leaderboard for Standings tab
+                  final Set<String> allUids = {
+                    ...contestantById.keys,
+                    ...scoreByUid.keys,
+                  };
+                  final List<_FinishedTallyRowData> tallyList = [];
+                  final Set<int> allQuizLevels = {};
+
+                  for (final cUid in allUids) {
+                    final cData =
+                        contestantById[cUid] ?? const <String, dynamic>{};
+                    final sData =
+                        scoreByUid[cUid] ?? const <String, dynamic>{};
+
+                    final String displayName = (cData['teamName'] ??
+                            cData['name'] ??
+                            sData['teamName'] ??
+                            sData['name'] ??
+                            cUid)
+                        .toString()
+                        .trim();
+
+                    final bool isTeam = cData['isTeam'] == true ||
+                        (cData['teamMembers'] is List &&
+                            (cData['teamMembers'] as List).isNotEmpty) ||
+                        sData['teamMembers'] is List;
+
+                    final List<String> teamMembers = [];
+                    final rawMembers = cData['teamMembers'] ??
+                        sData['teamMembers'] ??
+                        cData['members'];
+                    if (rawMembers is List) {
+                      for (final m in rawMembers) {
+                        final s = m is Map
+                            ? (m['name'] ?? '').toString().trim()
+                            : m.toString().trim();
+                        if (s.isNotEmpty) teamMembers.add(s);
+                      }
+                    }
+
+                    final Map<int, int> cLevelScores = {};
+                    for (int l = 1; l <= 20; l++) {
+                      final dynamic val = sData['level${l}Score'] ??
+                          sData['level_$l'] ??
+                          (sData['levelScores'] is Map
+                              ? sData['levelScores']['Level $l'] ??
+                                  sData['levelScores']['$l']
+                              : null) ??
+                          cData['level${l}Score'] ??
+                          cData['level_$l'] ??
+                          (cData['levelScores'] is Map
+                              ? cData['levelScores']['Level $l'] ??
+                                  cData['levelScores']['$l']
+                              : null);
+                      if (val != null) {
+                        final parsed = int.tryParse(val.toString());
+                        if (parsed != null && parsed >= 0) {
+                          cLevelScores[l] = parsed;
+                          allQuizLevels.add(l);
+                        }
+                      }
+                    }
+
+                    int sumOfLevelCells = 0;
+                    for (final pts in cLevelScores.values) {
+                      sumOfLevelCells += pts;
+                    }
+
+                    final int tbPts = int.tryParse(
+                            (sData['tieBreakerScore'] ??
+                                    cData['tieBreakerScore'] ??
+                                    '')
+                                .toString()) ??
+                        0;
+
+                    int totalPoints = sumOfLevelCells + tbPts;
+                    if (totalPoints == 0 && cLevelScores.isEmpty) {
+                      totalPoints = int.tryParse(
+                              (sData['totalScore'] ??
+                                      sData['score'] ??
+                                      cData['score'] ??
+                                      '')
+                                  .toString()) ??
+                          0;
+                    }
+
+                    tallyList.add(_FinishedTallyRowData(
+                      uid: cUid,
+                      name: displayName.isNotEmpty
+                          ? displayName
+                          : 'Contestant',
+                      isTeam: isTeam,
+                      teamMembers: teamMembers,
+                      levelScores: cLevelScores,
+                      tieBreakerScore: tbPts,
+                      totalScore: totalPoints,
+                    ));
+                  }
+
+                  // Sort tallyList
+                  tallyList.sort((a, b) {
+                    if (b.totalScore != a.totalScore) {
+                      return b.totalScore.compareTo(a.totalScore);
+                    }
+                    if (b.tieBreakerScore != a.tieBreakerScore) {
+                      return b.tieBreakerScore.compareTo(a.tieBreakerScore);
+                    }
+                    return a.name.compareTo(b.name);
+                  });
+
+                  for (int i = 0; i < tallyList.length; i++) {
+                    if (i > 0 &&
+                        tallyList[i].totalScore ==
+                            tallyList[i - 1].totalScore &&
+                        tallyList[i].tieBreakerScore ==
+                            tallyList[i - 1].tieBreakerScore) {
+                      tallyList[i].rank = tallyList[i - 1].rank;
+                    } else {
+                      tallyList[i].rank = i + 1;
+                    }
+                  }
+
+                  final sortedLevels = allQuizLevels.toList()..sort();
+
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 20,
                       ),
-                      child: Icon(
-                        Icons.balance_rounded,
-                        color: Colors.amber.shade900,
-                        size: 40,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 540),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // ==========================================
+                            // TOP NAVIGATION BAR (LIVE SHOWDOWN vs STANDINGS)
+                            // ==========================================
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 20),
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black
+                                        .withValues(alpha: 0.08),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      borderRadius:
+                                          BorderRadius.circular(26),
+                                      onTap: () {
+                                        if (_tieBreakerSpectatorTabIndex != 0) {
+                                          setState(() =>
+                                              _tieBreakerSpectatorTabIndex = 0);
+                                        }
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                            milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: _tieBreakerSpectatorTabIndex ==
+                                                  0
+                                              ? primaryGreen
+                                              : Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(26),
+                                          boxShadow:
+                                              _tieBreakerSpectatorTabIndex == 0
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: primaryGreen
+                                                            .withValues(
+                                                                alpha: 0.35),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(
+                                                            0, 2),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.bolt_rounded,
+                                              size: 18,
+                                              color:
+                                                  _tieBreakerSpectatorTabIndex ==
+                                                          0
+                                                      ? Colors.white
+                                                      : const Color(0xFF64748B),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              "LIVE SHOWDOWN",
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.5,
+                                                color:
+                                                    _tieBreakerSpectatorTabIndex ==
+                                                            0
+                                                        ? Colors.white
+                                                        : const Color(
+                                                            0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: InkWell(
+                                      borderRadius:
+                                          BorderRadius.circular(26),
+                                      onTap: () {
+                                        if (_tieBreakerSpectatorTabIndex != 1) {
+                                          setState(() =>
+                                              _tieBreakerSpectatorTabIndex = 1);
+                                        }
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                            milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: _tieBreakerSpectatorTabIndex ==
+                                                  1
+                                              ? primaryGreen
+                                              : Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(26),
+                                          boxShadow:
+                                              _tieBreakerSpectatorTabIndex == 1
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: primaryGreen
+                                                            .withValues(
+                                                                alpha: 0.35),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(
+                                                            0, 2),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.leaderboard_rounded,
+                                              size: 18,
+                                              color:
+                                                  _tieBreakerSpectatorTabIndex ==
+                                                          1
+                                                      ? Colors.white
+                                                      : const Color(0xFF64748B),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              "STANDINGS",
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.5,
+                                                color:
+                                                    _tieBreakerSpectatorTabIndex ==
+                                                            1
+                                                        ? Colors.white
+                                                        : const Color(
+                                                            0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // ==========================================
+                            // TAB 0: LIVE SHOWDOWN (KINSA ANG NAKA POINT)
+                            // ==========================================
+                            if (_tieBreakerSpectatorTabIndex == 0) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(
+                                    color: isBroken
+                                        ? const Color(0xFF86EFAC)
+                                        : const Color(0xFFFED7AA),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black
+                                          .withValues(alpha: 0.05),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 46,
+                                          height: 46,
+                                          decoration: BoxDecoration(
+                                            color: isBroken
+                                                ? const Color(0xFFDCFCE7)
+                                                : const Color(0xFFFEF3C7),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            isBroken
+                                                ? Icons.emoji_events_rounded
+                                                : Icons.balance_rounded,
+                                            color: isBroken
+                                                ? primaryGreen
+                                                : Colors.amber.shade900,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 8,
+                                                    height: 8,
+                                                    decoration: BoxDecoration(
+                                                      color: isBroken
+                                                          ? primaryGreen
+                                                          : Colors.amber
+                                                              .shade800,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: Text(
+                                                      isBroken
+                                                          ? 'TIE BROKEN — WINNER FOUND!'
+                                                          : 'TIE BREAKER SHOWDOWN IN PROGRESS',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: isBroken
+                                                            ? const Color(
+                                                                0xFF15803D)
+                                                            : const Color(
+                                                                0xFF9A3412),
+                                                        fontWeight:
+                                                            FontWeight.w900,
+                                                        fontSize: 13,
+                                                        letterSpacing: 0.3,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                isBroken && leadingName != null
+                                                    ? '$leadingName is leading with $maxTbScore pts!'
+                                                    : 'Sudden-Death Rule: Higher point wins immediately.',
+                                                style: const TextStyle(
+                                                  color: Colors.black54,
+                                                  fontSize: 11.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Divider(
+                                        height: 1,
+                                        color: Color(0xFFF1F5F9)),
+                                    const SizedBox(height: 16),
+
+                                    // Contestants live points list
+                                    if (tiedContestants.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 16),
+                                        child: Text(
+                                          'Showdown between: $names',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      ...tiedContestants.map((item) {
+                                        final String name =
+                                            item['name'] as String;
+                                        final int score =
+                                            item['tieBreakerScore'] as int;
+                                        final int total =
+                                            item['totalScore'] as int;
+                                        final bool isTeam =
+                                            item['isTeam'] == true;
+                                        final List<String> members =
+                                            (item['teamMembers']
+                                                    as List<String>?) ??
+                                                [];
+                                        final bool isLeading = isBroken &&
+                                            score == maxTbScore;
+
+                                        return Container(
+                                          margin:
+                                              const EdgeInsets.only(bottom: 10),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isLeading
+                                                ? const Color(0xFFF0FDF4)
+                                                : const Color(0xFFF8FAFC),
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: isLeading
+                                                  ? const Color(0xFF22C55E)
+                                                  : const Color(0xFFE2E8F0),
+                                              width: isLeading ? 2 : 1,
+                                            ),
+                                            boxShadow: isLeading
+                                                ? [
+                                                    BoxShadow(
+                                                      color: const Color(
+                                                              0xFF22C55E)
+                                                          .withValues(
+                                                              alpha: 0.15),
+                                                      blurRadius: 8,
+                                                      offset:
+                                                          const Offset(0, 2),
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 36,
+                                                height: 36,
+                                                decoration: BoxDecoration(
+                                                  color: isLeading
+                                                      ? const Color(0xFFDCFCE7)
+                                                      : const Color(0xFFF1F5F9),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  isLeading
+                                                      ? Icons
+                                                          .emoji_events_rounded
+                                                      : Icons
+                                                          .sports_score_rounded,
+                                                  color: isLeading
+                                                      ? primaryGreen
+                                                      : const Color(0xFF64748B),
+                                                  size: 19,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Flexible(
+                                                          child: Text(
+                                                            name,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                              fontWeight:
+                                                                  isLeading
+                                                                      ? FontWeight
+                                                                          .w900
+                                                                      : FontWeight
+                                                                          .w700,
+                                                              color: isLeading
+                                                                  ? darkGreen
+                                                                  : const Color(
+                                                                      0xFF0F172A),
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 6),
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                            horizontal: 5,
+                                                            vertical: 1.5,
+                                                          ),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: isTeam
+                                                                ? const Color(
+                                                                    0xFFEFF6FF)
+                                                                : const Color(
+                                                                    0xFFF0FDF4),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        5),
+                                                            border: Border.all(
+                                                              color: isTeam
+                                                                  ? const Color(
+                                                                      0xFF93C5FD)
+                                                                  : const Color(
+                                                                      0xFF86EFAC),
+                                                              width: 0.8,
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            isTeam
+                                                                ? 'TEAM'
+                                                                : 'SOLO',
+                                                            style: TextStyle(
+                                                              fontSize: 9,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              color: isTeam
+                                                                  ? const Color(
+                                                                      0xFF1D4ED8)
+                                                                  : primaryGreen,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    if (members.isNotEmpty) ...[
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        'Members: ${members.join(", ")}',
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontSize: 10.5,
+                                                          color: Colors.black54,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                    if (total > 0)
+                                                      Text(
+                                                        'Overall: $total pts',
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors
+                                                              .grey.shade500,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: isLeading
+                                                      ? primaryGreen
+                                                      : const Color(0xFF1E40AF),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: (isLeading
+                                                              ? primaryGreen
+                                                              : const Color(
+                                                                  0xFF1E40AF))
+                                                          .withValues(
+                                                              alpha: 0.3),
+                                                      blurRadius: 4,
+                                                      offset:
+                                                          const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      '$score ${score == 1 ? "PT" : "PTS"}',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.w900,
+                                                        fontSize: 12.5,
+                                                      ),
+                                                    ),
+                                                    if (isLeading)
+                                                      const Text(
+                                                        'LEADING',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.w900,
+                                                          fontSize: 8,
+                                                          letterSpacing: 0.5,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: borderGreen,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: primaryGreen,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Live points update automatically as tie breaker progresses",
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: darkGreen,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              // ==========================================
+                              // TAB 1: CURRENT STANDINGS (OVERALL TALLY)
+                              // ==========================================
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 20,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black
+                                          .withValues(alpha: 0.05),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDCFCE7),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(
+                                            Icons.leaderboard_rounded,
+                                            color: primaryGreen,
+                                            size: 22,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "CURRENT STANDINGS",
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 15,
+                                                  color: Color(0xFF0F172A),
+                                                ),
+                                              ),
+                                              Text(
+                                                "Live ranking of all contestants",
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  color: Colors.black54,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Divider(
+                                        height: 1, color: Color(0xFFF1F5F9)),
+                                    const SizedBox(height: 14),
+
+                                    if (tallyList.isEmpty)
+                                      const Padding(
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 24),
+                                        child: Center(
+                                          child: Text(
+                                            "No contestant standings found.",
+                                            style: TextStyle(
+                                              color: Color(0xFF64748B),
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        itemCount: tallyList.length,
+                                        separatorBuilder: (context, index) =>
+                                            const SizedBox(height: 10),
+                                        itemBuilder: (context, index) {
+                                          final item = tallyList[index];
+                                          return _buildFinishedTallyRow(
+                                              item, sortedLevels);
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Tie Breaker Round In Progress',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'A sudden-death tie breaker is currently being played between:\n\n$names\n\n'
-                      'Please stand by. Final rankings will be updated once the tie breaker concludes.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF475569),
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const CircularProgressIndicator(color: primaryGreen),
-                  ],
-                ),
-              ),
-            ),
+                  );
+                },
+              );
+            },
           ),
         ),
       ),
