@@ -2636,17 +2636,6 @@ class _QuizScreenState extends State<QuizScreen> {
     return opponents.isNotEmpty ? opponents.join(', ') : 'Opponent';
   }
 
-  List<String> _getTieBreakerOpponentUids(
-    Map<String, dynamic> quizData,
-    String myUid,
-  ) {
-    final rawUids = quizData['tieBreakerContestantUids'];
-    final uids = rawUids is List
-        ? rawUids.map((e) => e.toString()).toList()
-        : <String>[];
-    return uids.where((u) => u != myUid).toList();
-  }
-
   Widget _buildTieBreakerInvitationScreen(
     BuildContext context,
     Map<String, dynamic> quizData,
