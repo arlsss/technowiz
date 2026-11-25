@@ -11823,9 +11823,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                                     .shade300
                                                               : Colors.white70,
                                                         ),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
+                                                        const SizedBox(width: 4),
                                                       ],
                                                       Flexible(
                                                         child: Text(
