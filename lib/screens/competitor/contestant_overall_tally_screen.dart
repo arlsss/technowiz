@@ -315,9 +315,97 @@ class _ContestantOverallTallyScreenState
                                 // CURRENT CONTESTANT HIGHLIGHT CARD
                                 // ==========================================
                                 if (myParticipant != null)
-                                  _buildMyTallyCard(
-                                    myParticipant,
-                                    sortedLevels,
+                                  StreamBuilder<
+                                      QuerySnapshot<Map<String, dynamic>>>(
+                                    stream: _currentUid.isNotEmpty
+                                        ? sessionRef
+                                            .collection('answers')
+                                            .doc(_currentUid)
+                                            .collection('responses')
+                                            .snapshots()
+                                        : null,
+                                    builder: (context, responsesSnap) {
+                                      final responseDocs =
+                                          responsesSnap.data?.docs ?? [];
+                                      final Map<int, int> correctByLevel = {};
+                                      final Map<int, int> wrongByLevel = {};
+                                      final Map<int, int> contestByLevel = {};
+                                      int tbCorrect = 0;
+                                      int tbWrong = 0;
+                                      int tbContest = 0;
+
+                                      for (final doc in responseDocs) {
+                                        final data = doc.data();
+                                        final bool isTb =
+                                            data['isTieBreaker'] == true ||
+                                                (data['level']
+                                                        ?.toString()
+                                                        .toLowerCase()
+                                                        .contains('tie') ??
+                                                    false);
+
+                                        final bool isCorrect =
+                                            data['isCorrect'] == true ||
+                                                data['answerStatus'] ==
+                                                    'correct' ||
+                                                data['contestStatus'] ==
+                                                    'approved';
+
+                                        final bool isWrong = !isCorrect;
+
+                                        final bool isContest =
+                                            (data['contestStatus'] != null &&
+                                                    data['contestStatus'] !=
+                                                        'none') ||
+                                                data['isContested'] == true ||
+                                                data['contested'] == true;
+
+                                        if (isTb) {
+                                          if (isCorrect) tbCorrect++;
+                                          if (isWrong) tbWrong++;
+                                          if (isContest) tbContest++;
+                                          continue;
+                                        }
+
+                                        int level = 1;
+                                        final rawLvl = data['level'] ??
+                                            data['sessionLevel'];
+                                        if (rawLvl is num) {
+                                          level = rawLvl.toInt();
+                                        } else if (rawLvl != null) {
+                                          final m = RegExp(r'(\d+)')
+                                              .firstMatch(rawLvl.toString());
+                                          if (m != null) {
+                                            final p = int.tryParse(m.group(1)!);
+                                            if (p != null) level = p;
+                                          }
+                                        }
+
+                                        if (isCorrect) {
+                                          correctByLevel[level] =
+                                              (correctByLevel[level] ?? 0) + 1;
+                                        }
+                                        if (isWrong) {
+                                          wrongByLevel[level] =
+                                              (wrongByLevel[level] ?? 0) + 1;
+                                        }
+                                        if (isContest) {
+                                          contestByLevel[level] =
+                                              (contestByLevel[level] ?? 0) + 1;
+                                        }
+                                      }
+
+                                      return _buildMyTallyCard(
+                                        me: myParticipant!,
+                                        sortedLevels: sortedLevels,
+                                        correctByLevel: correctByLevel,
+                                        wrongByLevel: wrongByLevel,
+                                        contestByLevel: contestByLevel,
+                                        tbCorrect: tbCorrect,
+                                        tbWrong: tbWrong,
+                                        tbContest: tbContest,
+                                      );
+                                    },
                                   )
                                 else
                                   Container(
@@ -358,11 +446,19 @@ class _ContestantOverallTallyScreenState
   // ==========================================================
   // MY OVERALL TALLY CARD (Hero Card)
   // ==========================================================
-  Widget _buildMyTallyCard(
-    _TallyParticipant me,
-    List<int> sortedLevels,
-  ) {
-    final rankStyle = TechRankStyle.forRank(me.rank);
+  Widget _buildMyTallyCard({
+    required _TallyParticipant me,
+    required List<int> sortedLevels,
+    required Map<int, int> correctByLevel,
+    required Map<int, int> wrongByLevel,
+    required Map<int, int> contestByLevel,
+    required int tbCorrect,
+    required int tbWrong,
+    required int tbContest,
+  }) {
+    final displayName = me.isTeam
+        ? (me.teamName.isNotEmpty ? me.teamName : me.name)
+        : me.name;
 
     return Container(
       width: double.infinity,
@@ -382,25 +478,37 @@ class _ContestantOverallTallyScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top Row: Avatar + Name + Rank Badge
+          // Top Row: Avatar + Name (with Members if Team)
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFDCFCE7), Color(0xFFBBF7D0)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: const Color(0xFF86EFAC),
                     width: 2,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryGreen.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Icon(
                     me.isTeam ? Icons.groups_rounded : Icons.person_rounded,
                     color: primaryGreen,
-                    size: 26,
+                    size: 28,
                   ),
                 ),
               ),
@@ -409,27 +517,30 @@ class _ContestantOverallTallyScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
-                        Flexible(
-                          child: Text(
-                            me.name,
-                            style: const TextStyle(
-                              color: textDark,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: textDark,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
                           ),
                         ),
-                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                              horizontal: 7, vertical: 2.5),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDCFCE7),
                             borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFF86EFAC),
+                              width: 0.8,
+                            ),
                           ),
                           child: const Text(
                             "YOU",
@@ -437,17 +548,21 @@ class _ContestantOverallTallyScreenState
                               color: primaryGreen,
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),
-                        if (me.isTeam) ...[
-                          const SizedBox(width: 4),
+                        if (me.isTeam)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                                horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEDE9FE),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFDDD6FE),
+                                width: 0.8,
+                              ),
                             ),
                             child: const Text(
                               "TEAM",
@@ -455,61 +570,37 @@ class _ContestantOverallTallyScreenState
                                 color: Color(0xFF6D28D9),
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ),
-                        ],
                       ],
                     ),
                     if (me.isTeam && me.teamMembers.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 6),
                       Text(
                         "Members: ${me.teamMembers.join(', ')}",
                         style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 11.5,
+                          color: Colors.grey.shade700,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w500,
+                          height: 1.35,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
                 ),
               ),
-              // Rank Pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: rankStyle.bgColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: rankStyle.borderColor, width: 1.2),
-                ),
-                child: Text(
-                  me.rank == 1
-                      ? "1ST PLACE"
-                      : (me.rank == 2
-                          ? "2ND PLACE"
-                          : (me.rank == 3
-                              ? "3RD PLACE"
-                              : "RANK #${me.rank}")),
-                  style: TextStyle(
-                    color: rankStyle.primaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
           // Total Score Banner
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
@@ -549,7 +640,7 @@ class _ContestantOverallTallyScreenState
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Points Breakdown by Level
           Row(
@@ -568,76 +659,207 @@ class _ContestantOverallTallyScreenState
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final lvl in sortedLevels) ...[
-                _buildLevelScoreChip(
-                  label: "Level $lvl",
-                  points: me.levelPoints[lvl] ?? 0,
-                  isHighlighted: true,
-                ),
-              ],
-              if (me.tieBreakerPoints > 0)
-                _buildLevelScoreChip(
-                  label: "Tie Breaker",
-                  points: me.tieBreakerPoints,
-                  isTieBreaker: true,
-                ),
-            ],
-          ),
+          for (final lvl in sortedLevels) ...[
+            _buildLevelBreakdownCard(
+              title: "Level $lvl",
+              points: me.levelPoints[lvl] ?? 0,
+              correct: correctByLevel[lvl] ?? 0,
+              wrong: wrongByLevel[lvl] ?? 0,
+              contest: contestByLevel[lvl] ?? 0,
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (me.tieBreakerPoints > 0 ||
+              tbCorrect > 0 ||
+              tbWrong > 0 ||
+              tbContest > 0) ...[
+            _buildLevelBreakdownCard(
+              title: "Tie Breaker",
+              points: me.tieBreakerPoints,
+              correct: tbCorrect,
+              wrong: tbWrong,
+              contest: tbContest,
+              isTieBreaker: true,
+            ),
+          ],
         ],
       ),
     );
   }
 
   // ==========================================================
-  // LEVEL SCORE CHIP
+  // LEVEL BREAKDOWN CARD (Level, Points, Correct, Wrong, Contest)
   // ==========================================================
-  Widget _buildLevelScoreChip({
-    required String label,
+  Widget _buildLevelBreakdownCard({
+    required String title,
     required int points,
-    bool isHighlighted = false,
+    required int correct,
+    required int wrong,
+    required int contest,
     bool isTieBreaker = false,
   }) {
-    final Color bgColor = isTieBreaker
-        ? const Color(0xFFFEF3C7)
-        : (isHighlighted ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC));
-    final Color borderColor = isTieBreaker
-        ? const Color(0xFFFDE68A)
-        : (isHighlighted ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0));
-    final Color textColor = isTieBreaker
-        ? const Color(0xFFB45309)
-        : (isHighlighted ? const Color(0xFF065F46) : const Color(0xFF334155));
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 1.2),
+        color: isTieBreaker ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              isTieBreaker ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            "$label: ",
-            style: TextStyle(
-              color: textColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isTieBreaker
+                      ? const Color(0xFFFEF3C7)
+                      : const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isTieBreaker
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF86EFAC),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    color: isTieBreaker
+                        ? const Color(0xFF92400E)
+                        : const Color(0xFF14532D),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Text(
+                "$points ${points == 1 ? 'pt' : 'pts'}",
+                style: TextStyle(
+                  color:
+                      isTieBreaker ? const Color(0xFFD97706) : primaryGreen,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
-          Text(
-            "$points ${points == 1 ? 'pt' : 'pts'}",
-            style: TextStyle(
-              color: textColor,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w900,
-            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // CORRECT
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: const Color(0xFF86EFAC), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle_rounded,
+                          size: 14, color: Color(0xFF16A34A)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          "$correct Correct",
+                          style: const TextStyle(
+                            color: Color(0xFF15803D),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // WRONG
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: const Color(0xFFFCA5A5), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.cancel_rounded,
+                          size: 14, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          "$wrong Wrong",
+                          style: const TextStyle(
+                            color: Color(0xFFB91C1C),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // CONTEST
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: const Color(0xFFFDE68A), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.balance_rounded,
+                          size: 14, color: Color(0xFFD97706)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          "$contest Contest",
+                          style: const TextStyle(
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
