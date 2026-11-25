@@ -151,16 +151,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               status.contains('tiebreaker') ||
               status.contains('tie');
 
-          final publishedWinners = data['publishedWinners'] == true ||
-              data['winnersPublished'] == true ||
-              data['isFinalized'] == true;
+          final isFinished = data['isFinished'] == true ||
+              data['isCompleted'] == true ||
+              data['completed'] == true ||
+              data['finished'] == true ||
+              status == 'finished' ||
+              status == 'completed' ||
+              status == 'closed' ||
+              status == 'archived' ||
+              status == 'cancelled' ||
+              status == 'canceled';
 
-          final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-          if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+          if (!isTieBreakerActive && isFinished) {
             continue;
           }
 
-          if (isTieBreakerActive || !publishedWinners || activeStatuses.contains(status)) {
+          if (isTieBreakerActive || activeStatuses.contains(status)) {
             activeDoc = doc;
             break;
           }
@@ -334,24 +340,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           status.contains('tiebreaker') ||
                           status.contains('tie');
 
-                      final publishedWinners = data['publishedWinners'] == true ||
-                          data['winnersPublished'] == true ||
-                          data['isFinalized'] == true;
+                      final isFinished = data['isFinished'] == true ||
+                          data['isCompleted'] == true ||
+                          data['completed'] == true ||
+                          data['finished'] == true ||
+                          finishedStatuses.contains(status);
 
-                      // Live ranking stays active until Quiz Master officially declares it finished (publishes winners)
-                      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-
-                      if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+                      if (!isTieBreakerActive && isFinished) {
                         return false;
                       }
 
                       // If tie breaker is active, it MUST be in live ranking
                       if (isTieBreakerActive) {
-                        return true;
-                      }
-
-                      // If quiz master has not published winners yet, keep in live ranking
-                      if (!publishedWinners && (finishedStatuses.contains(status) || status == 'finished')) {
                         return true;
                       }
 

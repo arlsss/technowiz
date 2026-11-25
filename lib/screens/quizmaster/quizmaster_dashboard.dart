@@ -1022,17 +1022,16 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
             status.contains('tiebreaker') ||
             status.contains('tie');
 
-        final publishedWinners = data['publishedWinners'] == true ||
-            data['winnersPublished'] == true ||
-            data['isFinalized'] == true;
+        final isFinished = data['isFinished'] == true ||
+            data['isCompleted'] == true ||
+            data['completed'] == true ||
+            data['finished'] == true ||
+            status == 'finished' ||
+            status == 'completed' ||
+            status == 'closed' ||
+            status == 'archived';
 
-        final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-
-        if (isDeclaredFinished ||
-            status == 'archived' ||
-            status == 'closed') {
-          continue;
-        }
+        if (!isTieBreakerActive && isFinished) continue;
 
         final isPub =
             data['published'] == true ||
@@ -1045,7 +1044,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
             status == 'published';
 
         if (!isPub && !isTieBreakerActive) continue;
-        if (!isTieBreakerActive && !activeStatuses.contains(status) && publishedWinners) continue;
+        if (!isTieBreakerActive && !activeStatuses.contains(status)) continue;
 
         final code = doc.id.trim();
         if (code.isNotEmpty) {
@@ -1467,17 +1466,16 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                               status.contains('tiebreaker') ||
                               status.contains('tie');
 
-                          final publishedWinners = data['publishedWinners'] == true ||
-                              data['winnersPublished'] == true ||
-                              data['isFinalized'] == true;
+                          final isFinished = data['isFinished'] == true ||
+                              data['isCompleted'] == true ||
+                              data['completed'] == true ||
+                              data['finished'] == true ||
+                              status == 'finished' ||
+                              status == 'completed' ||
+                              status == 'closed' ||
+                              status == 'archived';
 
-                          final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-
-                          if (isDeclaredFinished ||
-                              status == 'archived' ||
-                              status == 'closed') {
-                            continue;
-                          }
+                          if (!isTieBreakerActive && isFinished) continue;
 
                           final isPublished =
                               data['published'] == true ||
@@ -1490,7 +1488,7 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
                               status == 'published';
 
                           if (!isPublished && !isTieBreakerActive) continue;
-                          if (!isTieBreakerActive && !activeStatuses.contains(status) && publishedWinners) continue;
+                          if (!isTieBreakerActive && !activeStatuses.contains(status)) continue;
 
                           final candidateName =
                               (data['title'] ??
@@ -1987,18 +1985,21 @@ class _QuizMasterDashboardState extends State<QuizMasterDashboard> {
           st.contains('tiebreaker') ||
           st.contains('tie');
 
-      final publishedWinners = data['publishedWinners'] == true ||
-          data['winnersPublished'] == true ||
-          data['isFinalized'] == true;
+      final isFinished = data['isFinished'] == true ||
+          data['isCompleted'] == true ||
+          data['completed'] == true ||
+          data['finished'] == true ||
+          st == 'finished' ||
+          st == 'completed' ||
+          st == 'closed' ||
+          st == 'archived';
 
-      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-      if (isDeclaredFinished || st == 'archived' || st == 'closed') continue;
+      if (!isTieBreakerActive && isFinished) continue;
       if (!isPub && !isTieBreakerActive) continue;
+      if (!isTieBreakerActive && !activeStatuses.contains(st)) continue;
 
-      if (isTieBreakerActive || activeStatuses.contains(st) || !publishedWinners) {
-        targetDoc = doc;
-        break;
-      }
+      targetDoc = doc;
+      break;
     }
     // Only show live card if there is an actual active quiz session
     if (targetDoc == null) return const SizedBox.shrink();

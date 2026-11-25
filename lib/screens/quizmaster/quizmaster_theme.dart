@@ -646,14 +646,18 @@ class QuizMasterBrandTitle extends StatelessWidget {
                           status.contains('tiebreaker') ||
                           status.contains('tie');
 
-                      final publishedWinners = data['publishedWinners'] == true ||
-                          data['winnersPublished'] == true ||
-                          data['isFinalized'] == true;
+                      final isFinished = data['isFinished'] == true ||
+                          data['isCompleted'] == true ||
+                          data['completed'] == true ||
+                          data['finished'] == true ||
+                          status == 'finished' ||
+                          status == 'completed' ||
+                          status == 'closed' ||
+                          status == 'archived';
 
-                      final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-                      if (isDeclaredFinished || status == 'archived' || status == 'closed') continue;
+                      if (!isTieBreakerActive && isFinished) continue;
                       if (!isPublished && !isTieBreakerActive) continue;
-                      if (!isTieBreakerActive && !activeStatuses.contains(status) && publishedWinners) continue;
+                      if (!isTieBreakerActive && !activeStatuses.contains(status)) continue;
                       final quizName = (data['title'] ??
                               data['quizTitle'] ??
                               data['name'] ??

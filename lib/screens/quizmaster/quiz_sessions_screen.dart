@@ -642,18 +642,9 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                       status.contains('tiebreaker') ||
                       status.contains('tie');
 
-                  final publishedWinners = data['publishedWinners'] == true ||
-                      data['winnersPublished'] == true ||
-                      data['isFinalized'] == true;
-
-                  final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-
-                  if (isDeclaredFinished || status == 'archived' || status == 'archive') {
-                    return false;
-                  }
-
-                  // Finished/completed quizzes belong strictly in Quiz History once officially finalized (winners published)
-                  if (!isTieBreakerActive && (isMarkedFinished || finishedStatuses.contains(status)) && publishedWinners) {
+                  // Finished/completed quizzes belong strictly in Quiz History, NOT in active Quizzes!
+                  if (!isTieBreakerActive &&
+                      (isMarkedFinished || finishedStatuses.contains(status))) {
                     return false;
                   }
 
@@ -1651,12 +1642,16 @@ class _QuizSessionsScreenState extends State<QuizSessionsScreen> {
                       status.contains('tiebreaker') ||
                       status.contains('tie');
 
-                  final publishedWinners = data['publishedWinners'] == true ||
-                      data['winnersPublished'] == true ||
-                      data['isFinalized'] == true;
+                  final isFinished = data['isFinished'] == true ||
+                      data['isCompleted'] == true ||
+                      data['completed'] == true ||
+                      data['finished'] == true ||
+                      status == 'finished' ||
+                      status == 'completed' ||
+                      status == 'closed' ||
+                      status == 'archived';
 
-                  final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-                  if (isDeclaredFinished || status == 'archived' || status == 'closed') return false;
+                  if (!isTieBreakerActive && isFinished) return false;
 
                   final isPub =
                       data['published'] == true ||

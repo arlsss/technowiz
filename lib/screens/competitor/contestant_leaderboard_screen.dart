@@ -86,17 +86,14 @@ class _ContestantLeaderboardScreenState
         normalized.contains('tiebreaker') ||
         normalized.contains('tie');
 
-    final publishedWinners = data?['publishedWinners'] == true ||
-        data?['winnersPublished'] == true ||
-        data?['isFinalized'] == true;
-
-    // Official declared finish requires winners to be published and no active tie breaker
     if (isTieBreakerActive) return false;
-    if (data != null && !publishedWinners) return false;
 
     return normalized == 'finished' ||
         normalized == 'completed' ||
-        normalized == 'ended';
+        normalized == 'ended' ||
+        data?['isFinished'] == true ||
+        data?['finished'] == true ||
+        data?['completed'] == true;
   }
 
   bool _isLiveStatus(String status) {

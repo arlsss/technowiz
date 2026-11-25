@@ -1897,16 +1897,16 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
               status.contains('tiebreaker') ||
               status.contains('tie');
 
-          final publishedWinners = data['publishedWinners'] == true ||
-              data['winnersPublished'] == true ||
-              data['isFinalized'] == true;
+          final isFinished = data['isFinished'] == true ||
+              data['isCompleted'] == true ||
+              data['completed'] == true ||
+              data['finished'] == true ||
+              status == 'finished' ||
+              status == 'completed' ||
+              status == 'closed' ||
+              status == 'archived';
 
-          final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-
-          // Dili na ipakita kon ang quiz opisyal na nga gi-declare nga nahuman (published winners) o na-archive
-          if (isDeclaredFinished ||
-              status == 'archived' ||
-              status == 'closed') {
+          if (!isTieBreakerActive && isFinished) {
             return false;
           }
 

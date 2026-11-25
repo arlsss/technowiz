@@ -933,21 +933,17 @@ class _ManageParticipantsScreenState extends State<ManageParticipantsScreen> {
                   status.contains('tiebreaker') ||
                   status.contains('tie');
 
-              final publishedWinners = data['publishedWinners'] == true ||
-                  data['winnersPublished'] == true ||
-                  data['isFinalized'] == true;
+              final isFinished = data['isFinished'] == true ||
+                  data['isCompleted'] == true ||
+                  data['completed'] == true ||
+                  data['finished'] == true ||
+                  finishedStatuses.contains(status);
 
-              final isDeclaredFinished = publishedWinners && !isTieBreakerActive;
-
-              if (isDeclaredFinished || status == 'archived' || status == 'cancelled' || status == 'canceled') {
+              if (!isTieBreakerActive && isFinished) {
                 return false;
               }
 
               if (isTieBreakerActive) {
-                return true;
-              }
-
-              if (!publishedWinners && (finishedStatuses.contains(status) || status == 'finished')) {
                 return true;
               }
 
