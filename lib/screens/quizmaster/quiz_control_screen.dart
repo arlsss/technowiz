@@ -161,7 +161,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       if (tiedUids.contains(doc.id)) {
         final data = doc.data();
         final s = _getContestantEffectiveScore(data, uid: doc.id);
-        final n = (data['teamName'] ?? data['name'] ?? doc.id).toString();
+        final rawTeam = (data['teamName'] ?? '').toString().trim();
+        final String n = rawTeam.isNotEmpty
+            ? rawTeam
+            : [
+                data['displayName'],
+                data['realName'],
+                data['fullName'],
+                data['name'],
+                data['contestantName'],
+                doc.id,
+              ].firstWhere(
+                (v) => v != null && v.toString().trim().isNotEmpty,
+                orElse: () => doc.id,
+              ).toString().trim();
         scoresMap[doc.id] = s;
         namesMap[doc.id] = n;
       }
@@ -4302,22 +4315,126 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               for (int i = 0; i < tiedUids.length; i++) {
                 final uid = tiedUids[i];
                 final fallbackName =
-                    i < tiedNames.length ? tiedNames[i] : 'Contestant ${i + 1}';
-                final req = reqDocs.where((d) => d.id == uid).firstOrNull?.data() ?? {};
-                final sc = scoreDocs.where((d) => d.id == uid).firstOrNull?.data() ?? {};
-                final name = (req['teamName'] ??
-                        req['name'] ??
-                        sc['teamName'] ??
-                        sc['name'] ??
-                        fallbackName)
-                    .toString();
+                    (i < tiedNames.length && tiedNames[i].trim().isNotEmpty)
+                        ? tiedNames[i].trim()
+                        : 'Contestant ${i + 1}';
+
+                final reqDoc = reqDocs.where((d) {
+                  final data = d.data();
+                  if (d.id == uid) return true;
+                  if ((data['uid'] ?? '').toString() == uid) return true;
+                  if ((data['userId'] ?? '').toString() == uid) return true;
+                  if (fallbackName.isNotEmpty) {
+                    final target = fallbackName.toLowerCase();
+                    final dName = (data['teamName'] ??
+                            data['displayName'] ??
+                            data['realName'] ??
+                            data['name'] ??
+                            '')
+                        .toString()
+                        .trim()
+                        .toLowerCase();
+                    if (dName.isNotEmpty && dName == target) return true;
+                  }
+                  return false;
+                }).firstOrNull;
+                final req = reqDoc?.data() ?? {};
+
+                final scDoc = scoreDocs.where((d) {
+                  final data = d.data();
+                  if (d.id == uid) return true;
+                  if ((data['uid'] ?? '').toString() == uid) return true;
+                  if ((data['userId'] ?? '').toString() == uid) return true;
+                  if (fallbackName.isNotEmpty) {
+                    final target = fallbackName.toLowerCase();
+                    final dName = (data['teamName'] ??
+                            data['displayName'] ??
+                            data['realName'] ??
+                            data['name'] ??
+                            data['contestantName'] ??
+                            '')
+                        .toString()
+                        .trim()
+                        .toLowerCase();
+                    if (dName.isNotEmpty && dName == target) return true;
+                  }
+                  return false;
+                }).firstOrNull;
+                final sc = scDoc?.data() ?? {};
+
+                final rawTeam =
+                    (sc['teamName'] ?? req['teamName'] ?? '').toString().trim();
+                final contestantType =
+                    (sc['contestantType'] ?? req['contestantType'] ?? '')
+                        .toString()
+                        .trim()
+                        .toLowerCase();
+                final bool isTeam = sc['isTeam'] == true ||
+                    req['isTeam'] == true ||
+                    contestantType == 'team' ||
+                    rawTeam.isNotEmpty;
+
+                final String personalFullName = [
+                  req['realName'],
+                  req['fullName'],
+                  req['displayName'],
+                  req['name'],
+                  sc['realName'],
+                  sc['fullName'],
+                  sc['displayName'],
+                  sc['name'],
+                  sc['contestantName'],
+                  req['email'],
+                  sc['email'],
+                  fallbackName,
+                ].firstWhere(
+                  (v) => v != null && v.toString().trim().isNotEmpty,
+                  orElse: () => fallbackName,
+                ).toString().trim();
+
+                final String finalTeamName = rawTeam.isNotEmpty
+                    ? rawTeam
+                    : (isTeam ? personalFullName : '');
+
+                final String displayName = isTeam
+                    ? (finalTeamName.isNotEmpty
+                        ? finalTeamName
+                        : personalFullName)
+                    : (personalFullName.isNotEmpty
+                        ? personalFullName
+                        : fallbackName);
+
+                final rawMembers = sc['teamMembers'] ??
+                    sc['members'] ??
+                    req['teamMembers'] ??
+                    req['members'];
+                final List<String> teamMembers = [];
+                if (rawMembers is List) {
+                  for (final m in rawMembers) {
+                    final s = m is Map
+                        ? (m['name'] ?? m['displayName'] ?? '')
+                            .toString()
+                            .trim()
+                        : m.toString().trim();
+                    if (s.isNotEmpty && !teamMembers.contains(s)) {
+                      teamMembers.add(s);
+                    }
+                  }
+                }
+
                 final score =
                     _getContestantEffectiveScore(sc, jData: req, uid: uid);
-                final isReady =
-                    req['tieBreakerReady'] == true || _isConfirmed(req);
+                final isReady = req['tieBreakerReady'] == true ||
+                    sc['tieBreakerReady'] == true ||
+                    _isConfirmed(req) ||
+                    _isConfirmed(sc);
                 tiedData.add({
                   'uid': uid,
-                  'name': name,
+                  'name': displayName,
+                  'isTeam': isTeam,
+                  'teamName': finalTeamName,
+                  'personalFullName': personalFullName,
+                  'teamMembers': teamMembers,
                   'score': score,
                   'isReady': isReady,
                 });
@@ -4412,6 +4529,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                       final name = item['name'] as String;
                       final score = item['score'] as int;
                       final isReady = item['isReady'] as bool;
+                      final isTeam = item['isTeam'] == true;
+                      final teamMembers =
+                          (item['teamMembers'] as List<String>?) ?? [];
                       final isLeading = isBroken && score == maxScore;
 
                       return Container(
@@ -4433,6 +4553,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                           ),
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Icon(
                               isReady
@@ -4442,21 +4563,127 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                   isReady ? Colors.green : Colors.orange,
                               size: 18,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
-                                name,
-                                style: TextStyle(
-                                  fontWeight: isLeading
-                                      ? FontWeight.w900
-                                      : FontWeight.w600,
-                                  color: isLeading
-                                      ? Colors.green.shade900
-                                      : darkBlue,
-                                  fontSize: 13,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: isLeading
+                                                ? FontWeight.w900
+                                                : FontWeight.w700,
+                                            color: isLeading
+                                                ? Colors.green.shade900
+                                                : darkBlue,
+                                            fontSize: 13.5,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      if (isTeam)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 5,
+                                            vertical: 1.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: primaryBlue.withValues(
+                                              alpha: 0.10,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(5),
+                                            border: Border.all(
+                                              color: primaryBlue.withValues(
+                                                alpha: 0.25,
+                                              ),
+                                            ),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.groups_rounded,
+                                                size: 10,
+                                                color: primaryBlue,
+                                              ),
+                                              SizedBox(width: 2.5),
+                                              Text(
+                                                'TEAM',
+                                                style: TextStyle(
+                                                  color: primaryBlue,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 5,
+                                            vertical: 1.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF10B981)
+                                                .withValues(alpha: 0.10),
+                                            borderRadius:
+                                                BorderRadius.circular(5),
+                                            border: Border.all(
+                                              color: const Color(0xFF10B981)
+                                                .withValues(alpha: 0.25),
+                                            ),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.person_rounded,
+                                                size: 10,
+                                                color: Color(0xFF059669),
+                                              ),
+                                              SizedBox(width: 2.5),
+                                              Text(
+                                                'SOLO',
+                                                style: TextStyle(
+                                                  color: Color(0xFF059669),
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (isTeam && teamMembers.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2.5),
+                                      child: Text(
+                                        'Members: ${teamMembers.join(', ')}',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF5B7A9C),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -4469,7 +4696,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                '$score PTS',
+                                score == 0
+                                    ? '0'
+                                    : (score == 1 ? '1 PT' : '$score PTS'),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w900,

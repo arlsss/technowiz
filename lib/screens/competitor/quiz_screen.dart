@@ -2584,8 +2584,8 @@ class _QuizScreenState extends State<QuizScreen> {
     final opponents = <String>[];
     for (int i = 0; i < uids.length; i++) {
       if (uids[i] != myUid) {
-        if (i < names.length) {
-          opponents.add(names[i]);
+        if (i < names.length && names[i].toString().trim().isNotEmpty) {
+          opponents.add(names[i].toString().trim());
         } else {
           opponents.add('Opponent');
         }
@@ -3118,8 +3118,14 @@ class _QuizScreenState extends State<QuizScreen> {
     Map<String, dynamic> quizData,
   ) {
     final rawNames = quizData['tieBreakerContestantNames'];
-    final names = rawNames is List
-        ? rawNames.map((e) => e.toString()).join(' vs ')
+    final namesList = rawNames is List
+        ? rawNames
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList()
+        : <String>[];
+    final names = namesList.isNotEmpty
+        ? namesList.join(' vs ')
         : 'Tied Contestants';
 
     return TechCircuitBackground(
