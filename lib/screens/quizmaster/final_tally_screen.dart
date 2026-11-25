@@ -941,6 +941,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
           {
             'status': 'finished',
             'isFinished': true,
+            'publishedWinners': true,
             'finishedAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           },

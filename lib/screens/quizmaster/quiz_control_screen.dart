@@ -240,10 +240,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         batch.update(quizDoc.reference, {
           'tieBreakerActive': false,
           'tieBreakerResolved': true,
-          'status': 'finished',
-          'eventStatus': 'finished',
-          'isFinished': true,
-          'finished': true,
+          'tieBreakerEnded': true,
+          'showTieBreakerResult': true,
+          'status': 'tie_breaker_ended',
+          'eventStatus': 'tie_breaker_ended',
+          'isFinished': false,
+          'finished': false,
           'timer': 0,
           'countdownActive': false,
           'readyCheckActive': false,
@@ -271,6 +273,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             quizCode: widget.quizCode,
             level: _currentLevel,
             isFinal: true,
+            onFinishQuiz: () async {
+              await _finishQuiz();
+            },
           ),
         ),
       );
@@ -2627,6 +2632,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       await quizRef.update({
         'status': 'finished',
         'isFinished': true,
+        'publishedWinners': true,
         'countdownActive': false,
         'readyCheckActive': false,
         'manuallyPaused': false,
