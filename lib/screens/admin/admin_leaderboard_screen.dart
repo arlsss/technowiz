@@ -2740,8 +2740,19 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
           int totalRespPoints = 0;
           for (final r in responsesSnap.docs) {
             final rData = r.data();
-            final int lvl =
-                _resolveResponseQuestionLevel(r.id, rData, quizData);
+            int lvl = 1;
+            final rawLvl = rData['level'] ?? rData['sessionLevel'];
+            if (rawLvl is num && rawLvl > 0) {
+              lvl = rawLvl.toInt();
+            } else if (rawLvl != null) {
+              final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+              if (m != null) {
+                final p = int.tryParse(m.group(1)!);
+                if (p != null && p > 0) lvl = p;
+              }
+            } else {
+              lvl = _resolveResponseQuestionLevel(r.id, rData, quizData);
+            }
 
             final isCorrect = rData['isCorrect'] == true ||
                 (rData['answerStatus'] ?? '').toString().toLowerCase() ==
@@ -2749,8 +2760,18 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 (rData['contestStatus'] ?? '').toString().toLowerCase() ==
                     'approved';
             if (isCorrect) {
-              final adminPts = _getAdminPointsForLevel(lvl, quizData);
-              int pts = adminPts > 0 ? adminPts : 1;
+              int pts = 0;
+              final rawPts = rData['points'];
+              if (rawPts is num && rawPts > 0) {
+                pts = rawPts.toInt();
+              } else if (rawPts != null &&
+                  int.tryParse(rawPts.toString()) != null &&
+                  int.tryParse(rawPts.toString())! > 0) {
+                pts = int.tryParse(rawPts.toString())!;
+              } else {
+                final adminPts = _getAdminPointsForLevel(lvl, quizData);
+                pts = adminPts > 0 ? adminPts : 1;
+              }
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
               totalRespPoints += pts;
             }
@@ -2772,8 +2793,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
             };
             final int tiePts = _toInt(data['tieBreakerScore']);
             final int realTotal = totalRespPoints + tiePts;
-            updateData['score'] = realTotal;
-            updateData['totalScore'] = realTotal;
+            final int existingDocScore = _toInt(data['score'] ?? data['totalScore']);
+            final int bestTotal = realTotal >= existingDocScore ? realTotal : existingDocScore;
+            updateData['score'] = bestTotal;
+            updateData['totalScore'] = bestTotal;
             doc.reference
                 .set(updateData, SetOptions(merge: true))
                 .catchError((_) {});

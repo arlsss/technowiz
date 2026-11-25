@@ -4324,8 +4324,19 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
           int totalRespPoints = 0;
           for (final r in responsesSnap.docs) {
             final rData = r.data();
-            final int lvl =
-                _resolveResponseQuestionLevel(r.id, rData, quizData ?? _quizData);
+            int lvl = 1;
+            final rawLvl = rData['level'] ?? rData['sessionLevel'];
+            if (rawLvl is num && rawLvl > 0) {
+              lvl = rawLvl.toInt();
+            } else if (rawLvl != null) {
+              final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+              if (m != null) {
+                final p = int.tryParse(m.group(1)!);
+                if (p != null && p > 0) lvl = p;
+              }
+            } else {
+              lvl = _resolveResponseQuestionLevel(r.id, rData, quizData ?? _quizData);
+            }
 
             final isCorrect = rData['isCorrect'] == true ||
                 (rData['answerStatus'] ?? '').toString().toLowerCase() ==
@@ -4333,9 +4344,19 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 (rData['contestStatus'] ?? '').toString().toLowerCase() ==
                     'approved';
             if (isCorrect) {
-              final adminPts =
-                  _getAdminPointsForLevel(lvl, quizData ?? _quizData);
-              int pts = adminPts > 0 ? adminPts : 1;
+              int pts = 0;
+              final rawPts = rData['points'];
+              if (rawPts is num && rawPts > 0) {
+                pts = rawPts.toInt();
+              } else if (rawPts != null &&
+                  int.tryParse(rawPts.toString()) != null &&
+                  int.tryParse(rawPts.toString())! > 0) {
+                pts = int.tryParse(rawPts.toString())!;
+              } else {
+                final adminPts =
+                    _getAdminPointsForLevel(lvl, quizData ?? _quizData);
+                pts = adminPts > 0 ? adminPts : 1;
+              }
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
               totalRespPoints += pts;
             }
@@ -4357,8 +4378,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             };
             final int tiePts = _asInt(data['tieBreakerScore']) ?? 0;
             final int realTotal = totalRespPoints + tiePts;
-            updateData['score'] = realTotal;
-            updateData['totalScore'] = realTotal;
+            final int existingDocScore = _asInt(data['score']) ?? _asInt(data['totalScore']) ?? 0;
+            final int bestTotal = realTotal >= existingDocScore ? realTotal : existingDocScore;
+            updateData['score'] = bestTotal;
+            updateData['totalScore'] = bestTotal;
             doc.reference
                 .set(updateData, SetOptions(merge: true))
                 .catchError((_) {});
@@ -4378,12 +4401,18 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         _asInt(jData?['tieBreakerScore']) ??
         0;
 
+    final stored = _asInt(sData['score']) ??
+        _asInt(sData['totalScore']) ??
+        _asInt(jData?['score']) ??
+        0;
+
     // 1. If we have live cached response scores from responses subcollection
     if (uid != null && _levelScoresCache.containsKey(uid)) {
       final cached = _levelScoresCache[uid];
       if (cached != null) {
         final cachedSum = cached.values.fold<int>(0, (acc, val) => acc + val);
-        return cachedSum + tiePts;
+        final int calculated = cachedSum + tiePts;
+        return calculated > stored ? calculated : stored;
       }
     }
 
@@ -4414,16 +4443,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     final int sumOfLevels =
         levelPointsMap.values.fold<int>(0, (acc, val) => acc + val);
 
-    if (sumOfLevels > 0) {
-      return sumOfLevels + tiePts;
-    }
-
-    final stored = _asInt(sData['score']) ??
-        _asInt(sData['totalScore']) ??
-        _asInt(jData?['score']) ??
-        0;
-
-    return stored;
+    final int calculated = sumOfLevels + tiePts;
+    return calculated > stored ? calculated : stored;
   }
 
   // ============================================================

@@ -238,8 +238,9 @@ class _FinalRankingScreenState extends State<FinalRankingScreen> {
       if (mSum > lvlSum) lvlSum = mSum;
     }
     final tiePts = int.tryParse(data['tieBreakerScore']?.toString() ?? '') ?? 0;
-    if (lvlSum > 0) {
-      total = lvlSum + tiePts;
+    final int levelTotal = lvlSum + tiePts;
+    if (levelTotal > total) {
+      total = levelTotal;
     } else if (tiePts > 0 && total < (lvlSum + tiePts)) {
       total += tiePts;
     }

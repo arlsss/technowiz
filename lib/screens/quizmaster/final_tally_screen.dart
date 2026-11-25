@@ -1201,12 +1201,8 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                 ? rawScore.toInt()
                                 : int.tryParse(rawScore?.toString() ?? '') ?? 0;
 
-                            int score = 0;
-                            if (lvlSum > 0) {
-                              score = lvlSum + tiePts;
-                            } else {
-                              score = stored > 0 ? (stored + tiePts) : 0;
-                            }
+                            int calculated = lvlSum + tiePts;
+                            int score = calculated > stored ? calculated : stored;
 
                             // Auto-heal corrupt score in Firestore
                             if (scoreDocByUid[uid] != null &&
