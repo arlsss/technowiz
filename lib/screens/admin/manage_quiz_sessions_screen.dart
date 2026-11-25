@@ -365,6 +365,31 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
   // =========================================================
 
   Future<bool> deleteQuiz(BuildContext context, String quizCode) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final snap = await firestore.collection('quiz_sessions').doc(quizCode).get();
+      final data = snap.data() ?? {};
+      final st = (data['status'] ?? '').toString().toLowerCase().trim();
+      final isFin = data['isFinished'] == true ||
+          data['isCompleted'] == true ||
+          st == 'finished' ||
+          st == 'completed';
+      final isOngoing = !isFin &&
+          (data['startedAt'] != null ||
+              data['levelStartedAt'] != null ||
+              data['isStarted'] == true ||
+              (st.isNotEmpty && st != 'waiting'));
+      if (isOngoing) {
+        showMessage(
+          'Cannot delete quiz "$quizCode" while it is currently in progress.',
+          error: true,
+        );
+        return false;
+      }
+    } catch (_) {}
+
+    if (!context.mounted) return false;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -586,20 +611,40 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
                 ],
               );
 
+              final String rawSt = status.trim().toLowerCase();
+              final bool isCardFinished = data['isFinished'] == true ||
+                  data['isCompleted'] == true ||
+                  rawSt == 'finished' ||
+                  rawSt == 'completed';
+              final bool isCardOngoing = !isCardFinished &&
+                  (data['startedAt'] != null ||
+                      data['levelStartedAt'] != null ||
+                      data['isStarted'] == true ||
+                      (rawSt.isNotEmpty && rawSt != 'waiting'));
+
               final actions = Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: 'Delete',
+                    tooltip: isCardOngoing
+                        ? 'Quiz in progress (delete locked)'
+                        : 'Delete',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
                       minWidth: 38,
                       minHeight: 38,
                     ),
-                    onPressed: () => deleteQuiz(context, quizCode),
-                    icon: const Icon(
+                    onPressed: isCardOngoing
+                        ? () => showMessage(
+                              'Cannot delete quiz "$quizCode" while it is currently in progress.',
+                              error: true,
+                            )
+                        : () => deleteQuiz(context, quizCode),
+                    icon: Icon(
                       Icons.delete_outline_rounded,
-                      color: Color(0xFFEF4444),
+                      color: isCardOngoing
+                          ? const Color(0xFFD1D5DB)
+                          : const Color(0xFFEF4444),
                       size: 19,
                     ),
                   ),
@@ -1245,6 +1290,21 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   bool isAddingLevel = false;
   String? editingLevelName;
 
+  Map<String, dynamic> _latestQuizData = {};
+
+  bool _isQuizStartedOrOngoing(Map<String, dynamic> data) {
+    if (data['startedAt'] != null ||
+        data['levelStartedAt'] != null ||
+        data['isStarted'] == true) {
+      return true;
+    }
+    final status = (data['status'] ?? '').toString().toLowerCase().trim();
+    if (status.isEmpty || status == 'waiting') {
+      return false;
+    }
+    return true;
+  }
+
   // Staged / pending questions for the level currently being added or edited.
   // These are kept in memory until the admin explicitly clicks "SAVE LEVEL".
   final Set<String> _pendingLevelQuestionIds = {};
@@ -1274,6 +1334,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _latestQuizData = widget.quizData;
 
     _rememberDetailPage();
 
@@ -1447,6 +1508,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
 
   Future<void> togglePublished(bool value) async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'Cannot change publish status while the quiz is in progress or completed.',
+        error: true,
+      );
+      return;
+    }
+
     final action = value ? 'publish' : 'unpublish';
 
     final confirm = await showDialog<bool>(
@@ -1541,6 +1610,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
 
   Future<void> openAddQuestions(String level) async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Questions cannot be added or modified.',
+        error: true,
+      );
+      return;
+    }
+
     final result = await showDialog<Set<String>>(
       context: context,
       barrierDismissible: false,
@@ -1754,6 +1831,13 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
   void addLevel() {
     if (!mounted) return;
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Levels cannot be added.',
+        error: true,
+      );
+      return;
+    }
 
     setState(() {
       _pendingLevelQuestionIds.clear();
@@ -1771,6 +1855,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   }
 
   Future<void> chooseLevelToEdit() async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Levels cannot be edited.',
+        error: true,
+      );
+      return;
+    }
+
     try {
       final snapshot = await quizRef.get();
       if (!mounted) return;
@@ -1818,6 +1910,13 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
   Future<void> editLevel(String level) async {
     if (!mounted) return;
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Levels cannot be edited.',
+        error: true,
+      );
+      return;
+    }
 
     final latestSnapshot = await quizRef.get();
     if (!mounted) return;
@@ -1968,6 +2067,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   }
 
   Future<void> saveLevel() async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Level changes cannot be saved.',
+        error: true,
+      );
+      return;
+    }
+
     final number = int.tryParse(addLevelController.text.trim());
     final timerSeconds = int.tryParse(levelTimerController.text.trim());
     final proceedCount = int.tryParse(levelEliminateController.text.trim());
@@ -2115,6 +2222,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
 
   Future<void> removeLevel(String level) async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Levels cannot be removed.',
+        error: true,
+      );
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -2362,6 +2477,13 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     );
 
     if (confirm != true) return;
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Questions cannot be removed.',
+        error: true,
+      );
+      return;
+    }
 
     try {
       await quizRef.collection('questions').doc(questionId).delete();
@@ -2608,19 +2730,32 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
               p['description'] == n['description'] &&
               p['published'] == n['published'] &&
               p['status'] == n['status'] &&
+              p['startedAt'] == n['startedAt'] &&
+              p['levelStartedAt'] == n['levelStartedAt'] &&
+              p['isStarted'] == n['isStarted'] &&
               p['tieBreakerTimerSeconds'] == n['tieBreakerTimerSeconds'] &&
               pLevels == nLevels;
         }),
         builder: (context, quizSnapshot) {
           final liveData = quizSnapshot.data?.data() ?? widget.quizData;
+          _latestQuizData = liveData;
           final published = liveData['published'] == true;
           final liveStatus = (liveData['status'] ?? '').toString().toLowerCase().trim();
-          final isWaiting = liveStatus == 'waiting' || liveStatus.isEmpty;
-          final isFinished = !isWaiting &&
+          final bool hasQuizStarted = _isQuizStartedOrOngoing(liveData);
+          final bool isFinished = hasQuizStarted &&
               (liveData['isFinished'] == true ||
                   liveData['isCompleted'] == true ||
                   liveStatus == 'finished' ||
                   liveStatus == 'completed');
+
+          if (hasQuizStarted && isAddingLevel) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && isAddingLevel) {
+                setState(() => isAddingLevel = false);
+              }
+            });
+          }
+
           final levels = getLevels(liveData);
           final effectiveSelectedLevel = levels.isEmpty
               ? ''
@@ -2650,6 +2785,51 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
               ),
             ),
           );
+
+          Widget statusLockBadge() {
+            if (!hasQuizStarted) return const SizedBox.shrink();
+            final color = isFinished
+                ? const Color(0xFF475569)
+                : const Color(0xFFB45309);
+            final bg = isFinished
+                ? const Color(0xFFF1F5F9)
+                : const Color(0xFFFEF3C7);
+            final border = isFinished
+                ? const Color(0xFFCBD5E1)
+                : const Color(0xFFFDE68A);
+            final label = isFinished ? 'FINISHED • LOCKED' : 'ONGOING • LOCKED';
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isFinished
+                        ? Icons.lock_outline_rounded
+                        : Icons.lock_clock_rounded,
+                    size: 11,
+                    color: color,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
 
           String levelDifficultyFor(String level) {
             final rawSettings = liveData['levelSettings'];
@@ -2756,20 +2936,21 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Remove $level',
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 14,
-                    color: Color(0xFFEF4444),
+                if (!hasQuizStarted)
+                  IconButton(
+                    tooltip: 'Remove $level',
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 14,
+                      color: Color(0xFFEF4444),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 26,
+                      minHeight: 26,
+                    ),
+                    onPressed: () => removeLevel(level),
                   ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 26,
-                    minHeight: 26,
-                  ),
-                  onPressed: () => removeLevel(level),
-                ),
               ],
             );
           }
@@ -2849,7 +3030,17 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        publishedBadge(),
+                                        Wrap(
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            publishedBadge(),
+                                            if (hasQuizStarted)
+                                              statusLockBadge(),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                     const SizedBox(height: 5),
@@ -2994,7 +3185,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 Expanded(
                                   flex: 1,
                                   child: FilledButton.icon(
-                                    onPressed: (published && !isFinished)
+                                    onPressed: (hasQuizStarted || (published && !isFinished))
                                         ? null
                                         : () => togglePublished(true),
                                     icon: const Icon(
@@ -3017,9 +3208,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 Expanded(
                                   flex: 1,
                                   child: OutlinedButton.icon(
-                                    onPressed: published
-                                        ? () => togglePublished(false)
-                                        : null,
+                                    onPressed: (hasQuizStarted || !published)
+                                        ? null
+                                        : () => togglePublished(false),
                                     icon: const Icon(
                                       Icons.visibility_off_outlined,
                                       size: 14,
@@ -3045,7 +3236,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                             runSpacing: 6,
                             children: [
                               FilledButton.icon(
-                                onPressed: (published && !isFinished)
+                                onPressed: (hasQuizStarted || (published && !isFinished))
                                     ? null
                                     : () => togglePublished(true),
                                 icon: const Icon(
@@ -3060,9 +3251,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 ),
                               ),
                               OutlinedButton.icon(
-                                onPressed: published
-                                    ? () => togglePublished(false)
-                                    : null,
+                                onPressed: (hasQuizStarted || !published)
+                                    ? null
+                                    : () => togglePublished(false),
                                 icon: const Icon(
                                   Icons.visibility_off_outlined,
                                   size: 15,
@@ -3080,6 +3271,83 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     ),
 
                     const SizedBox(height: 24),
+
+                    if (hasQuizStarted) ...[
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 18),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isFinished
+                              ? const Color(0xFFF8FAFC)
+                              : const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isFinished
+                                ? const Color(0xFFE2E8F0)
+                                : const Color(0xFFFDE68A),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isFinished
+                                    ? const Color(0xFFE2E8F0)
+                                    : const Color(0xFFFEF3C7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isFinished
+                                    ? Icons.lock_outline_rounded
+                                    : Icons.lock_clock_rounded,
+                                color: isFinished
+                                    ? const Color(0xFF475569)
+                                    : const Color(0xFFB45309),
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isFinished
+                                        ? 'Quiz Session Finished (Read-Only)'
+                                        : 'Quiz In Progress (Settings & Questions Locked)',
+                                    style: TextStyle(
+                                      color: isFinished
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFF92400E),
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isFinished
+                                        ? 'This quiz has concluded. Levels, questions, and session settings are locked in read-only mode.'
+                                        : 'The quiz has already started. Levels, questions, and timers cannot be modified while contestants are active.',
+                                    style: TextStyle(
+                                      color: isFinished
+                                          ? const Color(0xFF64748B)
+                                          : const Color(0xFFB45309),
+                                      fontSize: 11,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     // ASSIGNED QUESTIONS
                     phone
@@ -3100,73 +3368,108 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 style: TextStyle(color: textGrey, fontSize: 11),
                               ),
                               const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: isAddingLevel
-                                          ? null
-                                          : addLevel,
-                                      icon: const Icon(
-                                        Icons.add_rounded,
-                                        size: 17,
-                                      ),
-                                      label: const Text('ADD LEVEL'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: primaryPurple,
-                                        side: const BorderSide(
-                                          color: primaryPurple,
+                              if (!hasQuizStarted)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: isAddingLevel
+                                            ? null
+                                            : addLevel,
+                                        icon: const Icon(
+                                          Icons.add_rounded,
+                                          size: 17,
                                         ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 10,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
+                                        label: const Text('ADD LEVEL'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: primaryPurple,
+                                          side: const BorderSide(
+                                            color: primaryPurple,
                                           ),
-                                        ),
-                                        textStyle: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: isAddingLevel
-                                          ? null
-                                          : chooseLevelToEdit,
-                                      icon: const Icon(
-                                        Icons.edit_outlined,
-                                        size: 17,
-                                      ),
-                                      label: const Text('EDIT LEVEL'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: primaryPurple,
-                                        side: const BorderSide(
-                                          color: primaryPurple,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: isAddingLevel
+                                            ? null
+                                            : chooseLevelToEdit,
+                                        icon: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 17,
                                         ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 10,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
+                                        label: const Text('EDIT LEVEL'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: primaryPurple,
+                                          side: const BorderSide(
+                                            color: primaryPurple,
                                           ),
-                                        ),
-                                        textStyle: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
                                       ),
                                     ),
+                                  ],
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 7,
                                   ),
-                                ],
-                              ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.lock_rounded,
+                                        size: 13,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'LEVELS LOCKED (QUIZ STARTED)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF64748B),
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                             ],
                           )
                         : Row(
@@ -3196,54 +3499,90 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              OutlinedButton.icon(
-                                onPressed: isAddingLevel ? null : addLevel,
-                                icon: const Icon(Icons.add_rounded, size: 17),
-                                label: const Text('ADD LEVEL'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: primaryPurple,
-                                  side: const BorderSide(color: primaryPurple),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              OutlinedButton.icon(
-                                onPressed: isAddingLevel
-                                    ? null
-                                    : chooseLevelToEdit,
-                                icon: const Icon(Icons.edit_outlined, size: 17),
-                                label: const Text('EDIT LEVEL'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: primaryPurple,
-                                  side: const BorderSide(color: primaryPurple),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                              if (!hasQuizStarted) ...[
+                                OutlinedButton.icon(
+                                  onPressed: isAddingLevel ? null : addLevel,
+                                  icon: const Icon(Icons.add_rounded, size: 17),
+                                  label: const Text('ADD LEVEL'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: primaryPurple,
+                                    side: const BorderSide(color: primaryPurple),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: isAddingLevel
+                                      ? null
+                                      : chooseLevelToEdit,
+                                  icon: const Icon(Icons.edit_outlined, size: 17),
+                                  label: const Text('EDIT LEVEL'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: primaryPurple,
+                                    side: const BorderSide(color: primaryPurple),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ] else ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.lock_rounded,
+                                        size: 13,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'LEVELS LOCKED (QUIZ STARTED)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF64748B),
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                     const SizedBox(height: 10),
 
-                    if (isAddingLevel)
+                    if (isAddingLevel && !hasQuizStarted)
                       Builder(
                         builder: (context) {
                           final currentLvlText = addLevelController.text.trim();
@@ -3621,14 +3960,18 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                           }).toList();
 
                           if (docs.isEmpty) return _emptyQuestions();
-                          return _buildQuestionList(docs);
+                          return _buildQuestionList(docs, isLocked: hasQuizStarted);
                         },
                       ),
 
                     const SizedBox(height: 30),
 
                     // TIE BREAKER QUESTIONS
-                    _buildTieBreakerSection(phone: phone, liveData: liveData),
+                    _buildTieBreakerSection(
+                      phone: phone,
+                      liveData: liveData,
+                      isLocked: hasQuizStarted,
+                    ),
 
                     const SizedBox(height: 30),
 
@@ -3752,6 +4095,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   }
 
   Future<void> _openTieBreakerTimerDialog(int currentTimer) async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Tie breaker timer cannot be modified.',
+        error: true,
+      );
+      return;
+    }
+
     final controller = TextEditingController(text: currentTimer.toString());
     final result = await showDialog<int>(
       context: context,
@@ -3862,6 +4213,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     DocumentSnapshot<Map<String, dynamic>> doc,
     int currentTimer,
   ) async {
+    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+      showMessage(
+        'This quiz has already started. Question timers cannot be modified.',
+        error: true,
+      );
+      return;
+    }
+
     final data = doc.data() ?? {};
     final existingTimer = int.tryParse(
           (data['timerSeconds'] ?? data['timer'] ?? data['timeLimit'])
@@ -3971,6 +4330,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   Widget _buildTieBreakerSection({
     required bool phone,
     Map<String, dynamic>? liveData,
+    bool isLocked = false,
   }) {
     final int tbTimerSeconds = _getTieBreakerTimerSeconds(liveData);
 
@@ -3995,57 +4355,89 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     style: TextStyle(color: textGrey, fontSize: 11),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              _openTieBreakerTimerDialog(tbTimerSeconds),
-                          icon: const Icon(Icons.timer_outlined, size: 16),
-                          label: Text('TIMER: ${tbTimerSeconds}s'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFB45309),
-                            side: const BorderSide(color: Color(0xFFF59E0B)),
-                            backgroundColor: const Color(0xFFFFFBEB),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 10,
+                  if (isLocked)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock_rounded, size: 13, color: Color(0xFF64748B)),
+                            SizedBox(width: 5),
+                            Text(
+                              'TIE BREAKER LOCKED (QUIZ STARTED)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF64748B),
+                                letterSpacing: 0.3,
+                              ),
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                _openTieBreakerTimerDialog(tbTimerSeconds),
+                            icon: const Icon(Icons.timer_outlined, size: 16),
+                            label: Text('TIMER: ${tbTimerSeconds}s'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFB45309),
+                              side: const BorderSide(color: Color(0xFFF59E0B)),
+                              backgroundColor: const Color(0xFFFFFBEB),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => openAddQuestions('Tie Breaker'),
-                          icon: const Icon(Icons.add_rounded, size: 17),
-                          label: const Text('ADD TIE BREAKER'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryPurple,
-                            side: const BorderSide(color: primaryPurple),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => openAddQuestions('Tie Breaker'),
+                            icon: const Icon(Icons.add_rounded, size: 17),
+                            label: const Text('ADD TIE BREAKER'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: primaryPurple,
+                              side: const BorderSide(color: primaryPurple),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               )
             : Row(
@@ -4072,48 +4464,78 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  OutlinedButton.icon(
-                    onPressed: () => _openTieBreakerTimerDialog(tbTimerSeconds),
-                    icon: const Icon(Icons.timer_outlined, size: 16),
-                    label: Text('TIMER: ${tbTimerSeconds}s'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFB45309),
-                      side: const BorderSide(color: Color(0xFFF59E0B)),
-                      backgroundColor: const Color(0xFFFFFBEB),
+                  if (isLocked)
+                    Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 10,
+                        vertical: 8,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock_rounded, size: 14, color: Color(0xFF64748B)),
+                          SizedBox(width: 6),
+                          Text(
+                            'TIE BREAKER LOCKED (QUIZ STARTED)',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF64748B),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _openTieBreakerTimerDialog(tbTimerSeconds),
+                      icon: const Icon(Icons.timer_outlined, size: 16),
+                      label: Text('TIMER: ${tbTimerSeconds}s'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFB45309),
+                        side: const BorderSide(color: Color(0xFFF59E0B)),
+                        backgroundColor: const Color(0xFFFFFBEB),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => openAddQuestions('Tie Breaker'),
-                    icon: const Icon(Icons.add_rounded, size: 17),
-                    label: const Text('ADD TIE BREAKER'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: primaryPurple,
-                      side: const BorderSide(color: primaryPurple),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => openAddQuestions('Tie Breaker'),
+                      icon: const Icon(Icons.add_rounded, size: 17),
+                      label: const Text('ADD TIE BREAKER'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryPurple,
+                        side: const BorderSide(color: primaryPurple),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
         const SizedBox(height: 12),
@@ -4189,6 +4611,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                       doc,
                       isTieBreaker: true,
                       defaultTimer: tbTimerSeconds,
+                      isLocked: isLocked,
                     ),
                   )
                   .toList(),
@@ -4481,10 +4904,13 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
 
   Widget _buildQuestionList(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) {
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
+    bool isLocked = false,
+  }) {
     return Column(
-      children: docs.map((doc) => _assignedQuestionTile(doc)).toList(),
+      children: docs
+          .map((doc) => _assignedQuestionTile(doc, isLocked: isLocked))
+          .toList(),
     );
   }
 
@@ -4496,6 +4922,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
     QueryDocumentSnapshot<Map<String, dynamic>> doc, {
     bool isTieBreaker = false,
     int defaultTimer = 30,
+    bool isLocked = false,
   }) {
     final data = doc.data();
 
@@ -4571,8 +4998,10 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                             const SizedBox(width: 8),
                             InkWell(
                               borderRadius: BorderRadius.circular(6),
-                              onTap: () =>
-                                  _openQuestionTimerDialog(doc, qTimer),
+                              onTap: isLocked
+                                  ? null
+                                  : () =>
+                                      _openQuestionTimerDialog(doc, qTimer),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
@@ -4612,47 +5041,57 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
-                  tooltip: 'Question options',
-                  onSelected: (value) {
-                    if (value == 'remove') {
-                      removeQuestion(doc.id);
-                    } else if (value == 'timer') {
-                      _openQuestionTimerDialog(doc, qTimer);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    if (isTieBreaker)
+                if (isLocked)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      size: 18,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  )
+                else
+                  PopupMenuButton<String>(
+                    tooltip: 'Question options',
+                    onSelected: (value) {
+                      if (value == 'remove') {
+                        removeQuestion(doc.id);
+                      } else if (value == 'timer') {
+                        _openQuestionTimerDialog(doc, qTimer);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      if (isTieBreaker)
+                        const PopupMenuItem(
+                          value: 'timer',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.timer_outlined,
+                                color: primaryPurple,
+                                size: 19,
+                              ),
+                              SizedBox(width: 8),
+                              Text('Set Timer'),
+                            ],
+                          ),
+                        ),
                       const PopupMenuItem(
-                        value: 'timer',
+                        value: 'remove',
                         child: Row(
                           children: [
                             Icon(
-                              Icons.timer_outlined,
-                              color: primaryPurple,
+                              Icons.remove_circle_outline,
+                              color: Colors.red,
                               size: 19,
                             ),
                             SizedBox(width: 8),
-                            Text('Set Timer'),
+                            Text('Remove'),
                           ],
                         ),
                       ),
-                    const PopupMenuItem(
-                      value: 'remove',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.remove_circle_outline,
-                            color: Colors.red,
-                            size: 19,
-                          ),
-                          SizedBox(width: 8),
-                          Text('Remove'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),
