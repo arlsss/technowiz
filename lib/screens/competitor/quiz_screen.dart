@@ -8222,6 +8222,12 @@ class _QuizScreenState extends State<QuizScreen> {
                       }
 
                       // Build the complete Overall Tally of all contestants
+                      final Map<String, DocumentSnapshot<Map<String, dynamic>>> requestDocById = {
+                        for (final c in requestDocs) c.id: c,
+                      };
+                      final Map<String, DocumentSnapshot<Map<String, dynamic>>> scoreDocById = {
+                        for (final s in scoreDocs) s.id: s,
+                      };
                       final Map<String, Map<String, dynamic>> contestantById = {
                         for (final c in requestDocs) c.id: c.data(),
                       };
@@ -8397,24 +8403,53 @@ class _QuizScreenState extends State<QuizScreen> {
                           calculatedSum += pts;
                         }
 
-                        int scoreVal = int.tryParse((sData['score'] ??
+                        final tiePts = int.tryParse((sData['tieBreakerScore'] ??
+                                    cData['tieBreakerScore'])
+                                ?.toString() ??
+                            '') ??
+                            0;
+
+                        final storedScore = int.tryParse((sData['score'] ??
                                     sData['totalScore'] ??
                                     cData['finalScore'] ??
                                     cData['score'])
                                 ?.toString() ??
                             '') ??
                             0;
-                        if (calculatedSum > scoreVal) scoreVal = calculatedSum;
-                        final tiePts = int.tryParse((sData['tieBreakerScore'] ??
-                                    cData['tieBreakerScore'])
-                                ?.toString() ??
-                            '') ??
-                            0;
-                        if (tiePts > 0 && scoreVal < (calculatedSum + tiePts)) {
-                          scoreVal += tiePts;
+
+                        int scoreVal = 0;
+                        if (calculatedSum > 0) {
+                          scoreVal = calculatedSum + tiePts;
+                        } else {
+                          scoreVal = storedScore > 0 ? (storedScore + tiePts) : 0;
                         }
-                        if (isMe && finalScore > scoreVal) {
-                          scoreVal = finalScore;
+
+                        if (isMe && myLevelScores.isNotEmpty) {
+                          final mySum =
+                              myLevelScores.values.fold<int>(0, (a, b) => a + b);
+                          if (mySum + tiePts > scoreVal) {
+                            scoreVal = mySum + tiePts;
+                          }
+                        }
+
+                        // Auto-heal stale/corrupt scores in Firestore asynchronously
+                        final scoreDocSnap = scoreDocById[cUid];
+                        final requestDocSnap = requestDocById[cUid];
+                        if (scoreDocSnap != null &&
+                            storedScore != scoreVal &&
+                            scoreVal > 0) {
+                          scoreDocSnap.reference.update({
+                            'score': scoreVal,
+                            'totalScore': scoreVal,
+                          }).catchError((_) {});
+                        }
+                        if (requestDocSnap != null &&
+                            ((cData['finalScore'] ?? cData['score']) != scoreVal) &&
+                            scoreVal > 0) {
+                          requestDocSnap.reference.update({
+                            'finalScore': scoreVal,
+                            'score': scoreVal,
+                          }).catchError((_) {});
                         }
 
                         final rawRankVal = cData['finalRank'] ??
@@ -8457,7 +8492,9 @@ class _QuizScreenState extends State<QuizScreen> {
                           tallyList[i].rank = tallyList[i].explicitRank!;
                         } else if (i > 0 &&
                             tallyList[i].totalScore ==
-                                tallyList[i - 1].totalScore) {
+                                tallyList[i - 1].totalScore &&
+                            tallyList[i].tieBreakerScore ==
+                                tallyList[i - 1].tieBreakerScore) {
                           tallyList[i].rank = tallyList[i - 1].rank;
                         } else {
                           tallyList[i].rank = i + 1;
@@ -8469,12 +8506,18 @@ class _QuizScreenState extends State<QuizScreen> {
                           ? (allQuizLevels.toList()..sort())
                           : [1, 2, 3];
 
-                      // Calculate current contestant's final rank
+                      // Calculate current contestant's final rank & total score
                       int computedRank = 1;
                       final myTallyIdx = tallyList.indexWhere((t) => t.isMe);
                       if (myTallyIdx >= 0) {
                         computedRank = tallyList[myTallyIdx].rank;
+                        finalScore = tallyList[myTallyIdx].totalScore;
                       }
+                      final int myTieBreakerScore = myTallyIdx >= 0
+                          ? tallyList[myTallyIdx].tieBreakerScore
+                          : (int.tryParse((jData['tieBreakerScore'] ?? '')
+                                  .toString()) ??
+                              0);
                       final rawRank = jData['finalRank'] ?? jData['rank'];
                       final int finalRank = (rawRank is num && rawRank > 0)
                           ? rawRank.toInt()
@@ -9000,7 +9043,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    "$finalScore PTS",
+                                                    "$finalScore ${finalScore == 1 ? 'PT' : 'PTS'}",
                                                     style: const TextStyle(
                                                       fontSize: 28,
                                                       fontWeight:
@@ -9008,8 +9051,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       color: primaryGreen,
                                                     ),
                                                   ),
-                                                  if (myLevelScores
-                                                      .isNotEmpty) ...[
+                                                  if (myLevelScores.isNotEmpty ||
+                                                      myTieBreakerScore > 0) ...[
                                                     const SizedBox(height: 10),
                                                     const Divider(
                                                       height: 1,
@@ -9021,50 +9064,88 @@ class _QuizScreenState extends State<QuizScreen> {
                                                           WrapAlignment.center,
                                                       spacing: 8,
                                                       runSpacing: 6,
-                                                      children: (myLevelScores
-                                                              .keys
-                                                              .toList()
-                                                            ..sort())
-                                                          .map((lvl) {
-                                                        return Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                            horizontal: 10,
-                                                            vertical: 4,
-                                                          ),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFFE8F5E9),
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        8),
-                                                            border: Border.all(
+                                                      children: [
+                                                        ...(myLevelScores.keys
+                                                                .toList()
+                                                              ..sort())
+                                                            .map((lvl) {
+                                                          final pts =
+                                                              myLevelScores[lvl] ??
+                                                                  0;
+                                                          return Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                              horizontal: 10,
+                                                              vertical: 4,
+                                                            ),
+                                                            decoration:
+                                                                BoxDecoration(
                                                               color: const Color(
-                                                                  0xFFA5D6A7),
+                                                                  0xFFE8F5E9),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                              border: Border.all(
+                                                                color: const Color(
+                                                                    0xFFA5D6A7),
+                                                              ),
+                                                            ),
+                                                            child: Text(
+                                                              pts == 0
+                                                                  ? "Level $lvl: 0"
+                                                                  : "Level $lvl: $pts ${pts == 1 ? 'pt' : 'pts'}",
+                                                              style:
+                                                                  const TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: Color(
+                                                                    0xFF1B5E20),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }),
+                                                        if (myTieBreakerScore > 0)
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                              horizontal: 10,
+                                                              vertical: 4,
+                                                            ),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: const Color(
+                                                                  0xFFFEF3C7),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                              border: Border.all(
+                                                                color: const Color(
+                                                                    0xFFFDE68A),
+                                                              ),
+                                                            ),
+                                                            child: Text(
+                                                              "TB: +$myTieBreakerScore ${myTieBreakerScore == 1 ? 'pt' : 'pts'}",
+                                                              style:
+                                                                  const TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: Color(
+                                                                    0xFFB45309),
+                                                              ),
                                                             ),
                                                           ),
-                                                          child: Text(
-                                                            (myLevelScores[lvl] ?? 0) == 0
-                                                                ? "Level $lvl: 0"
-                                                                : "Level $lvl: ${myLevelScores[lvl]} ${(myLevelScores[lvl] ?? 0) == 1 ? 'pt' : 'pts'}",
-                                                            style:
-                                                                const TextStyle(
-                                                              fontSize: 12,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w700,
-                                                              color: Color(
-                                                                  0xFF1B5E20),
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }).toList(),
+                                                      ],
                                                     ),
                                                   ],
-                                                ],
+                                                 ],
                                               ),
                                             ),
 
@@ -9181,15 +9262,29 @@ class _QuizScreenState extends State<QuizScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(9),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFF59E0B), width: 1.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: const Icon(
-                  Icons.leaderboard_rounded,
-                  color: primaryGreen,
-                  size: 22,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/trophies/gold_trophy_3d.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(
+                      Icons.emoji_events_rounded,
+                      color: Color(0xFFF59E0B),
+                      size: 24,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -9224,6 +9319,119 @@ class _QuizScreenState extends State<QuizScreen> {
           const SizedBox(height: 16),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           const SizedBox(height: 14),
+
+          if (tallyList.isNotEmpty) ...[
+            Builder(
+              builder: (context) {
+                final winner = tallyList.first;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFFDE68A),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B)
+                            .withValues(alpha: 0.12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFF59E0B),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/trophies/gold_trophy_3d.jpg',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.emoji_events_rounded,
+                              color: Color(0xFFF59E0B),
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.emoji_events_rounded,
+                                  size: 13,
+                                  color: Color(0xFFD97706),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  "TOURNAMENT CHAMPION",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              winner.name,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              "${winner.totalScore} ${winner.totalScore == 1 ? 'PT' : 'PTS'} • 1ST PLACE",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
 
           if (tallyList.isEmpty)
             const Padding(
@@ -9298,29 +9506,149 @@ class _QuizScreenState extends State<QuizScreen> {
   // Row for Each Contestant in Finished Overall Tally
   Widget _buildFinishedTallyRow(
       _FinishedTallyRowData item, List<int> sortedLevels) {
-    Color rankBadgeColor;
-    Widget rankIcon;
+    Widget rankBadge;
 
-    if (item.rank == 1) {
-      rankBadgeColor = const Color(0xFFF59E0B);
-      rankIcon = const Icon(Icons.emoji_events_rounded,
-          color: Colors.white, size: 16);
-    } else if (item.rank == 2) {
-      rankBadgeColor = const Color(0xFF94A3B8);
-      rankIcon = const Icon(Icons.military_tech_rounded,
-          color: Colors.white, size: 16);
-    } else if (item.rank == 3) {
-      rankBadgeColor = const Color(0xFFD97706);
-      rankIcon = const Icon(Icons.military_tech_rounded,
-          color: Colors.white, size: 16);
+    if (item.rank <= 3) {
+      final String trophyAsset = item.rank == 1
+          ? 'assets/trophies/gold_trophy_3d.jpg'
+          : (item.rank == 2
+              ? 'assets/trophies/silver_trophy_3d.jpg'
+              : 'assets/trophies/bronze_trophy_3d.jpg');
+
+      final Color rankColor = item.rank == 1
+          ? const Color(0xFFF59E0B)
+          : (item.rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+
+      rankBadge = Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: rankColor.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                trophyAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Icon(
+                  item.rank == 1
+                      ? Icons.emoji_events_rounded
+                      : Icons.military_tech_rounded,
+                  size: 20,
+                  color: rankColor,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              width: 17,
+              height: 17,
+              decoration: BoxDecoration(
+                color: rankColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '${item.rank}',
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (item.rank <= 10) {
+      rankBadge = Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF3B82F6), width: 1.8),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/trophies/top10_badge_3d.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.military_tech_rounded,
+                  size: 20,
+                  color: Color(0xFF3B82F6),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            right: -3,
+            child: Container(
+              width: 17,
+              height: 17,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '${item.rank}',
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     } else {
-      rankBadgeColor = const Color(0xFFF1F5F9);
-      rankIcon = Text(
-        "#${item.rank}",
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF475569),
+      rankBadge = Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          "#${item.rank}",
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF475569),
+          ),
         ),
       );
     }
@@ -9347,42 +9675,8 @@ class _QuizScreenState extends State<QuizScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Rank Badge
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: rankBadgeColor,
-              shape: BoxShape.circle,
-              boxShadow: item.rank <= 3
-                  ? [
-                      BoxShadow(
-                        color: rankBadgeColor.withValues(alpha: 0.4),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: item.rank <= 3
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      rankIcon,
-                      Text(
-                        "${item.rank}",
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.0,
-                        ),
-                      ),
-                    ],
-                  )
-                : rankIcon,
-          ),
+          // Rank Badge with 3D Trophy
+          rankBadge,
           const SizedBox(width: 12),
 
           // Name, Team, and Level Chips
@@ -9569,7 +9863,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  "PTS",
+                  item.totalScore == 1 ? "PT" : "PTS",
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
