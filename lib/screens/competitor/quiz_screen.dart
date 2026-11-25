@@ -954,24 +954,7 @@ class _QuizScreenState extends State<QuizScreen> {
       if (p != null && p > 0) return p;
     }
 
-    // 3. Check if the specific question has points explicitly set
-    if (question != null) {
-      final qPoints = _parsePoints(question);
-      if (qPoints != null && qPoints > 0) return qPoints;
-    }
-
-    // 4. Check questions in _sortedSessionQuestions for this level
-    for (final doc in _sortedSessionQuestions) {
-      final qData = doc.data() as Map<String, dynamic>?;
-      if (qData == null) continue;
-      final qLvl = getLevelFromSessionQuestion(qData);
-      if (qLvl == level) {
-        final p = _parsePoints(qData);
-        if (p != null && p > 0) return p;
-      }
-    }
-
-    // 5. Fallback default
+    // 3. Fallback default based on level (Level 1 = 1, Level 2 = 2, Level 3 = 3)
     switch (level) {
       case 1:
         return 1;
@@ -7219,10 +7202,30 @@ class _QuizScreenState extends State<QuizScreen> {
                         int totalQuestionsInLevel = 0;
                         int levelTotalPossiblePoints = 0;
 
-                        // 1. Count questions in this level from _sortedSessionQuestions
-                        if (_sortedSessionQuestions.isNotEmpty) {
+                        // 1. First check session levelQuestions mapping
+                        final rawLevelQuestions =
+                            sessionData['levelQuestions'] ??
+                                _latestQuizData['levelQuestions'];
+                        if (rawLevelQuestions is Map) {
+                          final target = 'level$currentLevel';
+                          for (final entry in rawLevelQuestions.entries) {
+                            final norm = entry.key
+                                .toString()
+                                .toLowerCase()
+                                .replaceAll(RegExp(r'[^a-z0-9]'), '');
+                            if ((norm == target ||
+                                    norm == '$currentLevel') &&
+                                entry.value is List) {
+                              totalQuestionsInLevel =
+                                  (entry.value as List).length;
+                              break;
+                            }
+                          }
+                        }
+
+                        // 2. Count questions in this level from _sortedSessionQuestions
+                        if (totalQuestionsInLevel == 0 && _sortedSessionQuestions.isNotEmpty) {
                           int count = 0;
-                          int calculatedPoints = 0;
                           for (var i = 0;
                               i < _sortedSessionQuestions.length;
                               i++) {
@@ -7235,45 +7238,14 @@ class _QuizScreenState extends State<QuizScreen> {
                             );
                             if (qLvl == currentLevel) {
                               count++;
-                              final qPts = getPointsForLevel(
-                                currentLevel,
-                                question: qData,
-                                sessionData: sessionData,
-                              );
-                              calculatedPoints += qPts;
                             }
                           }
                           if (count > 0) {
                             totalQuestionsInLevel = count;
-                            levelTotalPossiblePoints = calculatedPoints;
                           }
                         }
 
-                        // 2. Fallback to session levelQuestions mapping
-                        if (totalQuestionsInLevel == 0) {
-                          final rawLevelQuestions =
-                              sessionData['levelQuestions'] ??
-                                  _latestQuizData['levelQuestions'];
-                          if (rawLevelQuestions is Map) {
-                            final target = 'level$currentLevel';
-                            for (final entry in rawLevelQuestions.entries) {
-                              final norm = entry.key
-                                  .toString()
-                                  .toLowerCase()
-                                  .replaceAll(RegExp(r'[^a-z0-9]'), '');
-                              if ((norm == target ||
-                                      norm == '$currentLevel') &&
-                                  entry.value is List) {
-                                totalQuestionsInLevel =
-                                    (entry.value as List).length;
-                                break;
-                              }
-                            }
-                          }
-                        }
-
-                        if (levelTotalPossiblePoints == 0 &&
-                            totalQuestionsInLevel > 0) {
+                        if (totalQuestionsInLevel > 0) {
                           levelTotalPossiblePoints =
                               totalQuestionsInLevel * ptsPerQ;
                         }
@@ -7299,16 +7271,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                   .snapshots()
                               : null,
                           builder: (context, responsesSnapshot) {
-                            int points = _localLevelPoints[currentLevel] ?? 0;
                             int correctCount = 0;
-                            int respPoints = 0;
                             int answeredCount = 0;
 
                             if (responsesSnapshot.hasData &&
                                 responsesSnapshot.data != null) {
                               for (final doc in responsesSnapshot.data!.docs) {
                                 final data = doc.data();
-                                final rawLvl = data['level'];
+                                final rawLvl = data['level'] ?? data['sessionLevel'];
                                 int? itemLevel;
                                 if (rawLvl is num) {
                                   itemLevel = rawLvl.toInt();
@@ -7320,6 +7290,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                     itemLevel = int.tryParse(match.group(1)!);
                                   }
                                 }
+                                if (itemLevel == null || itemLevel <= 0) {
+                                  final mQ = RegExp(r'question_(\d+)').firstMatch(doc.id);
+                                  final qIdx = mQ != null ? int.tryParse(mQ.group(1)!) : null;
+                                  final qNum = (data['questionNumber'] as num?)?.toInt() ?? (qIdx != null ? qIdx + 1 : null);
+                                  if (qNum != null) {
+                                    itemLevel = getLevelFromQuestionNumber(qNum);
+                                  }
+                                }
                                 if (itemLevel == currentLevel) {
                                   answeredCount++;
                                   final bool isCorrect =
@@ -7329,23 +7307,20 @@ class _QuizScreenState extends State<QuizScreen> {
                                   if (isCorrect) {
                                     correctCount++;
                                   }
-                                  final val = data['points'];
-                                  if (val is num) {
-                                    respPoints += val.toInt();
-                                  }
                                 }
                               }
                             }
 
-                            // Contestant points strictly based on Admin-configured points per question
-                            final int scoreFromCorrect =
-                                correctCount * ptsPerQ;
-                            if (scoreFromCorrect > respPoints) {
-                              respPoints = scoreFromCorrect;
+                            if (totalQuestionsInLevel == 0) {
+                              totalQuestionsInLevel = answeredCount > 0
+                                  ? answeredCount
+                                  : (correctCount > 0 ? correctCount : 2);
                             }
-                            if (respPoints > points) {
-                              points = respPoints;
-                              _localLevelPoints[currentLevel] = points;
+                            levelTotalPossiblePoints =
+                                totalQuestionsInLevel * ptsPerQ;
+
+                            if (correctCount > totalQuestionsInLevel) {
+                              correctCount = totalQuestionsInLevel;
                             }
 
                             return StreamBuilder<
@@ -7357,51 +7332,41 @@ class _QuizScreenState extends State<QuizScreen> {
                                       .snapshots()
                                   : null,
                               builder: (context, scoreSnapshot) {
-                                int finalPoints = points;
                                 final sData = scoreSnapshot.data?.data();
-                                if (sData != null) {
-                                  final String levelKey =
-                                      'level${currentLevel}Score';
-                                  final dynamic rawLvl = sData[levelKey] ??
-                                      (sData['levelScores'] is Map
-                                          ? sData['levelScores']
+                                final String levelKey =
+                                    'level${currentLevel}Score';
+
+                                // Contestant score in this level is STRICTLY correctCount * ptsPerQ
+                                int finalPoints = correctCount * ptsPerQ;
+                                if (correctCount == 0 &&
+                                    (responsesSnapshot.data == null ||
+                                        responsesSnapshot.data!.docs.isEmpty)) {
+                                  final dynamic rawLvl = sData?[levelKey] ??
+                                      (sData?['levelScores'] is Map
+                                          ? sData!['levelScores']
                                               ['Level $currentLevel']
                                           : null);
                                   if (rawLvl != null) {
                                     final parsed =
                                         int.tryParse(rawLvl.toString());
                                     if (parsed != null &&
-                                        parsed > finalPoints) {
+                                        parsed <= levelTotalPossiblePoints) {
                                       finalPoints = parsed;
-                                      _localLevelPoints[currentLevel] =
-                                          finalPoints;
-                                    }
-                                  } else if (currentLevel == 1 &&
-                                      sData['score'] != null) {
-                                    final parsed = int.tryParse(
-                                      sData['score'].toString(),
-                                    );
-                                    if (parsed != null &&
-                                        parsed > finalPoints) {
-                                      finalPoints = parsed;
-                                      _localLevelPoints[currentLevel] =
-                                          finalPoints;
                                     }
                                   }
                                 }
+                                _localLevelPoints[currentLevel] = finalPoints;
 
-                                if (finalPoints > 0 &&
-                                    FirebaseAuth.instance.currentUser != null) {
+                                if (FirebaseAuth.instance.currentUser != null) {
                                   final currentUid =
                                       FirebaseAuth.instance.currentUser!.uid;
                                   final scoreRef = _sessionRef
                                       .collection('scores')
                                       .doc(currentUid);
-                                  final levelKey = 'level${currentLevel}Score';
                                   final int existingLvlScore = int.tryParse(
                                           sData?[levelKey]?.toString() ?? '') ??
-                                      0;
-                                  if (finalPoints > existingLvlScore) {
+                                      -1;
+                                  if (finalPoints != existingLvlScore) {
                                     final Map<String, dynamic> mergedScores = {};
                                     if (sData?['levelScores'] is Map) {
                                       (sData!['levelScores'] as Map)
@@ -7443,25 +7408,6 @@ class _QuizScreenState extends State<QuizScreen> {
                                       'updatedAt': FieldValue.serverTimestamp(),
                                     }, SetOptions(merge: true)).catchError((_) {});
                                   }
-                                }
-
-                                if (correctCount == 0 &&
-                                    finalPoints > 0 &&
-                                    ptsPerQ > 0) {
-                                  correctCount =
-                                      (finalPoints / ptsPerQ).round();
-                                }
-                                if (totalQuestionsInLevel == 0) {
-                                  totalQuestionsInLevel = answeredCount > 0
-                                      ? answeredCount
-                                      : (correctCount > 0 ? correctCount : 5);
-                                }
-                                if (levelTotalPossiblePoints == 0) {
-                                  levelTotalPossiblePoints =
-                                      totalQuestionsInLevel * ptsPerQ;
-                                }
-                                if (levelTotalPossiblePoints < finalPoints) {
-                                  levelTotalPossiblePoints = finalPoints;
                                 }
 
                                 return Column(

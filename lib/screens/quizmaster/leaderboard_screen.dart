@@ -2693,6 +2693,75 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     return level;
   }
 
+  int _resolveResponseQuestionLevel(
+    String docId,
+    Map<String, dynamic> rData,
+    Map<String, dynamic>? quizData,
+  ) {
+    final rawLevelQuestions = quizData?['levelQuestions'] ??
+        quizData?['level_questions'];
+
+    // 1. Check by questionId in levelQuestions
+    final qId = (rData['questionId'] ?? rData['id'] ?? '').toString().trim();
+    if (qId.isNotEmpty && rawLevelQuestions is Map) {
+      for (final entry in rawLevelQuestions.entries) {
+        if (entry.value is List && (entry.value as List).contains(qId)) {
+          final m = RegExp(r'(\d+)').firstMatch(entry.key.toString());
+          if (m != null) {
+            final p = int.tryParse(m.group(1)!);
+            if (p != null && p > 0) return p;
+          }
+        }
+      }
+    }
+
+    // 2. Check by question index from docId or questionNumber
+    final matchQ = RegExp(r'question_(\d+)').firstMatch(docId);
+    int qIndex = matchQ != null ? (int.tryParse(matchQ.group(1)!) ?? -1) : -1;
+    if (qIndex < 0 && rData['questionNumber'] is num) {
+      qIndex = (rData['questionNumber'] as num).toInt() - 1;
+    }
+
+    if (qIndex >= 0 && rawLevelQuestions is Map) {
+      int accumulated = 0;
+      for (int l = 1; l <= 20; l++) {
+        final target = 'level$l';
+        int count = 0;
+        for (final entry in rawLevelQuestions.entries) {
+          final norm = entry.key
+              .toString()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '');
+          if ((norm == target || norm == '$l') && entry.value is List) {
+            count = (entry.value as List).length;
+            break;
+          }
+        }
+        if (count > 0) {
+          if (qIndex < accumulated + count) {
+            return l;
+          }
+          accumulated += count;
+        }
+      }
+    }
+
+    // 3. Fallback to sessionLevel or level in rData
+    final rawLvl = rData['sessionLevel'] ?? rData['level'];
+    if (rawLvl is num) {
+      final v = rawLvl.toInt();
+      if (v > 0) return v;
+    } else if (rawLvl != null) {
+      final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
+      if (m != null) {
+        final v = int.tryParse(m.group(1)!);
+        if (v != null && v > 0) return v;
+      }
+    }
+
+    return 1;
+  }
+
   void _syncOrFetchLevelScores(
     String quizCode,
     List<QueryDocumentSnapshot> scoreDocs, {
@@ -2729,15 +2798,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           int totalRespPoints = 0;
           for (final r in responsesSnap.docs) {
             final rData = r.data();
-            final rawLvl = rData['level'] ?? rData['sessionLevel'];
-            int lvl = 1;
-            if (rawLvl is num) {
-              lvl = rawLvl.toInt();
-            } else if (rawLvl != null) {
-              final m = RegExp(r'(\d+)').firstMatch(rawLvl.toString());
-              if (m != null) lvl = int.tryParse(m.group(1)!) ?? 1;
-            }
-            final rawPts = rData['points'] ?? rData['score'];
+            final int lvl =
+                _resolveResponseQuestionLevel(r.id, rData, quizData);
+
             final isCorrect = rData['isCorrect'] == true ||
                 (rData['answerStatus'] ?? '').toString().toLowerCase() ==
                     'correct' ||
@@ -2745,8 +2808,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     'approved';
             if (isCorrect) {
               final adminPts = _getAdminPointsForLevel(lvl, quizData);
-              int pts = adminPts > 0 ? adminPts : _toInt(rawPts);
-              if (pts <= 0) pts = 1;
+              int pts = adminPts > 0 ? adminPts : 1;
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
               totalRespPoints += pts;
             }
