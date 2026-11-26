@@ -762,7 +762,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 (savedManualPause || restoredTimer > 0))
             ? 'paused'
             : restoredStatus;
-        _isRunning = restoredStatus == 'active';
+        _isRunning = restoredStatus == 'active' && restoredTimer > 0;
         _isFinished = restoredStatus == 'finished';
       });
 
@@ -1543,13 +1543,14 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         if (mounted) {
           setState(() {
             _secondsLeft = 0;
+            _isRunning = false;
           });
         }
 
-        // Do NOT automatically move to the next question here.
-        // The contestant must first see the Result screen.
-        // The Quiz Master can proceed to the next question after
-        // the contestant confirms.
+        try {
+          _updateSession({'timer': 0});
+        } catch (_) {}
+
         return;
       }
 
@@ -5210,10 +5211,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   }
 
   void _confirmFinishQuiz() {
-    final bool isTimerActive = _isRunning ||
+    final bool isTimerActive =
         _status == 'countdown' ||
         (_secondsLeft > 0 &&
-            (_status == 'active' ||
+            (_isRunning ||
+                _status == 'active' ||
                 _status == 'paused' ||
                 _status == 'tie_breaker_active'));
     if (isTimerActive) {
@@ -7534,9 +7536,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                         !isCountdown &&
                                         !isLevelPause &&
                                         !_contestReviewActive &&
+                                        _secondsLeft > 0 &&
                                         (_isRunning ||
-                                            _status == 'active' ||
-                                            _secondsLeft > 0),
+                                            _status == 'active'),
                                     onTap: _pauseQuiz,
                                   ),
                                 ),
@@ -7562,14 +7564,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                     color: Colors.red,
                                     enabled: !_isFinished &&
                                         !_isFinishingQuiz &&
-                                        !_isRunning &&
                                         !isCountdown &&
-                                        !(_secondsLeft > 0 &&
-                                            (_status == 'active' ||
-                                                _status == 'countdown' ||
-                                                _status == 'paused' ||
-                                                _status ==
-                                                    'tie_breaker_active')),
+                                        !_contestReviewActive &&
+                                        !(_isRunning && _secondsLeft > 0),
                                     onTap: _isTieBreakerActive
                                         ? _endTieBreakerAndOpenFinalTally
                                         : _confirmFinishQuiz,
