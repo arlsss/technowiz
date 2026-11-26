@@ -2591,8 +2591,6 @@ class _QuizScreenState extends State<QuizScreen> {
       final bool correct =
           hasAnswer && isAnswerCorrect(question, effectiveAnswer);
 
-      final bool isTieBreakerActive =
-          _latestQuizData['tieBreakerActive'] == true;
       final sessionLevel = getLevelFromSessionQuestion(
         question,
         fallbackQuestionNumber: questionNumber,
@@ -5709,13 +5707,17 @@ class _QuizScreenState extends State<QuizScreen> {
                 final s = m is Map
                     ? (m['name'] ?? m['displayName'] ?? '').toString().trim()
                     : m.toString().trim();
-                if (s.isNotEmpty && !teamMembers.contains(s))
+                if (s.isNotEmpty && !teamMembers.contains(s)) {
                   teamMembers.add(s);
+                }
               }
             }
-            if (rawTeam.isNotEmpty) teamName = rawTeam;
-            if (cType == 'team' || rawTeam.isNotEmpty || teamMembers.isNotEmpty)
+            if (rawTeam.isNotEmpty) {
+              teamName = rawTeam;
+            }
+            if (cType == 'team' || rawTeam.isNotEmpty || teamMembers.isNotEmpty) {
               isTeam = true;
+            }
             final rName = (uData?['fullName'] ?? uData?['name'] ?? '')
                 .toString()
                 .trim();
@@ -7141,15 +7143,17 @@ class _QuizScreenState extends State<QuizScreen> {
                             _latestQuizData['levelQuestions'];
                         if (rawLQ is Map) {
                           for (final key in rawLQ.keys) {
-                            if (key.toString().toLowerCase().contains('tie'))
+                            if (key.toString().toLowerCase().contains('tie')) {
                               continue;
+                            }
                             final m = RegExp(
                               r'(\d+)',
                             ).firstMatch(key.toString());
                             if (m != null) {
                               final l = int.tryParse(m.group(1)!);
-                              if (l != null && l > 0)
+                              if (l != null && l > 0) {
                                 allConfiguredLevels.add(l);
+                              }
                             }
                           }
                         }
@@ -7157,15 +7161,17 @@ class _QuizScreenState extends State<QuizScreen> {
                             sessionData['levels'] ?? _latestQuizData['levels'];
                         if (rawLvls is List) {
                           for (final lvl in rawLvls) {
-                            if (lvl.toString().toLowerCase().contains('tie'))
+                            if (lvl.toString().toLowerCase().contains('tie')) {
                               continue;
+                            }
                             final m = RegExp(
                               r'(\d+)',
                             ).firstMatch(lvl.toString());
                             if (m != null) {
                               final l = int.tryParse(m.group(1)!);
-                              if (l != null && l > 0)
+                              if (l != null && l > 0) {
                                 allConfiguredLevels.add(l);
+                              }
                             }
                           }
                         }
@@ -8581,26 +8587,33 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ? (cData['levelScores']['Level $l'] ??
                                         cData['levelScores']['$l'])
                                   : null);
-                          if (v != null)
+                          if (v != null) {
                             lvlSum += int.tryParse(v.toString()) ?? 0;
+                          }
                         }
                         if (sData['levelScores'] is Map) {
                           int mSum = 0;
                           for (final v
                               in (sData['levelScores'] as Map).values) {
-                            if (v != null)
+                            if (v != null) {
                               mSum += int.tryParse(v.toString()) ?? 0;
+                            }
                           }
-                          if (mSum > lvlSum) lvlSum = mSum;
+                          if (mSum > lvlSum) {
+                            lvlSum = mSum;
+                          }
                         }
                         if (cData['levelScores'] is Map) {
                           int cSum = 0;
                           for (final v
                               in (cData['levelScores'] as Map).values) {
-                            if (v != null)
+                            if (v != null) {
                               cSum += int.tryParse(v.toString()) ?? 0;
+                            }
                           }
-                          if (cSum > lvlSum) lvlSum = cSum;
+                          if (cSum > lvlSum) {
+                            lvlSum = cSum;
+                          }
                         }
                         final tiePts =
                             int.tryParse(
@@ -11639,8 +11652,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   child: ElevatedButton.icon(
                                                     onPressed: () async {
                                                       await _clearQuizScreenPersistence();
-                                                      if (!context.mounted)
+                                                      if (!context.mounted) {
                                                         return;
+                                                      }
                                                       Navigator.of(
                                                         context,
                                                       ).pushAndRemoveUntil(
@@ -12675,8 +12689,9 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                     .toString()
                                     .trim()
                               : m.toString().trim();
-                          if (s.isNotEmpty && !membersList.contains(s))
+                          if (s.isNotEmpty && !membersList.contains(s)) {
                             membersList.add(s);
+                          }
                         }
                       }
 
