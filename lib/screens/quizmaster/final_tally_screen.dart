@@ -26,6 +26,7 @@ class ContestantTally {
   final bool isTied;
   final Map<int, int> levelPoints;
   final int? eliminatedLevel;
+  final int tieBreakerScore;
 
   const ContestantTally({
     required this.uid,
@@ -44,6 +45,7 @@ class ContestantTally {
     required this.isTied,
     this.levelPoints = const {},
     this.eliminatedLevel,
+    this.tieBreakerScore = 0,
   });
 
   String get effectiveName {
@@ -58,6 +60,7 @@ class ContestantTally {
     bool? isTied,
     Map<int, int>? levelPoints,
     int? eliminatedLevel,
+    int? tieBreakerScore,
   }) {
     return ContestantTally(
       uid: uid,
@@ -76,6 +79,7 @@ class ContestantTally {
       isTied: isTied ?? this.isTied,
       levelPoints: levelPoints ?? this.levelPoints,
       eliminatedLevel: eliminatedLevel ?? this.eliminatedLevel,
+      tieBreakerScore: tieBreakerScore ?? this.tieBreakerScore,
     );
   }
 }
@@ -766,6 +770,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
       await scoreRef.set({
         'score': FieldValue.increment(1),
         'totalScore': FieldValue.increment(1),
+        'tieBreakerScore': FieldValue.increment(1),
         'tieBreakerWon': true,
         'tieBreakerResolved': true,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -1320,6 +1325,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                 isTied: false,
                                 levelPoints: levelPoints,
                                 eliminatedLevel: elimLevel,
+                                tieBreakerScore: tiePts,
                               ),
                             );
                           }
@@ -1686,11 +1692,91 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     );
   }
 
+  int _getContestantTieBreakerScore(
+    ContestantTally c,
+    Map<String, dynamic>? sData,
+    int maxLevel,
+  ) {
+    if (c.tieBreakerScore > 0) return c.tieBreakerScore;
+    final pts = int.tryParse(sData?['tieBreakerScore']?.toString() ?? '') ?? 0;
+    if (pts > 0) return pts;
+
+    int rowSum = 0;
+    for (int lvl = 1; lvl <= maxLevel; lvl++) {
+      rowSum += _getContestantLevelScore(c, lvl, sData, maxLevel);
+    }
+    if (c.score > rowSum && rowSum > 0) {
+      return c.score - rowSum;
+    }
+    return 0;
+  }
+
+  Widget _buildTieBreakerScoreCell(
+    ContestantTally c,
+    Map<String, dynamic>? sData,
+    int maxLevel,
+  ) {
+    final int tiePts = _getContestantTieBreakerScore(c, sData, maxLevel);
+
+    if (tiePts <= 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        alignment: Alignment.center,
+        child: const Text(
+          '—',
+          style: TextStyle(
+            color: QuizMasterColors.textMuted,
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFFDE68A),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.bolt_rounded,
+            size: 14,
+            color: Color(0xFFD97706),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            '+$tiePts ${tiePts == 1 ? 'pt' : 'pts'}',
+            style: const TextStyle(
+              color: Color(0xFFB45309),
+              fontWeight: FontWeight.w900,
+              fontSize: 12.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTableCard(
     List<ContestantTally> contestants, {
     required Map<String, Map<String, dynamic>> scoreByUid,
     required int maxLevel,
   }) {
+    final bool hasAnyTieBreakerScore = contestants.any((c) {
+      final sData = scoreByUid[c.uid];
+      return _getContestantTieBreakerScore(c, sData, maxLevel) > 0;
+    });
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -1755,6 +1841,17 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                     ),
                   ),
                 ),
+              if (hasAnyTieBreakerScore)
+                const DataColumn(
+                  label: Text(
+                    'TIE BREAKER',
+                    style: TextStyle(
+                      color: Color(0xFFB45309),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
               const DataColumn(
                 label: Text(
                   'TOTAL SCORE',
@@ -1786,6 +1883,10 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                   for (int lvl = 1; lvl <= maxLevel; lvl++)
                     DataCell(_buildLevelScoreCell(c, lvl, sData, maxLevel)),
 
+                  // Tie Breaker Score Cell
+                  if (hasAnyTieBreakerScore)
+                    DataCell(_buildTieBreakerScoreCell(c, sData, maxLevel)),
+
                   // Total Score Cell (strictly accurate sum of displayed levels + tiebreaker)
                   DataCell(
                     Builder(
@@ -1795,9 +1896,8 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                           rowSum +=
                               _getContestantLevelScore(c, lvl, sData, maxLevel);
                         }
-                        final tiePts = int.tryParse(
-                                sData?['tieBreakerScore']?.toString() ?? '') ??
-                            0;
+                        final tiePts = _getContestantTieBreakerScore(
+                            c, sData, maxLevel);
                         final int displayTotal =
                             rowSum > 0 ? (rowSum + tiePts) : c.score;
                         return Container(
