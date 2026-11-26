@@ -369,12 +369,15 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
       final firestore = FirebaseFirestore.instance;
       final snap = await firestore.collection('quiz_sessions').doc(quizCode).get();
       final data = snap.data() ?? {};
+      final pub = data['published'] == true || data['isPublished'] == true;
       final st = (data['status'] ?? '').toString().toLowerCase().trim();
-      final isFin = data['isFinished'] == true ||
-          data['isCompleted'] == true ||
-          st == 'finished' ||
-          st == 'completed';
-      final isOngoing = !isFin &&
+      final isFin = pub &&
+          (data['isFinished'] == true ||
+              data['isCompleted'] == true ||
+              st == 'finished' ||
+              st == 'completed');
+      final isOngoing = pub &&
+          !isFin &&
           (data['startedAt'] != null ||
               data['levelStartedAt'] != null ||
               data['isStarted'] == true ||
@@ -612,11 +615,13 @@ class _ManageQuizSessionsScreenState extends State<ManageQuizSessionsScreen> {
               );
 
               final String rawSt = status.trim().toLowerCase();
-              final bool isCardFinished = data['isFinished'] == true ||
-                  data['isCompleted'] == true ||
-                  rawSt == 'finished' ||
-                  rawSt == 'completed';
-              final bool isCardOngoing = !isCardFinished &&
+              final bool isCardFinished = published &&
+                  (data['isFinished'] == true ||
+                      data['isCompleted'] == true ||
+                      rawSt == 'finished' ||
+                      rawSt == 'completed');
+              final bool isCardOngoing = published &&
+                  !isCardFinished &&
                   (data['startedAt'] != null ||
                       data['levelStartedAt'] != null ||
                       data['isStarted'] == true ||
@@ -1292,17 +1297,42 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
 
   Map<String, dynamic> _latestQuizData = {};
 
-  bool _isQuizStartedOrOngoing(Map<String, dynamic> data) {
-    if (data['startedAt'] != null ||
-        data['levelStartedAt'] != null ||
-        data['isStarted'] == true) {
-      return true;
-    }
-    final status = (data['status'] ?? '').toString().toLowerCase().trim();
-    if (status.isEmpty || status == 'waiting') {
+  bool _isQuizLocked(Map<String, dynamic> data) {
+    final published = data['published'] == true || data['isPublished'] == true;
+    // An unpublished / draft quiz is NEVER locked.
+    // Reused quizzes remain completely unlocked and editable until published.
+    if (!published) {
       return false;
     }
     return true;
+  }
+
+  bool _isLiveOngoing(Map<String, dynamic> data) {
+    final published = data['published'] == true || data['isPublished'] == true;
+    if (!published) return false;
+    final status = (data['status'] ?? '').toString().toLowerCase().trim();
+    final isFin = data['isFinished'] == true ||
+        data['isCompleted'] == true ||
+        status == 'finished' ||
+        status == 'completed';
+    if (isFin) return false;
+    return status == 'active' ||
+        data['isStarted'] == true ||
+        (data['startedAt'] != null && status != 'waiting');
+  }
+
+  bool _isQuizFinished(Map<String, dynamic> data) {
+    final published = data['published'] == true || data['isPublished'] == true;
+    if (!published) return false;
+    final status = (data['status'] ?? '').toString().toLowerCase().trim();
+    return data['isFinished'] == true ||
+        data['isCompleted'] == true ||
+        status == 'finished' ||
+        status == 'completed';
+  }
+
+  bool _isQuizStartedOrOngoing(Map<String, dynamic> data) {
+    return _isQuizLocked(data);
   }
 
   // Staged / pending questions for the level currently being added or edited.
@@ -1508,9 +1538,10 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
   // =========================================================
 
   Future<void> togglePublished(bool value) async {
-    if (_isQuizStartedOrOngoing(_latestQuizData)) {
+    final liveOngoing = _isLiveOngoing(_latestQuizData);
+    if (liveOngoing) {
       showMessage(
-        'Cannot change publish status while the quiz is in progress or completed.',
+        'Cannot change publish status while the quiz is actively in progress with contestants.',
         error: true,
       );
       return;
@@ -1567,17 +1598,62 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           'published': true,
           'isPublished': true,
           'status': 'waiting',
+          'eventStatus': 'waiting',
           'isFinished': false,
           'isCompleted': false,
           'completed': false,
           'finished': false,
           'currentQuestion': 0,
           'preparedLevel': 1,
-          'eventStatus': 'waiting',
+          'currentLevel': 1,
+          'level': 1,
+          'timer': 0,
+          'countdown': 0,
           'readyCheckActive': false,
           'countdownActive': false,
+          'isStarted': false,
+          'quizStarted': false,
+          'startedAt': FieldValue.delete(),
+          'levelStartedAt': FieldValue.delete(),
+          'finishedAt': FieldValue.delete(),
+          'endedAt': FieldValue.delete(),
+          'publishedWinners': false,
+          'publishedTally': false,
+          'tieBreakerActive': false,
+          'isTieBreakerActive': false,
+          'tieBreakerBroken': false,
+          'tieBreakerEnded': false,
+          'tieBreakerLevelEnded': false,
+          'tieBreakerRound': 0,
+          'tieBreakerCurrentQuestion': 0,
+          'tieBreakerLeadingScore': 0,
+          'tieBreakerLeadingName': FieldValue.delete(),
+          'tieBreakerLeadingNames': FieldValue.delete(),
+          'tieBreakerContestants': FieldValue.delete(),
+          'tieBreakerContestantNames': FieldValue.delete(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
+
+        // Clear previous session participants, scores, and join requests
+        // so the reused quiz starts completely fresh for the new event.
+        final participantsSnap = await quizRef.collection('participants').get();
+        final scoresSnap = await quizRef.collection('scores').get();
+        final requestsSnap = await quizRef.collection('join_requests').get();
+        if (participantsSnap.docs.isNotEmpty ||
+            scoresSnap.docs.isNotEmpty ||
+            requestsSnap.docs.isNotEmpty) {
+          final batch = FirebaseFirestore.instance.batch();
+          for (final doc in participantsSnap.docs) {
+            batch.delete(doc.reference);
+          }
+          for (final doc in scoresSnap.docs) {
+            batch.delete(doc.reference);
+          }
+          for (final doc in requestsSnap.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+        }
       } else {
         await quizRef.update({
           'published': false,
@@ -1586,6 +1662,14 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           'isCompleted': false,
           'completed': false,
           'finished': false,
+          'status': 'waiting',
+          'eventStatus': 'waiting',
+          'isStarted': false,
+          'quizStarted': false,
+          'startedAt': FieldValue.delete(),
+          'levelStartedAt': FieldValue.delete(),
+          'finishedAt': FieldValue.delete(),
+          'endedAt': FieldValue.delete(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
@@ -2739,14 +2823,12 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
         builder: (context, quizSnapshot) {
           final liveData = quizSnapshot.data?.data() ?? widget.quizData;
           _latestQuizData = liveData;
-          final published = liveData['published'] == true;
-          final liveStatus = (liveData['status'] ?? '').toString().toLowerCase().trim();
-          final bool hasQuizStarted = _isQuizStartedOrOngoing(liveData);
-          final bool isFinished = hasQuizStarted &&
-              (liveData['isFinished'] == true ||
-                  liveData['isCompleted'] == true ||
-                  liveStatus == 'finished' ||
-                  liveStatus == 'completed');
+          final published = liveData['published'] == true || liveData['isPublished'] == true;
+          final bool isLiveOngoing = _isLiveOngoing(liveData);
+          final bool isFinished = _isQuizFinished(liveData);
+          final bool hasQuizStarted = _isQuizLocked(liveData);
+          final bool canPublish = !published || isFinished;
+          final bool canUnpublish = published && !isLiveOngoing;
 
           if (hasQuizStarted && isAddingLevel) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2787,7 +2869,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           );
 
           Widget statusLockBadge() {
-            if (!hasQuizStarted) return const SizedBox.shrink();
+            if (!published || (!isFinished && !isLiveOngoing)) {
+              return const SizedBox.shrink();
+            }
             final color = isFinished
                 ? const Color(0xFF475569)
                 : const Color(0xFFB45309);
@@ -3185,7 +3269,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 Expanded(
                                   flex: 1,
                                   child: FilledButton.icon(
-                                    onPressed: (hasQuizStarted || (published && !isFinished))
+                                    onPressed: !canPublish
                                         ? null
                                         : () => togglePublished(true),
                                     icon: const Icon(
@@ -3208,7 +3292,7 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 Expanded(
                                   flex: 1,
                                   child: OutlinedButton.icon(
-                                    onPressed: (hasQuizStarted || !published)
+                                    onPressed: !canUnpublish
                                         ? null
                                         : () => togglePublished(false),
                                     icon: const Icon(
@@ -3236,9 +3320,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                             runSpacing: 6,
                             children: [
                               FilledButton.icon(
-                                onPressed: (hasQuizStarted || (published && !isFinished))
-                                    ? null
-                                    : () => togglePublished(true),
+                                onPressed: canPublish
+                                    ? () => togglePublished(true)
+                                    : null,
                                 icon: const Icon(
                                   Icons.publish_rounded,
                                   size: 15,
@@ -3251,9 +3335,9 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                 ),
                               ),
                               OutlinedButton.icon(
-                                onPressed: (hasQuizStarted || !published)
-                                    ? null
-                                    : () => togglePublished(false),
+                                onPressed: canUnpublish
+                                    ? () => togglePublished(false)
+                                    : null,
                                 icon: const Icon(
                                   Icons.visibility_off_outlined,
                                   size: 15,
@@ -3283,12 +3367,16 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                         decoration: BoxDecoration(
                           color: isFinished
                               ? const Color(0xFFF8FAFC)
-                              : const Color(0xFFFFFBEB),
+                              : (isLiveOngoing
+                                  ? const Color(0xFFFFFBEB)
+                                  : const Color(0xFFEFF6FF)),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: isFinished
                                 ? const Color(0xFFE2E8F0)
-                                : const Color(0xFFFDE68A),
+                                : (isLiveOngoing
+                                    ? const Color(0xFFFDE68A)
+                                    : const Color(0xFFBFDBFE)),
                           ),
                         ),
                         child: Row(
@@ -3298,16 +3386,22 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                               decoration: BoxDecoration(
                                 color: isFinished
                                     ? const Color(0xFFE2E8F0)
-                                    : const Color(0xFFFEF3C7),
+                                    : (isLiveOngoing
+                                        ? const Color(0xFFFEF3C7)
+                                        : const Color(0xFFDBEAFE)),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 isFinished
                                     ? Icons.lock_outline_rounded
-                                    : Icons.lock_clock_rounded,
+                                    : (isLiveOngoing
+                                        ? Icons.lock_clock_rounded
+                                        : Icons.lock_outline_rounded),
                                 color: isFinished
                                     ? const Color(0xFF475569)
-                                    : const Color(0xFFB45309),
+                                    : (isLiveOngoing
+                                        ? const Color(0xFFB45309)
+                                        : const Color(0xFF1D4ED8)),
                                 size: 18,
                               ),
                             ),
@@ -3319,11 +3413,15 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                   Text(
                                     isFinished
                                         ? 'Quiz Session Finished (Read-Only)'
-                                        : 'Quiz In Progress (Settings & Questions Locked)',
+                                        : (isLiveOngoing
+                                            ? 'Quiz In Progress (Settings & Questions Locked)'
+                                            : 'Published Event (Settings & Questions Locked)'),
                                     style: TextStyle(
                                       color: isFinished
                                           ? const Color(0xFF1E293B)
-                                          : const Color(0xFF92400E),
+                                          : (isLiveOngoing
+                                              ? const Color(0xFF92400E)
+                                              : const Color(0xFF1E40AF)),
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -3332,11 +3430,15 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
                                   Text(
                                     isFinished
                                         ? 'This quiz has concluded. Levels, questions, and session settings are locked in read-only mode.'
-                                        : 'The quiz has already started. Levels, questions, and timers cannot be modified while contestants are active.',
+                                        : (isLiveOngoing
+                                            ? 'The quiz has already started. Levels, questions, and timers cannot be modified while contestants are active.'
+                                            : 'This quiz is published. To add, edit, or remove questions, levels, or timers, tap UNPUBLISH first.'),
                                     style: TextStyle(
                                       color: isFinished
                                           ? const Color(0xFF64748B)
-                                          : const Color(0xFFB45309),
+                                          : (isLiveOngoing
+                                              ? const Color(0xFFB45309)
+                                              : const Color(0xFF2563EB)),
                                       fontSize: 11,
                                       height: 1.3,
                                     ),
