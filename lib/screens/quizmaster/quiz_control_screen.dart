@@ -982,6 +982,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         'currentQuestion': targetQuestion,
         'currentLevel': targetLevel,
         'timer': 0,
+        if (!widget.isTieBreaker) ...{
+          'tieBreakerActive': false,
+          'tieBreakerEnded': false,
+          'tieBreakerResolved': false,
+          'showTieBreakerResult': false,
+        },
       });
 
       await batch.commit();
@@ -1217,6 +1223,12 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       'manuallyPaused': false,
       // Reset sa elimination announcement para sa bag-ong question/level
       'eliminationPublished': false,
+      if (!widget.isTieBreaker) ...{
+        'tieBreakerActive': false,
+        'tieBreakerEnded': false,
+        'tieBreakerResolved': false,
+        'showTieBreakerResult': false,
+      },
     });
 
     if (!mounted) return;

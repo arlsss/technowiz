@@ -4432,11 +4432,13 @@ class _QuizScreenState extends State<QuizScreen> {
     final bool isThisQuestionConfirmed =
         nextReadyConfirmed && (confirmedQuestionIndex == currentQuestion);
 
-    final isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
-    final isTieBreakerEnded =
-        _latestQuizData['tieBreakerEnded'] == true ||
-        (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
-            'tie_breaker_ended';
+    final bool isTieBreakerRound = _isCurrentlyInTieBreaker();
+    final isTieBreakerActive = isTieBreakerRound && _latestQuizData['tieBreakerActive'] == true;
+    final isTieBreakerEnded = isTieBreakerRound &&
+        (_latestQuizData['tieBreakerEnded'] == true ||
+            (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
+                'tie_breaker_ended' ||
+            _latestQuizData['tieBreakerResolved'] == true);
 
     final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
     final List<String> tieBreakerContestantUids = rawTieUids is List
@@ -5011,6 +5013,38 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  bool _isCurrentlyInTieBreaker() {
+    // 1. If the current question data is explicitly for a regular level, it is NOT tie breaker!
+    final rawLvl = (currentQuestionData?['level'] ?? '').toString().toLowerCase().trim();
+    if (rawLvl.startsWith('level') || currentQuestionData?['isTieBreaker'] == false) {
+      return false;
+    }
+    if (currentQuestionData?['isTieBreaker'] == true || rawLvl == 'tie breaker') {
+      return true;
+    }
+
+    // 2. If the current question level is a normal level (> 0), it is NOT tie breaker!
+    if (_currentQuestionLevel > 0) {
+      final rawStatus = (_latestQuizData['status'] ?? '').toString().toLowerCase().trim();
+      if (!rawStatus.startsWith('tie_breaker')) {
+        return false;
+      }
+    }
+
+    // 3. Check session currentLevel
+    final currentLvl = int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '');
+    if (currentLvl != null && currentLvl > 0) {
+      return false;
+    }
+
+    // 4. Check session status and tieBreakerActive flag
+    final status = (_latestQuizData['status'] ?? '').toString().toLowerCase().trim();
+    if (status.startsWith('tie_breaker')) {
+      return true;
+    }
+    return _latestQuizData['tieBreakerActive'] == true;
+  }
+
   Widget waitingForNextQuestion({
     required bool readyCheckActive,
     required String readyCheckId,
@@ -5021,12 +5055,13 @@ class _QuizScreenState extends State<QuizScreen> {
       return const SizedBox.shrink();
     }
 
-    final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
-    final bool isTieBreakerEnded =
-        _latestQuizData['tieBreakerEnded'] == true ||
-        (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
-            'tie_breaker_ended' ||
-        _latestQuizData['tieBreakerResolved'] == true;
+    final bool isTieBreakerRound = _isCurrentlyInTieBreaker();
+    final bool isTieBreakerActive = isTieBreakerRound && _latestQuizData['tieBreakerActive'] == true;
+    final bool isTieBreakerEnded = isTieBreakerRound &&
+        (_latestQuizData['tieBreakerEnded'] == true ||
+            (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
+                'tie_breaker_ended' ||
+            _latestQuizData['tieBreakerResolved'] == true);
 
     if (isTieBreakerActive || isTieBreakerEnded) {
       final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
@@ -9077,8 +9112,10 @@ class _QuizScreenState extends State<QuizScreen> {
               .trim()
               .toLowerCase();
           final bool isTieBreakerEnded =
-              quizData['tieBreakerEnded'] == true ||
-              rawStatus == 'tie_breaker_ended';
+              (quizData['tieBreakerEnded'] == true ||
+                  rawStatus == 'tie_breaker_ended') &&
+              (rawStatus.startsWith('tie_breaker') ||
+                  quizData['tieBreakerActive'] == true);
           final bool publishedWinners = quizData['publishedWinners'] == true;
 
           final bool isQuizFinished =
@@ -9585,13 +9622,14 @@ class _QuizScreenState extends State<QuizScreen> {
           }
 
           if (answered && resultRevealed) {
-            final isTieBreakerActive =
+            final bool isTieBreakerRound = _isCurrentlyInTieBreaker();
+            final isTieBreakerActive = isTieBreakerRound &&
                 _latestQuizData['tieBreakerActive'] == true;
-            final isTieBreakerEnded =
-                _latestQuizData['tieBreakerEnded'] == true ||
-                (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
-                    'tie_breaker_ended' ||
-                _latestQuizData['tieBreakerResolved'] == true;
+            final isTieBreakerEnded = isTieBreakerRound &&
+                (_latestQuizData['tieBreakerEnded'] == true ||
+                    (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
+                        'tie_breaker_ended' ||
+                    _latestQuizData['tieBreakerResolved'] == true);
 
             if (isTieBreakerActive &&
                 !isTieBreakerEnded &&
