@@ -3150,6 +3150,9 @@ class _QuizScreenState extends State<QuizScreen> {
     Map<String, dynamic> quizData,
   ) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final bool publishedWinners =
+        quizData['publishedWinners'] == true ||
+        _latestQuizData['publishedWinners'] == true;
     final rawNames = quizData['tieBreakerContestantNames'];
     final namesList = rawNames is List
         ? rawNames
@@ -4119,6 +4122,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                           return _buildFinishedTallyRow(
                                             item,
                                             sortedLevels,
+                                            showTrophies: publishedWinners,
                                           );
                                         },
                                       ),
@@ -11861,7 +11865,11 @@ class _QuizScreenState extends State<QuizScreen> {
               separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final item = tallyList[index];
-                return _buildFinishedTallyRow(item, sortedLevels);
+                return _buildFinishedTallyRow(
+                  item,
+                  sortedLevels,
+                  showTrophies: true,
+                );
               },
             ),
 
@@ -11915,11 +11923,12 @@ class _QuizScreenState extends State<QuizScreen> {
   // Row for Each Contestant in Finished Overall Tally
   Widget _buildFinishedTallyRow(
     _FinishedTallyRowData item,
-    List<int> sortedLevels,
-  ) {
+    List<int> sortedLevels, {
+    bool showTrophies = false,
+  }) {
     Widget rankBadge;
 
-    if (item.rank <= 3) {
+    if (showTrophies && item.rank <= 3) {
       final String trophyAsset = item.rank == 1
           ? 'assets/trophies/gold_trophy_3d.jpg'
           : (item.rank == 2
@@ -11989,7 +11998,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
         ],
       );
-    } else if (item.rank <= 10) {
+    } else if (showTrophies && item.rank <= 10) {
       rankBadge = Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
@@ -12046,21 +12055,52 @@ class _QuizScreenState extends State<QuizScreen> {
         ],
       );
     } else {
+      Color bg;
+      Color border;
+      Color textColor;
+
+      if (item.rank == 1) {
+        bg = const Color(0xFFFEF3C7);
+        border = const Color(0xFFF59E0B);
+        textColor = const Color(0xFFB45309);
+      } else if (item.rank == 2) {
+        bg = const Color(0xFFF1F5F9);
+        border = const Color(0xFF94A3B8);
+        textColor = const Color(0xFF475569);
+      } else if (item.rank == 3) {
+        bg = const Color(0xFFFFEDD5);
+        border = const Color(0xFFD97706);
+        textColor = const Color(0xFF9A3412);
+      } else {
+        bg = const Color(0xFFF8FAFC);
+        border = const Color(0xFFCBD5E1);
+        textColor = const Color(0xFF64748B);
+      }
+
       rankBadge = Container(
-        width: 36,
-        height: 36,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
+          color: bg,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+          border: Border.all(color: border, width: 1.8),
+          boxShadow: item.rank <= 3
+              ? [
+                  BoxShadow(
+                    color: border.withValues(alpha: 0.25),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Text(
           "#${item.rank}",
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF475569),
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+            color: textColor,
           ),
         ),
       );
