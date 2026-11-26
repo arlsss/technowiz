@@ -74,8 +74,9 @@ class _QuizScreenState extends State<QuizScreen> {
     if (timerStartedForQuestion >= 0) {
       return timerStartedForQuestion;
     }
-    final raw =
-        int.tryParse(_latestQuizData['currentQuestion']?.toString() ?? '');
+    final raw = int.tryParse(
+      _latestQuizData['currentQuestion']?.toString() ?? '',
+    );
     if (raw != null && raw >= 0) {
       return raw;
     }
@@ -92,7 +93,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _loadingSessionQuestions = false;
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      _sessionDeletionSubscription;
+  _sessionDeletionSubscription;
   bool _isExitingDueToDeletion = false;
 
   void _listenForSessionDeletion() {
@@ -161,193 +162,199 @@ class _QuizScreenState extends State<QuizScreen> {
         .doc(widget.quizCode)
         .get()
         .then((doc) {
-      if (doc.exists && doc.data() != null) {
-        _latestQuizData = doc.data()!;
-      }
-    }).catchError((_) {});
+          if (doc.exists && doc.data() != null) {
+            _latestQuizData = doc.data()!;
+          }
+        })
+        .catchError((_) {});
 
-    _questionsFuture = FirebaseFirestore.instance
-        .collection('quiz_sessions')
-        .doc(widget.quizCode)
-        .collection('questions')
-        .get()
-      ..then((snapshot) {
-        _loadingSessionQuestions = false;
-        final sorted = sortSessionQuestions(snapshot.docs);
-        if (!mounted) return;
-        setState(() {
-          _sortedSessionQuestions = sorted;
-        });
-      }).catchError((Object e) {
-        _loadingSessionQuestions = false;
-        debugPrint('LOAD SESSION QUESTIONS ERROR: $e');
-      });
+    _questionsFuture =
+        FirebaseFirestore.instance
+            .collection('quiz_sessions')
+            .doc(widget.quizCode)
+            .collection('questions')
+            .get()
+          ..then((snapshot) {
+            _loadingSessionQuestions = false;
+            final sorted = sortSessionQuestions(snapshot.docs);
+            if (!mounted) return;
+            setState(() {
+              _sortedSessionQuestions = sorted;
+            });
+          }).catchError((Object e) {
+            _loadingSessionQuestions = false;
+            debugPrint('LOAD SESSION QUESTIONS ERROR: $e');
+          });
   }
 
   void _listenForContestantDecision() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    _contestantDecisionSubscription = _joinRequestRef(user.uid)
-        .snapshots()
-        .listen(
-          (snapshot) async {
-            final data = snapshot.data();
-            if (data?['quizFinished'] == true ||
-                data?['quizEnded'] == true ||
-                data?['status'] == 'finished') {
-              _handleQuizFinishedAndExit();
-              return;
-            }
-            final decision = data?['contestantDecision']?.toString();
-            final rawReadyForLevel = data?['readyForLevel'];
-            final readyForLevel = rawReadyForLevel is num
-                ? rawReadyForLevel.toInt()
-                : int.tryParse(rawReadyForLevel?.toString() ?? '');
+    _contestantDecisionSubscription = _joinRequestRef(user.uid).snapshots().listen(
+      (snapshot) async {
+        final data = snapshot.data();
+        if (data?['quizFinished'] == true ||
+            data?['quizEnded'] == true ||
+            data?['status'] == 'finished') {
+          _handleQuizFinishedAndExit();
+          return;
+        }
+        final decision = data?['contestantDecision']?.toString();
+        final rawReadyForLevel = data?['readyForLevel'];
+        final readyForLevel = rawReadyForLevel is num
+            ? rawReadyForLevel.toInt()
+            : int.tryParse(rawReadyForLevel?.toString() ?? '');
 
-            final decisionLevel = int.tryParse(
-              data?['decisionLevel']?.toString() ?? '',
-            );
-
-            final rawRank = data?['rank'] ??
-                data?['levelRank'] ??
-                data?['currentRank'] ??
-                data?['rankAtProceed'] ??
-                data?['rankAtElimination'];
-            final int? assignedRank = rawRank is num
-                ? rawRank.toInt()
-                : int.tryParse(rawRank?.toString() ?? '');
-
-            final int currentSessionLevel = int.tryParse(
-                  _latestQuizData['currentLevel']?.toString() ?? '',
-                ) ??
-                1;
-
-            final sessionStatus =
-                _latestQuizData['status']?.toString().toLowerCase() ?? '';
-            final isCountdown =
-                _latestQuizData['countdownActive'] == true ||
-                sessionStatus == 'countdown';
-            final isActive = sessionStatus == 'active';
-            final bool targetLevelIsActivelyPlaying = decisionLevel != null &&
-                currentSessionLevel > decisionLevel &&
-                (isActive || isCountdown);
-
-            // Kung ang contestant nakapadayon na para ani nga decision level,
-            // ayaw na sila ibalik sa decision screen o i-reset ang instructions.
-            final bool alreadyProceededForLevel = decisionLevel != null &&
-                ((_lastProceededDecisionLevel != null &&
-                        _lastProceededDecisionLevel! >= decisionLevel) ||
-                    (_nextLevelInstructionsLevel != null &&
-                        _nextLevelInstructionsLevel! > decisionLevel) ||
-                    (readyForLevel != null && readyForLevel > decisionLevel) ||
-                    targetLevelIsActivelyPlaying);
-
-            if (decision != 'proceeding' && decision != 'eliminated') {
-              return;
-            }
-
-            if (decision == 'proceeding' && alreadyProceededForLevel) {
-              if (!mounted) return;
-              // If the target level has already actively begun playing, do NOT reopen instructions!
-              if (targetLevelIsActivelyPlaying) {
-                setState(() {
-                  _contestantDecision = null;
-                  _showNextLevelInstructions = false;
-                  _nextLevelInstructionsLevel = null;
-                });
-                return;
-              }
-              final targetNext = decisionLevel + 1;
-              setState(() {
-                _contestantDecision = null;
-                _showNextLevelInstructions = true;
-                _nextLevelInstructionsLevel = targetNext;
-                _showLocalLevelResults = false;
-                answered = false;
-                resultRevealed = false;
-              });
-              return;
-            }
-
-            // Show the decision immediately when Firestore publishes it.
-            // Also retire the completed level's last question result/waiting
-            // state so it cannot reappear when transitioning to the next level.
-            if (!mounted) return;
-            setState(() {
-              _contestantDecision = decision;
-              _contestantDecisionLevel = decisionLevel;
-              if (assignedRank != null && assignedRank > 0) {
-                _contestantDecisionRank = assignedRank;
-                currentRank = assignedRank;
-              }
-              _showNextLevelInstructions = false;
-              _showLocalLevelResults = false;
-              answered = false;
-              submitting = false;
-              resultRevealed = false;
-              nextReadyConfirmed = false;
-              nextQuestionConfirmed = false;
-              confirmedQuestionIndex = -1;
-            });
-            timer?.cancel();
-
-            SharedPreferences.getInstance().then((prefs) async {
-              if (prefs.getString(_contestantQuizCodeKey) == widget.quizCode) {
-                await prefs.setBool(_contestantQuizNextReadyKey, false);
-                await prefs.remove('contestant_quiz_confirmed_question');
-              }
-            });
-
-            // Rank refresh is secondary UI data; it must never delay the
-            // contestant's Proceeding/Eliminated decision screen.
-            try {
-              if (assignedRank == null || assignedRank <= 0) {
-                final sessionSnap = await _sessionRef.get();
-                final officialRanks = sessionSnap.data()?['officialRanks'];
-                if (officialRanks is Map && officialRanks.containsKey(user.uid)) {
-                  final offRank = officialRanks[user.uid];
-                  final sRank = offRank is num ? offRank.toInt() : int.tryParse(offRank?.toString() ?? '');
-                  if (sRank != null && sRank > 0 && mounted) {
-                    setState(() {
-                      _contestantDecisionRank = sRank;
-                      currentRank = sRank;
-                    });
-                  }
-                }
-
-                if (_contestantDecisionRank == null || _contestantDecisionRank! <= 0) {
-                  final scoreSnap = await _sessionRef
-                      .collection('scores')
-                      .doc(user.uid)
-                      .get();
-                  if (scoreSnap.exists) {
-                    final sData = scoreSnap.data();
-                    final sRaw = sData?['rank'] ??
-                        sData?['levelRank'] ??
-                        sData?['currentRank'] ??
-                        sData?['rankAtProceed'];
-                    final int? sRank = sRaw is num
-                        ? sRaw.toInt()
-                        : int.tryParse(sRaw?.toString() ?? '');
-                    if (sRank != null && sRank > 0 && mounted) {
-                      setState(() {
-                        _contestantDecisionRank = sRank;
-                        currentRank = sRank;
-                      });
-                    }
-                  }
-                }
-              }
-              await updateLiveRank();
-            } catch (e) {
-              debugPrint('REFRESH LIVE RANK AFTER DECISION ERROR: $e');
-            }
-          },
-          onError: (Object error) {
-            debugPrint('CONTESTANT DECISION LISTENER ERROR: $error');
-          },
+        final decisionLevel = int.tryParse(
+          data?['decisionLevel']?.toString() ?? '',
         );
+
+        final rawRank =
+            data?['rank'] ??
+            data?['levelRank'] ??
+            data?['currentRank'] ??
+            data?['rankAtProceed'] ??
+            data?['rankAtElimination'];
+        final int? assignedRank = rawRank is num
+            ? rawRank.toInt()
+            : int.tryParse(rawRank?.toString() ?? '');
+
+        final int currentSessionLevel =
+            int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '') ??
+            1;
+
+        final sessionStatus =
+            _latestQuizData['status']?.toString().toLowerCase() ?? '';
+        final isCountdown =
+            _latestQuizData['countdownActive'] == true ||
+            sessionStatus == 'countdown';
+        final isActive = sessionStatus == 'active';
+        final bool targetLevelIsActivelyPlaying =
+            decisionLevel != null &&
+            currentSessionLevel > decisionLevel &&
+            (isActive || isCountdown);
+
+        // Kung ang contestant nakapadayon na para ani nga decision level,
+        // ayaw na sila ibalik sa decision screen o i-reset ang instructions.
+        final bool alreadyProceededForLevel =
+            decisionLevel != null &&
+            ((_lastProceededDecisionLevel != null &&
+                    _lastProceededDecisionLevel! >= decisionLevel) ||
+                (_nextLevelInstructionsLevel != null &&
+                    _nextLevelInstructionsLevel! > decisionLevel) ||
+                (readyForLevel != null && readyForLevel > decisionLevel) ||
+                targetLevelIsActivelyPlaying);
+
+        if (decision != 'proceeding' && decision != 'eliminated') {
+          return;
+        }
+
+        if (decision == 'proceeding' && alreadyProceededForLevel) {
+          if (!mounted) return;
+          // If the target level has already actively begun playing, do NOT reopen instructions!
+          if (targetLevelIsActivelyPlaying) {
+            setState(() {
+              _contestantDecision = null;
+              _showNextLevelInstructions = false;
+              _nextLevelInstructionsLevel = null;
+            });
+            return;
+          }
+          final targetNext = decisionLevel + 1;
+          setState(() {
+            _contestantDecision = null;
+            _showNextLevelInstructions = true;
+            _nextLevelInstructionsLevel = targetNext;
+            _showLocalLevelResults = false;
+            answered = false;
+            resultRevealed = false;
+          });
+          return;
+        }
+
+        // Show the decision immediately when Firestore publishes it.
+        // Also retire the completed level's last question result/waiting
+        // state so it cannot reappear when transitioning to the next level.
+        if (!mounted) return;
+        setState(() {
+          _contestantDecision = decision;
+          _contestantDecisionLevel = decisionLevel;
+          if (assignedRank != null && assignedRank > 0) {
+            _contestantDecisionRank = assignedRank;
+            currentRank = assignedRank;
+          }
+          _showNextLevelInstructions = false;
+          _showLocalLevelResults = false;
+          answered = false;
+          submitting = false;
+          resultRevealed = false;
+          nextReadyConfirmed = false;
+          nextQuestionConfirmed = false;
+          confirmedQuestionIndex = -1;
+        });
+        timer?.cancel();
+
+        SharedPreferences.getInstance().then((prefs) async {
+          if (prefs.getString(_contestantQuizCodeKey) == widget.quizCode) {
+            await prefs.setBool(_contestantQuizNextReadyKey, false);
+            await prefs.remove('contestant_quiz_confirmed_question');
+          }
+        });
+
+        // Rank refresh is secondary UI data; it must never delay the
+        // contestant's Proceeding/Eliminated decision screen.
+        try {
+          if (assignedRank == null || assignedRank <= 0) {
+            final sessionSnap = await _sessionRef.get();
+            final officialRanks = sessionSnap.data()?['officialRanks'];
+            if (officialRanks is Map && officialRanks.containsKey(user.uid)) {
+              final offRank = officialRanks[user.uid];
+              final sRank = offRank is num
+                  ? offRank.toInt()
+                  : int.tryParse(offRank?.toString() ?? '');
+              if (sRank != null && sRank > 0 && mounted) {
+                setState(() {
+                  _contestantDecisionRank = sRank;
+                  currentRank = sRank;
+                });
+              }
+            }
+
+            if (_contestantDecisionRank == null ||
+                _contestantDecisionRank! <= 0) {
+              final scoreSnap = await _sessionRef
+                  .collection('scores')
+                  .doc(user.uid)
+                  .get();
+              if (scoreSnap.exists) {
+                final sData = scoreSnap.data();
+                final sRaw =
+                    sData?['rank'] ??
+                    sData?['levelRank'] ??
+                    sData?['currentRank'] ??
+                    sData?['rankAtProceed'];
+                final int? sRank = sRaw is num
+                    ? sRaw.toInt()
+                    : int.tryParse(sRaw?.toString() ?? '');
+                if (sRank != null && sRank > 0 && mounted) {
+                  setState(() {
+                    _contestantDecisionRank = sRank;
+                    currentRank = sRank;
+                  });
+                }
+              }
+            }
+          }
+          await updateLiveRank();
+        } catch (e) {
+          debugPrint('REFRESH LIVE RANK AFTER DECISION ERROR: $e');
+        }
+      },
+      onError: (Object error) {
+        debugPrint('CONTESTANT DECISION LISTENER ERROR: $error');
+      },
+    );
   }
 
   Widget _contestantDecisionScreen({
@@ -401,10 +408,11 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: (eliminated
-                                    ? Colors.red
-                                    : const Color(0xFF16A34A))
-                                .withValues(alpha: 0.22),
+                            color:
+                                (eliminated
+                                        ? Colors.red
+                                        : const Color(0xFF16A34A))
+                                    .withValues(alpha: 0.22),
                             blurRadius: 30,
                             spreadRadius: 3,
                             offset: const Offset(0, 8),
@@ -419,10 +427,7 @@ class _QuizScreenState extends State<QuizScreen> {
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
                               colors: eliminated
-                                  ? const [
-                                      Color(0xFFEF4444),
-                                      Color(0xFFB91C1C),
-                                    ]
+                                  ? const [Color(0xFFEF4444), Color(0xFFB91C1C)]
                                   : const [
                                       Color(0xFF22C55E),
                                       Color(0xFF15803D),
@@ -562,11 +567,10 @@ class _QuizScreenState extends State<QuizScreen> {
                                   'decisionAt': FieldValue.delete(),
                                 }, SetOptions(merge: true));
                               } catch (e) {
-                                debugPrint(
-                                  'SAVE NEXT LEVEL READY ERROR: $e',
-                                );
+                                debugPrint('SAVE NEXT LEVEL READY ERROR: $e');
                                 if (!mounted) return;
-                                showTopSnackBar(context, 
+                                showTopSnackBar(
+                                  context,
                                   const SnackBar(
                                     content: Text(
                                       'Unable to save your Level readiness. Please try again.',
@@ -579,7 +583,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
                             if (!mounted) return;
                             setState(() {
-                              _lastProceededDecisionLevel = currentDecisionLevel;
+                              _lastProceededDecisionLevel =
+                                  currentDecisionLevel;
                               _nextLevelInstructionsLevel = nextLevel;
                               _showNextLevelInstructions = true;
                               _showLocalLevelResults = false;
@@ -593,16 +598,16 @@ class _QuizScreenState extends State<QuizScreen> {
                               confirmedQuestionIndex = -1;
                               previousQuestion = currentQuestion;
                             });
-                            SharedPreferences.getInstance().then((
-                              prefs,
-                            ) async {
+                            SharedPreferences.getInstance().then((prefs) async {
                               if (prefs.getString(_contestantQuizCodeKey) ==
                                   widget.quizCode) {
                                 await prefs.setBool(
                                   _contestantQuizNextReadyKey,
                                   false,
                                 );
-                                await prefs.remove('contestant_quiz_confirmed_question');
+                                await prefs.remove(
+                                  'contestant_quiz_confirmed_question',
+                                );
                                 await prefs.setInt(
                                   _contestantLastProceededLevelKey,
                                   currentDecisionLevel,
@@ -614,7 +619,10 @@ class _QuizScreenState extends State<QuizScreen> {
                               }
                             });
                           },
-                          icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                          icon: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 20,
+                          ),
                           label: Text(
                             'PROCEED TO LEVEL $nextLevel',
                             style: const TextStyle(
@@ -656,7 +664,10 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _rememberQuizScreen() async {
-    await CompetitorNavPersistence.savePage('quiz_screen', quizCode: widget.quizCode);
+    await CompetitorNavPersistence.savePage(
+      'quiz_screen',
+      quizCode: widget.quizCode,
+    );
   }
 
   Future<void> _restoreQuizLocalState() async {
@@ -671,12 +682,13 @@ class _QuizScreenState extends State<QuizScreen> {
         prefs.getBool(_contestantQuizInstructionsKey) ?? false;
     final savedConfirmedQuestion =
         prefs.getInt('contestant_quiz_confirmed_question') ?? -1;
-    final nextReady = (prefs.getBool(_contestantQuizNextReadyKey) ?? false) &&
+    final nextReady =
+        (prefs.getBool(_contestantQuizNextReadyKey) ?? false) &&
         (savedConfirmedQuestion == currentQuestion);
-    final savedProceededLevel =
-        prefs.getInt(_contestantLastProceededLevelKey);
-    final savedInstructionsLevel =
-        prefs.getInt('contestant_next_instructions_level');
+    final savedProceededLevel = prefs.getInt(_contestantLastProceededLevelKey);
+    final savedInstructionsLevel = prefs.getInt(
+      'contestant_next_instructions_level',
+    );
 
     if (!mounted) return;
 
@@ -832,8 +844,9 @@ class _QuizScreenState extends State<QuizScreen> {
     int fallbackQuestionNumber = 1,
   }) {
     // 1. Check if the question is assigned to a specific level in levelQuestions mapping
-    final qId =
-        (question['questionId'] ?? question['id'] ?? '').toString().trim();
+    final qId = (question['questionId'] ?? question['id'] ?? '')
+        .toString()
+        .trim();
     final rawLevelQuestions = _latestQuizData['levelQuestions'];
     if (qId.isNotEmpty && rawLevelQuestions is Map) {
       for (final entry in rawLevelQuestions.entries) {
@@ -923,8 +936,11 @@ class _QuizScreenState extends State<QuizScreen> {
     return null;
   }
 
-  int getPointsForLevel(int level,
-      {Map<String, dynamic>? question, Map<String, dynamic>? sessionData}) {
+  int getPointsForLevel(
+    int level, {
+    Map<String, dynamic>? question,
+    Map<String, dynamic>? sessionData,
+  }) {
     final quizData = sessionData ?? _latestQuizData;
 
     // 1. Check quiz session levelSettings configured by Admin FIRST!
@@ -932,13 +948,14 @@ class _QuizScreenState extends State<QuizScreen> {
     if (rawLevelSettings is Map) {
       final target = 'level$level';
       for (final entry in rawLevelSettings.entries) {
-        final norm = entry.key
-            .toString()
-            .toLowerCase()
-            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        final norm = entry.key.toString().toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]'),
+          '',
+        );
         if ((norm == target || norm == '$level') && entry.value is Map) {
-          final lp =
-              _parsePoints(Map<String, dynamic>.from(entry.value as Map));
+          final lp = _parsePoints(
+            Map<String, dynamic>.from(entry.value as Map),
+          );
           if (lp != null && lp > 0) return lp;
         }
       }
@@ -978,14 +995,19 @@ class _QuizScreenState extends State<QuizScreen> {
   void _prefetchUserProfile(String uid) {
     if (uid.isEmpty || _userProfileCache.containsKey(uid)) return;
     _userProfileCache[uid] = const {};
-    FirebaseFirestore.instance.collection('users').doc(uid).get().then((snap) {
-      if (snap.exists && snap.data() != null) {
-        _userProfileCache[uid] = snap.data()!;
-        if (mounted) setState(() {});
-      }
-    }).catchError((e) {
-      debugPrint("PREFETCH USER ERROR: $e");
-    });
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get()
+        .then((snap) {
+          if (snap.exists && snap.data() != null) {
+            _userProfileCache[uid] = snap.data()!;
+            if (mounted) setState(() {});
+          }
+        })
+        .catchError((e) {
+          debugPrint("PREFETCH USER ERROR: $e");
+        });
   }
 
   // ==========================================================
@@ -1049,8 +1071,9 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   String _sortTokens(String value) {
-    final tokens =
-        _stripPunctuation(value).split(' ').where((t) => t.isNotEmpty).toList();
+    final tokens = _stripPunctuation(
+      value,
+    ).split(' ').where((t) => t.isNotEmpty).toList();
     tokens.sort();
     return tokens.join(' ');
   }
@@ -1063,8 +1086,9 @@ class _QuizScreenState extends State<QuizScreen> {
     variants.add(trimmed);
 
     // 1. Parentheses/brackets: e.g. "DNS (Domain Name System)" or "DNS(Domain Name System)"
-    final parenMatch =
-        RegExp(r'^(.*?)\s*[\(\[\{](.*?)[\)\]\}]\s*$').firstMatch(trimmed);
+    final parenMatch = RegExp(
+      r'^(.*?)\s*[\(\[\{](.*?)[\)\]\}]\s*$',
+    ).firstMatch(trimmed);
     if (parenMatch != null) {
       final part1 = parenMatch.group(1)?.trim() ?? '';
       final part2 = parenMatch.group(2)?.trim() ?? '';
@@ -1189,8 +1213,10 @@ class _QuizScreenState extends State<QuizScreen> {
     final filtered = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final isTB = data['isTieBreaker'] == true;
-      final sessionLevel =
-          (data['sessionLevel'] ?? '').toString().trim().toLowerCase();
+      final sessionLevel = (data['sessionLevel'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
       final isTieLevel = sessionLevel == 'tie breaker';
       if (isTieBreakerActive) {
         return isTB || isTieLevel;
@@ -1198,8 +1224,9 @@ class _QuizScreenState extends State<QuizScreen> {
       if (isTB || isTieLevel) return false;
       return true;
     }).toList();
-    final sourceDocs =
-        (isTieBreakerActive && filtered.isEmpty) ? docs : filtered;
+    final sourceDocs = (isTieBreakerActive && filtered.isEmpty)
+        ? docs
+        : filtered;
     final sorted = [...sourceDocs];
 
     int getLevel(QueryDocumentSnapshot doc) {
@@ -1669,7 +1696,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
       if (!mounted) return;
 
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text("Unable to save ready status: $e"),
           backgroundColor: Colors.red,
@@ -1752,7 +1780,8 @@ class _QuizScreenState extends State<QuizScreen> {
         confirmedQuestionIndex = !ready ? currentQuestion : -1;
       });
 
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text("Unable to save ready status: $e"),
           backgroundColor: Colors.red,
@@ -1780,7 +1809,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         const SnackBar(
           content: Text('Please sign in again before leaving the quiz.'),
           backgroundColor: Colors.red,
@@ -1810,16 +1840,15 @@ class _QuizScreenState extends State<QuizScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => const CompetitorDashboard(),
-        ),
+        MaterialPageRoute<void>(builder: (_) => const CompetitorDashboard()),
         (route) => false,
       );
     } catch (e) {
       debugPrint('LEAVE QUIZ ERROR: $e');
       if (!mounted) return;
 
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         const SnackBar(
           content: Text(
             'Could not leave the quiz safely. Please check your connection and try again.',
@@ -2080,69 +2109,73 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
 
-  // ==========================================================
-  // PLEASE WAIT FOR QUIZ MASTER
-  // ==========================================================
+    // ==========================================================
+    // PLEASE WAIT FOR QUIZ MASTER
+    // ==========================================================
 
-  return TechCircuitBackground(
-    baseColor: lightGreen,
-    child: Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    return TechCircuitBackground(
+      baseColor: lightGreen,
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-        title: const Text(
-          "Waiting",
-          style: TextStyle(color: textDark, fontWeight: FontWeight.bold),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          title: const Text(
+            "Waiting",
+            style: TextStyle(color: textDark, fontWeight: FontWeight.bold),
+          ),
         ),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 115,
-                height: 115,
-                decoration: const BoxDecoration(
-                  color: softGreen,
-                  shape: BoxShape.circle,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 115,
+                  height: 115,
+                  decoration: const BoxDecoration(
+                    color: softGreen,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.hourglass_top_rounded,
+                    color: primaryGreen,
+                    size: 68,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.hourglass_top_rounded,
-                  color: primaryGreen,
-                  size: 68,
+                const SizedBox(height: 25),
+                const Text(
+                  "PLEASE WAIT",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: darkGreen,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 25),
-              const Text(
-                "PLEASE WAIT",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: darkGreen,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 12),
+                const Text(
+                  "Please wait for the Quiz Master to start the quiz.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "Please wait for the Quiz Master to start the quiz.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 16, height: 1.5),
-              ),
-              const SizedBox(height: 25),
-              const CircularProgressIndicator(color: primaryGreen),
-            ],
+                const SizedBox(height: 25),
+                const CircularProgressIndicator(color: primaryGreen),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   Widget synchronizedCountdownScreen(int countdown, {int questionNumber = 1}) {
@@ -2154,19 +2187,20 @@ class _QuizScreenState extends State<QuizScreen> {
       activeLevel = pos.level;
     }
     if (activeLevel <= 0) {
-      final parsed =
-          int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '');
+      final parsed = int.tryParse(
+        _latestQuizData['currentLevel']?.toString() ?? '',
+      );
       if (parsed != null && parsed > 0) activeLevel = parsed;
     }
     if (activeLevel <= 0) activeLevel = 1;
 
     final int effectiveQuestionNumber = isTieBreaker
         ? ((_latestQuizData['tieBreakerQuestionIndex'] is int)
-            ? ((_latestQuizData['tieBreakerQuestionIndex'] as int) + 1)
-            : ((_latestQuizData['currentQuestion'] is int &&
-                    (_latestQuizData['currentQuestion'] as int) >= 0)
-                ? ((_latestQuizData['currentQuestion'] as int) + 1)
-                : 1))
+              ? ((_latestQuizData['tieBreakerQuestionIndex'] as int) + 1)
+              : ((_latestQuizData['currentQuestion'] is int &&
+                        (_latestQuizData['currentQuestion'] as int) >= 0)
+                    ? ((_latestQuizData['currentQuestion'] as int) + 1)
+                    : 1))
         : questionNumber;
 
     return QuizCountdownScreen(
@@ -2232,15 +2266,18 @@ class _QuizScreenState extends State<QuizScreen> {
       bool isCurrentlyCorrect =
           data['isCorrect'] == true || savedAnswerStatus == "correct";
 
-      final Map<String, dynamic>? questionForEval = currentQuestionData ??
+      final Map<String, dynamic>? questionForEval =
+          currentQuestionData ??
           (questionIndex < _sortedSessionQuestions.length
               ? _sortedSessionQuestions[questionIndex].data()
-                  as Map<String, dynamic>?
+                    as Map<String, dynamic>?
               : null);
 
       if (questionForEval != null && savedAnswer.trim().isNotEmpty) {
-        final bool shouldBeCorrect =
-            isAnswerCorrect(questionForEval, savedAnswer);
+        final bool shouldBeCorrect = isAnswerCorrect(
+          questionForEval,
+          savedAnswer,
+        );
 
         final sessionLevel = getLevelFromSessionQuestion(
           questionForEval,
@@ -2255,18 +2292,24 @@ class _QuizScreenState extends State<QuizScreen> {
           isCurrentlyCorrect = false;
           final int existingPoints = (data['points'] as num?)?.toInt() ?? 0;
           try {
-            responseRef.update({
-              'isCorrect': false,
-              'answerStatus': 'wrong',
-              'points': 0,
-              'autoCorrected': true,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }).catchError((e) {
-              debugPrint("CORRECT TO WRONG RESPONSE ERROR: $e");
-            });
+            responseRef
+                .update({
+                  'isCorrect': false,
+                  'answerStatus': 'wrong',
+                  'points': 0,
+                  'autoCorrected': true,
+                  'updatedAt': FieldValue.serverTimestamp(),
+                })
+                .catchError((e) {
+                  debugPrint("CORRECT TO WRONG RESPONSE ERROR: $e");
+                });
             if (existingPoints > 0) {
-              updateScore(currentUser.uid, -existingPoints, questionIndex + 1, level: sessionLevel)
-                  .catchError((e) {
+              updateScore(
+                currentUser.uid,
+                -existingPoints,
+                questionIndex + 1,
+                level: sessionLevel,
+              ).catchError((e) {
                 debugPrint("DEDUCT INCOMPLETE SCORE ERROR: $e");
               });
             }
@@ -2278,19 +2321,27 @@ class _QuizScreenState extends State<QuizScreen> {
           // self-heal and award points.
           isCurrentlyCorrect = true;
           try {
-            final earnedPoints =
-                getPointsForLevel(sessionLevel, question: questionForEval);
-            responseRef.update({
-              'isCorrect': true,
-              'answerStatus': 'correct',
-              'points': earnedPoints,
-              'autoCorrected': true,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }).catchError((e) {
-              debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
-            });
-            updateScore(currentUser.uid, earnedPoints, questionIndex + 1, level: sessionLevel)
+            final earnedPoints = getPointsForLevel(
+              sessionLevel,
+              question: questionForEval,
+            );
+            responseRef
+                .update({
+                  'isCorrect': true,
+                  'answerStatus': 'correct',
+                  'points': earnedPoints,
+                  'autoCorrected': true,
+                  'updatedAt': FieldValue.serverTimestamp(),
+                })
                 .catchError((e) {
+                  debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
+                });
+            updateScore(
+              currentUser.uid,
+              earnedPoints,
+              questionIndex + 1,
+              level: sessionLevel,
+            ).catchError((e) {
               debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
             });
           } catch (e) {
@@ -2397,19 +2448,22 @@ class _QuizScreenState extends State<QuizScreen> {
                   existingData['selectedAnswer']?.toString() ?? '';
               final savedContestStatus =
                   existingData['contestStatus']?.toString() ?? "none";
-              bool isCurrentlyCorrect = existingData['isCorrect'] == true ||
+              bool isCurrentlyCorrect =
+                  existingData['isCorrect'] == true ||
                   existingData['answerStatus'] == "correct";
 
               final Map<String, dynamic>? questionForEval =
                   currentQuestionData ??
-                      (questionIndex < _sortedSessionQuestions.length
-                          ? _sortedSessionQuestions[questionIndex].data()
-                              as Map<String, dynamic>?
-                          : null);
+                  (questionIndex < _sortedSessionQuestions.length
+                      ? _sortedSessionQuestions[questionIndex].data()
+                            as Map<String, dynamic>?
+                      : null);
 
               if (questionForEval != null && savedAnswer.trim().isNotEmpty) {
-                final bool shouldBeCorrect =
-                    isAnswerCorrect(questionForEval, savedAnswer);
+                final bool shouldBeCorrect = isAnswerCorrect(
+                  questionForEval,
+                  savedAnswer,
+                );
                 final sessionLevel = getLevelFromSessionQuestion(
                   questionForEval,
                   fallbackQuestionNumber: questionNumber,
@@ -2422,37 +2476,51 @@ class _QuizScreenState extends State<QuizScreen> {
                   isCurrentlyCorrect = false;
                   final int existingPoints =
                       (existingData['points'] as num?)?.toInt() ?? 0;
-                  responseRef.update({
-                    'isCorrect': false,
-                    'answerStatus': 'wrong',
-                    'points': 0,
-                    'autoCorrected': true,
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  }).catchError((e) {
-                    debugPrint("CORRECT TO WRONG RESPONSE ERROR: $e");
-                  });
+                  responseRef
+                      .update({
+                        'isCorrect': false,
+                        'answerStatus': 'wrong',
+                        'points': 0,
+                        'autoCorrected': true,
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      })
+                      .catchError((e) {
+                        debugPrint("CORRECT TO WRONG RESPONSE ERROR: $e");
+                      });
                   if (existingPoints > 0) {
-                    updateScore(uid, -existingPoints, questionNumber, level: sessionLevel)
-                        .catchError((e) {
+                    updateScore(
+                      uid,
+                      -existingPoints,
+                      questionNumber,
+                      level: sessionLevel,
+                    ).catchError((e) {
                       debugPrint("DEDUCT INCOMPLETE SCORE ERROR: $e");
                     });
                   }
                 } else if (!isCurrentlyCorrect && shouldBeCorrect) {
                   // Complete answer (e.g. "DNS(Domain Name System)"): Mark CORRECT
                   isCurrentlyCorrect = true;
-                  final earnedPoints =
-                      getPointsForLevel(sessionLevel, question: questionForEval);
-                  responseRef.update({
-                    'isCorrect': true,
-                    'answerStatus': 'correct',
-                    'points': earnedPoints,
-                    'autoCorrected': true,
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  }).catchError((e) {
-                    debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
-                  });
-                  updateScore(uid, earnedPoints, questionNumber, level: sessionLevel)
+                  final earnedPoints = getPointsForLevel(
+                    sessionLevel,
+                    question: questionForEval,
+                  );
+                  responseRef
+                      .update({
+                        'isCorrect': true,
+                        'answerStatus': 'correct',
+                        'points': earnedPoints,
+                        'autoCorrected': true,
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      })
                       .catchError((e) {
+                        debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
+                      });
+                  updateScore(
+                    uid,
+                    earnedPoints,
+                    questionNumber,
+                    level: sessionLevel,
+                  ).catchError((e) {
                     debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
                   });
                 }
@@ -2476,10 +2544,11 @@ class _QuizScreenState extends State<QuizScreen> {
       // USE THE CURRENT ADMIN-ASSIGNED SESSION QUESTION
       // ======================================================
 
-      final question = currentQuestionData ??
+      final question =
+          currentQuestionData ??
           (questionIndex >= 0 && questionIndex < _sortedSessionQuestions.length
               ? _sortedSessionQuestions[questionIndex].data()
-                  as Map<String, dynamic>?
+                    as Map<String, dynamic>?
               : null);
 
       if (question == null || questionIndex < 0) {
@@ -2517,8 +2586,8 @@ class _QuizScreenState extends State<QuizScreen> {
       );
       final earnedPoints = correct
           ? (isTieBreakerActive
-              ? 1
-              : getPointsForLevel(sessionLevel, question: question))
+                ? 1
+                : getPointsForLevel(sessionLevel, question: question))
           : 0;
 
       await answerDoc.set({
@@ -2549,7 +2618,12 @@ class _QuizScreenState extends State<QuizScreen> {
           _localLevelPoints[sessionLevel] =
               (_localLevelPoints[sessionLevel] ?? 0) + earnedPoints;
         }
-        await updateScore(uid, earnedPoints, questionNumber, level: sessionLevel);
+        await updateScore(
+          uid,
+          earnedPoints,
+          questionNumber,
+          level: sessionLevel,
+        );
       }
 
       if (!mounted) return;
@@ -2598,7 +2672,8 @@ class _QuizScreenState extends State<QuizScreen> {
           submitting = false;
         });
 
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text("Error saving answer: $e"),
             backgroundColor: Colors.red,
@@ -2644,17 +2719,18 @@ class _QuizScreenState extends State<QuizScreen> {
     String opponentName,
   ) {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final forText = (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
+    final forText =
+        (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
         ? quizData['tieBreakerFor'].toString().trim()
         : ((quizData['tieBreakerRank'] != null)
-            ? (quizData['tieBreakerRank'] == 1
-                ? '1st Place'
-                : quizData['tieBreakerRank'] == 2
+              ? (quizData['tieBreakerRank'] == 1
+                    ? '1st Place'
+                    : quizData['tieBreakerRank'] == 2
                     ? '2nd Place'
                     : quizData['tieBreakerRank'] == 3
-                        ? '3rd Place'
-                        : 'Rank ${quizData['tieBreakerRank']}')
-            : 'the Tied Rank');
+                    ? '3rd Place'
+                    : 'Rank ${quizData['tieBreakerRank']}')
+              : 'the Tied Rank');
 
     return TechCircuitBackground(
       baseColor: lightGreen,
@@ -2829,10 +2905,7 @@ class _QuizScreenState extends State<QuizScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        icon: const Icon(
-                          Icons.check_circle_rounded,
-                          size: 22,
-                        ),
+                        icon: const Icon(Icons.check_circle_rounded, size: 22),
                         label: const Text(
                           'CONFIRM',
                           style: TextStyle(
@@ -2842,8 +2915,8 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         onPressed: () async {
-                          final sessId =
-                              quizData['tieBreakerSessionId']?.toString();
+                          final sessId = quizData['tieBreakerSessionId']
+                              ?.toString();
                           setState(() {
                             _tieBreakerInviteConfirmed = true;
                             _confirmedTieBreakerSessionId = sessId;
@@ -2854,14 +2927,15 @@ class _QuizScreenState extends State<QuizScreen> {
                                   .collection('join_requests')
                                   .doc(myUid)
                                   .set({
-                                'tieBreakerReady': true,
-                                'ready': true,
-                                'updatedAt': FieldValue.serverTimestamp(),
-                              }, SetOptions(merge: true));
+                                    'tieBreakerReady': true,
+                                    'ready': true,
+                                    'updatedAt': FieldValue.serverTimestamp(),
+                                  }, SetOptions(merge: true));
 
                               await _sessionRef.update({
-                                'tieBreakerReadyUids':
-                                    FieldValue.arrayUnion([myUid]),
+                                'tieBreakerReadyUids': FieldValue.arrayUnion([
+                                  myUid,
+                                ]),
                               });
                             }
                           } catch (e) {
@@ -2886,21 +2960,22 @@ class _QuizScreenState extends State<QuizScreen> {
     String? opponentName,
   ]) {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final oppName = opponentName ??
-        _getTieBreakerOpponentName(quizData, myUid);
-    final forText = (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
+    final oppName = opponentName ?? _getTieBreakerOpponentName(quizData, myUid);
+    final forText =
+        (quizData['tieBreakerFor']?.toString().trim().isNotEmpty ?? false)
         ? quizData['tieBreakerFor'].toString().trim()
         : ((quizData['tieBreakerRank'] != null)
-            ? (quizData['tieBreakerRank'] == 1
-                ? '1st Place'
-                : quizData['tieBreakerRank'] == 2
+              ? (quizData['tieBreakerRank'] == 1
+                    ? '1st Place'
+                    : quizData['tieBreakerRank'] == 2
                     ? '2nd Place'
                     : quizData['tieBreakerRank'] == 3
-                        ? '3rd Place'
-                        : 'Rank ${quizData['tieBreakerRank']}')
-            : 'the Tied Rank');
+                    ? '3rd Place'
+                    : 'Rank ${quizData['tieBreakerRank']}')
+              : 'the Tied Rank');
 
-    final tieBreakerStarted = quizData['tieBreakerStarted'] == true ||
+    final tieBreakerStarted =
+        quizData['tieBreakerStarted'] == true ||
         quizData['status'] == 'tie_breaker_preparation';
 
     return TechCircuitBackground(
@@ -2963,7 +3038,9 @@ class _QuizScreenState extends State<QuizScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFEA580C).withValues(alpha: 0.35),
+                            color: const Color(
+                              0xFFEA580C,
+                            ).withValues(alpha: 0.35),
                             blurRadius: 20,
                             offset: const Offset(0, 6),
                           ),
@@ -3001,7 +3078,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     const SizedBox(height: 28),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 28,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -3073,9 +3153,9 @@ class _QuizScreenState extends State<QuizScreen> {
     final rawNames = quizData['tieBreakerContestantNames'];
     final namesList = rawNames is List
         ? rawNames
-            .map((e) => e.toString().trim())
-            .where((e) => e.isNotEmpty)
-            .toList()
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
         : <String>[];
     final names = namesList.isNotEmpty
         ? namesList.join(' vs ')
@@ -3115,24 +3195,26 @@ class _QuizScreenState extends State<QuizScreen> {
                   for (final uid in tieBreakerContestantUids) {
                     final cData =
                         contestantById[uid] ?? const <String, dynamic>{};
-                    final sData =
-                        scoreByUid[uid] ?? const <String, dynamic>{};
+                    final sData = scoreByUid[uid] ?? const <String, dynamic>{};
 
-                    final String displayName = (cData['teamName'] ??
-                            cData['name'] ??
-                            sData['teamName'] ??
-                            sData['name'] ??
-                            uid)
-                        .toString()
-                        .trim();
+                    final String displayName =
+                        (cData['teamName'] ??
+                                cData['name'] ??
+                                sData['teamName'] ??
+                                sData['name'] ??
+                                uid)
+                            .toString()
+                            .trim();
 
-                    final bool isTeam = cData['isTeam'] == true ||
+                    final bool isTeam =
+                        cData['isTeam'] == true ||
                         (cData['teamMembers'] is List &&
                             (cData['teamMembers'] as List).isNotEmpty) ||
                         sData['teamMembers'] is List;
 
                     final List<String> teamMembers = [];
-                    final rawMembers = cData['teamMembers'] ??
+                    final rawMembers =
+                        cData['teamMembers'] ??
                         sData['teamMembers'] ??
                         cData['members'];
                     if (rawMembers is List) {
@@ -3144,19 +3226,23 @@ class _QuizScreenState extends State<QuizScreen> {
                       }
                     }
 
-                    final int tbScore = int.tryParse(
-                            (sData['tieBreakerScore'] ??
-                                    cData['tieBreakerScore'] ??
-                                    '')
-                                .toString()) ??
+                    final int tbScore =
+                        int.tryParse(
+                          (sData['tieBreakerScore'] ??
+                                  cData['tieBreakerScore'] ??
+                                  '')
+                              .toString(),
+                        ) ??
                         0;
 
-                    final int totalScore = int.tryParse(
-                            (sData['totalScore'] ??
-                                    sData['score'] ??
-                                    cData['score'] ??
-                                    '')
-                                .toString()) ??
+                    final int totalScore =
+                        int.tryParse(
+                          (sData['totalScore'] ??
+                                  sData['score'] ??
+                                  cData['score'] ??
+                                  '')
+                              .toString(),
+                        ) ??
                         0;
 
                     if (tbScore > maxTbScore) maxTbScore = tbScore;
@@ -3164,8 +3250,9 @@ class _QuizScreenState extends State<QuizScreen> {
 
                     tiedContestants.add({
                       'uid': uid,
-                      'name':
-                          displayName.isNotEmpty ? displayName : 'Contestant',
+                      'name': displayName.isNotEmpty
+                          ? displayName
+                          : 'Contestant',
                       'isTeam': isTeam,
                       'teamMembers': teamMembers,
                       'tieBreakerScore': tbScore,
@@ -3174,14 +3261,16 @@ class _QuizScreenState extends State<QuizScreen> {
                     });
                   }
 
-                  final bool isBroken = tiedContestants.length > 1 &&
+                  final bool isBroken =
+                      tiedContestants.length > 1 &&
                       maxTbScore > minTbScore &&
                       maxTbScore > 0;
                   final String? leadingName = isBroken
                       ? (tiedContestants.firstWhere(
-                          (c) => c['tieBreakerScore'] == maxTbScore,
-                          orElse: () => tiedContestants.first,
-                        )['name'] as String)
+                              (c) => c['tieBreakerScore'] == maxTbScore,
+                              orElse: () => tiedContestants.first,
+                            )['name']
+                            as String)
                       : null;
 
                   // 2. Compute Full Leaderboard for Standings tab
@@ -3195,24 +3284,26 @@ class _QuizScreenState extends State<QuizScreen> {
                   for (final cUid in allUids) {
                     final cData =
                         contestantById[cUid] ?? const <String, dynamic>{};
-                    final sData =
-                        scoreByUid[cUid] ?? const <String, dynamic>{};
+                    final sData = scoreByUid[cUid] ?? const <String, dynamic>{};
 
-                    final String displayName = (cData['teamName'] ??
-                            cData['name'] ??
-                            sData['teamName'] ??
-                            sData['name'] ??
-                            cUid)
-                        .toString()
-                        .trim();
+                    final String displayName =
+                        (cData['teamName'] ??
+                                cData['name'] ??
+                                sData['teamName'] ??
+                                sData['name'] ??
+                                cUid)
+                            .toString()
+                            .trim();
 
-                    final bool isTeam = cData['isTeam'] == true ||
+                    final bool isTeam =
+                        cData['isTeam'] == true ||
                         (cData['teamMembers'] is List &&
                             (cData['teamMembers'] as List).isNotEmpty) ||
                         sData['teamMembers'] is List;
 
                     final List<String> teamMembers = [];
-                    final rawMembers = cData['teamMembers'] ??
+                    final rawMembers =
+                        cData['teamMembers'] ??
                         sData['teamMembers'] ??
                         cData['members'];
                     if (rawMembers is List) {
@@ -3226,17 +3317,18 @@ class _QuizScreenState extends State<QuizScreen> {
 
                     final Map<int, int> cLevelScores = {};
                     for (int l = 1; l <= 20; l++) {
-                      final dynamic val = sData['level${l}Score'] ??
+                      final dynamic val =
+                          sData['level${l}Score'] ??
                           sData['level_$l'] ??
                           (sData['levelScores'] is Map
                               ? sData['levelScores']['Level $l'] ??
-                                  sData['levelScores']['$l']
+                                    sData['levelScores']['$l']
                               : null) ??
                           cData['level${l}Score'] ??
                           cData['level_$l'] ??
                           (cData['levelScores'] is Map
                               ? cData['levelScores']['Level $l'] ??
-                                  cData['levelScores']['$l']
+                                    cData['levelScores']['$l']
                               : null);
                       if (val != null) {
                         final parsed = int.tryParse(val.toString());
@@ -3252,36 +3344,42 @@ class _QuizScreenState extends State<QuizScreen> {
                       sumOfLevelCells += pts;
                     }
 
-                    final int tbPts = int.tryParse(
-                            (sData['tieBreakerScore'] ??
-                                    cData['tieBreakerScore'] ??
-                                    '')
-                                .toString()) ??
+                    final int tbPts =
+                        int.tryParse(
+                          (sData['tieBreakerScore'] ??
+                                  cData['tieBreakerScore'] ??
+                                  '')
+                              .toString(),
+                        ) ??
                         0;
 
                     int totalPoints = sumOfLevelCells + tbPts;
                     if (totalPoints == 0 && cLevelScores.isEmpty) {
-                      totalPoints = int.tryParse(
-                              (sData['totalScore'] ??
-                                      sData['score'] ??
-                                      cData['score'] ??
-                                      '')
-                                  .toString()) ??
+                      totalPoints =
+                          int.tryParse(
+                            (sData['totalScore'] ??
+                                    sData['score'] ??
+                                    cData['score'] ??
+                                    '')
+                                .toString(),
+                          ) ??
                           0;
                     }
 
-                    tallyList.add(_FinishedTallyRowData(
-                      uid: cUid,
-                      name: displayName.isNotEmpty
-                          ? displayName
-                          : 'Contestant',
-                      isTeam: isTeam,
-                      teamMembers: teamMembers,
-                      levelScores: cLevelScores,
-                      tieBreakerScore: tbPts,
-                      totalScore: totalPoints,
-                      isMe: cUid == currentUid,
-                    ));
+                    tallyList.add(
+                      _FinishedTallyRowData(
+                        uid: cUid,
+                        name: displayName.isNotEmpty
+                            ? displayName
+                            : 'Contestant',
+                        isTeam: isTeam,
+                        teamMembers: teamMembers,
+                        levelScores: cLevelScores,
+                        tieBreakerScore: tbPts,
+                        totalScore: totalPoints,
+                        isMe: cUid == currentUid,
+                      ),
+                    );
                   }
 
                   // Sort tallyList
@@ -3335,8 +3433,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 10,
                                     offset: const Offset(0, 3),
                                   ),
@@ -3346,39 +3443,43 @@ class _QuizScreenState extends State<QuizScreen> {
                                 children: [
                                   Expanded(
                                     child: InkWell(
-                                      borderRadius:
-                                          BorderRadius.circular(26),
+                                      borderRadius: BorderRadius.circular(26),
                                       onTap: () {
                                         if (_tieBreakerSpectatorTabIndex != 0) {
-                                          setState(() =>
-                                              _tieBreakerSpectatorTabIndex = 0);
+                                          setState(
+                                            () => _tieBreakerSpectatorTabIndex =
+                                                0,
+                                          );
                                         }
                                       },
                                       child: AnimatedContainer(
                                         duration: const Duration(
-                                            milliseconds: 200),
+                                          milliseconds: 200,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 10),
+                                          vertical: 10,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: _tieBreakerSpectatorTabIndex ==
-                                                  0
+                                          color:
+                                              _tieBreakerSpectatorTabIndex == 0
                                               ? primaryGreen
                                               : Colors.transparent,
-                                          borderRadius:
-                                              BorderRadius.circular(26),
+                                          borderRadius: BorderRadius.circular(
+                                            26,
+                                          ),
                                           boxShadow:
                                               _tieBreakerSpectatorTabIndex == 0
-                                                  ? [
-                                                      BoxShadow(
-                                                        color: primaryGreen
-                                                            .withValues(
-                                                                alpha: 0.35),
-                                                        blurRadius: 8,
-                                                        offset: const Offset(
-                                                            0, 2),
-                                                      ),
-                                                    ]
-                                                  : null,
+                                              ? [
+                                                  BoxShadow(
+                                                    color: primaryGreen
+                                                        .withValues(
+                                                          alpha: 0.35,
+                                                        ),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : null,
                                         ),
                                         child: Row(
                                           mainAxisAlignment:
@@ -3389,9 +3490,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                               size: 18,
                                               color:
                                                   _tieBreakerSpectatorTabIndex ==
-                                                          0
-                                                      ? Colors.white
-                                                      : const Color(0xFF64748B),
+                                                      0
+                                                  ? Colors.white
+                                                  : const Color(0xFF64748B),
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
@@ -3402,10 +3503,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 letterSpacing: 0.5,
                                                 color:
                                                     _tieBreakerSpectatorTabIndex ==
-                                                            0
-                                                        ? Colors.white
-                                                        : const Color(
-                                                            0xFF64748B),
+                                                        0
+                                                    ? Colors.white
+                                                    : const Color(0xFF64748B),
                                               ),
                                             ),
                                           ],
@@ -3415,39 +3515,43 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                   Expanded(
                                     child: InkWell(
-                                      borderRadius:
-                                          BorderRadius.circular(26),
+                                      borderRadius: BorderRadius.circular(26),
                                       onTap: () {
                                         if (_tieBreakerSpectatorTabIndex != 1) {
-                                          setState(() =>
-                                              _tieBreakerSpectatorTabIndex = 1);
+                                          setState(
+                                            () => _tieBreakerSpectatorTabIndex =
+                                                1,
+                                          );
                                         }
                                       },
                                       child: AnimatedContainer(
                                         duration: const Duration(
-                                            milliseconds: 200),
+                                          milliseconds: 200,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 10),
+                                          vertical: 10,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: _tieBreakerSpectatorTabIndex ==
-                                                  1
+                                          color:
+                                              _tieBreakerSpectatorTabIndex == 1
                                               ? primaryGreen
                                               : Colors.transparent,
-                                          borderRadius:
-                                              BorderRadius.circular(26),
+                                          borderRadius: BorderRadius.circular(
+                                            26,
+                                          ),
                                           boxShadow:
                                               _tieBreakerSpectatorTabIndex == 1
-                                                  ? [
-                                                      BoxShadow(
-                                                        color: primaryGreen
-                                                            .withValues(
-                                                                alpha: 0.35),
-                                                        blurRadius: 8,
-                                                        offset: const Offset(
-                                                            0, 2),
-                                                      ),
-                                                    ]
-                                                  : null,
+                                              ? [
+                                                  BoxShadow(
+                                                    color: primaryGreen
+                                                        .withValues(
+                                                          alpha: 0.35,
+                                                        ),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : null,
                                         ),
                                         child: Row(
                                           mainAxisAlignment:
@@ -3458,9 +3562,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                               size: 18,
                                               color:
                                                   _tieBreakerSpectatorTabIndex ==
-                                                          1
-                                                      ? Colors.white
-                                                      : const Color(0xFF64748B),
+                                                      1
+                                                  ? Colors.white
+                                                  : const Color(0xFF64748B),
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
@@ -3471,10 +3575,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 letterSpacing: 0.5,
                                                 color:
                                                     _tieBreakerSpectatorTabIndex ==
-                                                            1
-                                                        ? Colors.white
-                                                        : const Color(
-                                                            0xFF64748B),
+                                                        1
+                                                    ? Colors.white
+                                                    : const Color(0xFF64748B),
                                               ),
                                             ),
                                           ],
@@ -3504,8 +3607,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.05),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.05,
+                                      ),
                                       blurRadius: 14,
                                       offset: const Offset(0, 4),
                                     ),
@@ -3548,8 +3652,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                     decoration: BoxDecoration(
                                                       color: isBroken
                                                           ? primaryGreen
-                                                          : Colors.amber
-                                                              .shade800,
+                                                          : Colors
+                                                                .amber
+                                                                .shade800,
                                                       shape: BoxShape.circle,
                                                     ),
                                                   ),
@@ -3565,9 +3670,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       style: TextStyle(
                                                         color: isBroken
                                                             ? const Color(
-                                                                0xFF15803D)
+                                                                0xFF15803D,
+                                                              )
                                                             : const Color(
-                                                                0xFF9A3412),
+                                                                0xFF9A3412,
+                                                              ),
                                                         fontWeight:
                                                             FontWeight.w900,
                                                         fontSize: 13,
@@ -3594,15 +3701,17 @@ class _QuizScreenState extends State<QuizScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     const Divider(
-                                        height: 1,
-                                        color: Color(0xFFF1F5F9)),
+                                      height: 1,
+                                      color: Color(0xFFF1F5F9),
+                                    ),
                                     const SizedBox(height: 16),
 
                                     // Contestants live points list
                                     if (tiedContestants.isEmpty)
                                       Padding(
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 16),
+                                          vertical: 16,
+                                        ),
                                         child: Text(
                                           'Showdown between: $names',
                                           textAlign: TextAlign.center,
@@ -3624,14 +3733,15 @@ class _QuizScreenState extends State<QuizScreen> {
                                             item['isTeam'] == true;
                                         final List<String> members =
                                             (item['teamMembers']
-                                                    as List<String>?) ??
-                                                [];
-                                        final bool isLeading = isBroken &&
-                                            score == maxTbScore;
+                                                as List<String>?) ??
+                                            [];
+                                        final bool isLeading =
+                                            isBroken && score == maxTbScore;
 
                                         return Container(
-                                          margin:
-                                              const EdgeInsets.only(bottom: 10),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 10,
+                                          ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 14,
                                             vertical: 12,
@@ -3640,8 +3750,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                             color: isLeading
                                                 ? const Color(0xFFF0FDF4)
                                                 : const Color(0xFFF8FAFC),
-                                            borderRadius:
-                                                BorderRadius.circular(14),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
                                             border: Border.all(
                                               color: isLeading
                                                   ? const Color(0xFF22C55E)
@@ -3652,12 +3763,13 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 ? [
                                                     BoxShadow(
                                                       color: const Color(
-                                                              0xFF22C55E)
-                                                          .withValues(
-                                                              alpha: 0.15),
+                                                        0xFF22C55E,
+                                                      ).withValues(alpha: 0.15),
                                                       blurRadius: 8,
-                                                      offset:
-                                                          const Offset(0, 2),
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
                                                     ),
                                                   ]
                                                 : null,
@@ -3676,9 +3788,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 child: Icon(
                                                   isLeading
                                                       ? Icons
-                                                          .emoji_events_rounded
+                                                            .emoji_events_rounded
                                                       : Icons
-                                                          .sports_score_rounded,
+                                                            .sports_score_rounded,
                                                   color: isLeading
                                                       ? primaryGreen
                                                       : const Color(0xFF64748B),
@@ -3705,44 +3817,48 @@ class _QuizScreenState extends State<QuizScreen> {
                                                             style: TextStyle(
                                                               fontWeight:
                                                                   isLeading
-                                                                      ? FontWeight
-                                                                          .w900
-                                                                      : FontWeight
-                                                                          .w700,
+                                                                  ? FontWeight
+                                                                        .w900
+                                                                  : FontWeight
+                                                                        .w700,
                                                               color: isLeading
                                                                   ? darkGreen
                                                                   : const Color(
-                                                                      0xFF0F172A),
+                                                                      0xFF0F172A,
+                                                                    ),
                                                               fontSize: 14,
                                                             ),
                                                           ),
                                                         ),
                                                         const SizedBox(
-                                                            width: 6),
+                                                          width: 6,
+                                                        ),
                                                         Container(
                                                           padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                            horizontal: 5,
-                                                            vertical: 1.5,
-                                                          ),
-                                                          decoration:
-                                                              BoxDecoration(
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 5,
+                                                                vertical: 1.5,
+                                                              ),
+                                                          decoration: BoxDecoration(
                                                             color: isTeam
                                                                 ? const Color(
-                                                                    0xFFEFF6FF)
+                                                                    0xFFEFF6FF,
+                                                                  )
                                                                 : const Color(
-                                                                    0xFFF0FDF4),
+                                                                    0xFFF0FDF4,
+                                                                  ),
                                                             borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        5),
+                                                                BorderRadius.circular(
+                                                                  5,
+                                                                ),
                                                             border: Border.all(
                                                               color: isTeam
                                                                   ? const Color(
-                                                                      0xFF93C5FD)
+                                                                      0xFF93C5FD,
+                                                                    )
                                                                   : const Color(
-                                                                      0xFF86EFAC),
+                                                                      0xFF86EFAC,
+                                                                    ),
                                                               width: 0.8,
                                                             ),
                                                           ),
@@ -3757,7 +3873,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                                                       .w800,
                                                               color: isTeam
                                                                   ? const Color(
-                                                                      0xFF1D4ED8)
+                                                                      0xFF1D4ED8,
+                                                                    )
                                                                   : primaryGreen,
                                                             ),
                                                           ),
@@ -3783,7 +3900,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                                         style: TextStyle(
                                                           fontSize: 10,
                                                           color: Colors
-                                                              .grey.shade500,
+                                                              .grey
+                                                              .shade500,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                         ),
@@ -3795,9 +3913,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                               Container(
                                                 padding:
                                                     const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 6,
-                                                ),
+                                                      horizontal: 10,
+                                                      vertical: 6,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: isLeading
                                                       ? primaryGreen
@@ -3806,15 +3924,20 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       BorderRadius.circular(8),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: (isLeading
-                                                              ? primaryGreen
-                                                              : const Color(
-                                                                  0xFF1E40AF))
-                                                          .withValues(
-                                                              alpha: 0.3),
+                                                      color:
+                                                          (isLeading
+                                                                  ? primaryGreen
+                                                                  : const Color(
+                                                                      0xFF1E40AF,
+                                                                    ))
+                                                              .withValues(
+                                                                alpha: 0.3,
+                                                              ),
                                                       blurRadius: 4,
-                                                      offset:
-                                                          const Offset(0, 2),
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -3908,8 +4031,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.05),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.05,
+                                      ),
                                       blurRadius: 14,
                                       offset: const Offset(0, 4),
                                     ),
@@ -3924,8 +4048,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFDCFCE7),
-                                            borderRadius:
-                                                BorderRadius.circular(10),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                           ),
                                           child: const Icon(
                                             Icons.leaderboard_rounded,
@@ -3961,13 +4086,16 @@ class _QuizScreenState extends State<QuizScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     const Divider(
-                                        height: 1, color: Color(0xFFF1F5F9)),
+                                      height: 1,
+                                      color: Color(0xFFF1F5F9),
+                                    ),
                                     const SizedBox(height: 14),
 
                                     if (tallyList.isEmpty)
                                       const Padding(
-                                        padding:
-                                            EdgeInsets.symmetric(vertical: 24),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 24,
+                                        ),
                                         child: Center(
                                           child: Text(
                                             "No contestant standings found.",
@@ -3989,7 +4117,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                         itemBuilder: (context, index) {
                                           final item = tallyList[index];
                                           return _buildFinishedTallyRow(
-                                              item, sortedLevels);
+                                            item,
+                                            sortedLevels,
+                                          );
                                         },
                                       ),
                                   ],
@@ -4016,7 +4146,8 @@ class _QuizScreenState extends State<QuizScreen> {
     String currentUid,
     bool isTiedContestant,
   ) {
-    final bool isTieBreaker = quizData['tieBreakerEnded'] == true ||
+    final bool isTieBreaker =
+        quizData['tieBreakerEnded'] == true ||
         quizData['tieBreakerActive'] == true ||
         (quizData['status'] ?? '').toString().toLowerCase() ==
             'tie_breaker_ended';
@@ -4034,20 +4165,24 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                   stream: currentUid.isNotEmpty
                       ? _sessionRef
-                          .collection('scores')
-                          .doc(currentUid)
-                          .snapshots()
+                            .collection('scores')
+                            .doc(currentUid)
+                            .snapshots()
                       : null,
                   builder: (context, scoreSnap) {
                     final sData =
                         scoreSnap.data?.data() ?? const <String, dynamic>{};
-                    final int tbScore = int.tryParse(
-                            sData['tieBreakerScore']?.toString() ?? '') ??
+                    final int tbScore =
+                        int.tryParse(
+                          sData['tieBreakerScore']?.toString() ?? '',
+                        ) ??
                         0;
-                    final int totalScore = int.tryParse(
-                            sData['totalScore']?.toString() ??
-                                sData['score']?.toString() ??
-                                '') ??
+                    final int totalScore =
+                        int.tryParse(
+                          sData['totalScore']?.toString() ??
+                              sData['score']?.toString() ??
+                              '',
+                        ) ??
                         0;
 
                     return Column(
@@ -4072,8 +4207,9 @@ class _QuizScreenState extends State<QuizScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF16A34A)
-                                    .withValues(alpha: 0.22),
+                                color: const Color(
+                                  0xFF16A34A,
+                                ).withValues(alpha: 0.22),
                                 blurRadius: 26,
                                 spreadRadius: 2,
                                 offset: const Offset(0, 6),
@@ -4105,8 +4241,8 @@ class _QuizScreenState extends State<QuizScreen> {
                         Text(
                           isTieBreaker
                               ? (isTiedContestant
-                                  ? "Outstanding work! Your tie breaker points have been recorded."
-                                  : "The tie breaker round between the tied contestants has concluded.")
+                                    ? "Outstanding work! Your tie breaker points have been recorded."
+                                    : "The tie breaker round between the tied contestants has concluded.")
                               : "Outstanding work! All your answers and points have been recorded.",
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -4129,8 +4265,9 @@ class _QuizScreenState extends State<QuizScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF16A34A)
-                                      .withValues(alpha: 0.08),
+                                  color: const Color(
+                                    0xFF16A34A,
+                                  ).withValues(alpha: 0.08),
                                   blurRadius: 18,
                                   offset: const Offset(0, 6),
                                 ),
@@ -4226,10 +4363,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(30),
-                            border: Border.all(
-                              color: borderGreen,
-                              width: 1.2,
-                            ),
+                            border: Border.all(color: borderGreen, width: 1.2),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -4283,7 +4417,8 @@ class _QuizScreenState extends State<QuizScreen> {
         nextReadyConfirmed && (confirmedQuestionIndex == currentQuestion);
 
     final isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
-    final isTieBreakerEnded = _latestQuizData['tieBreakerEnded'] == true ||
+    final isTieBreakerEnded =
+        _latestQuizData['tieBreakerEnded'] == true ||
         (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
             'tie_breaker_ended';
 
@@ -4299,7 +4434,9 @@ class _QuizScreenState extends State<QuizScreen> {
     if (publishedWinners) {
       if (_showTieBreakerOverallTally ||
           (_quizFinishedForContestant &&
-              (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant))) {
+              (!isTieBreakerActive ||
+                  isTieBreakerEnded ||
+                  !isTiedContestant))) {
         return _buildFinishedCongratulationsScreen(context, currentUid);
       }
     } else if (isTieBreakerEnded) {
@@ -4393,7 +4530,8 @@ class _QuizScreenState extends State<QuizScreen> {
         ? yourAnswer.trim()
         : questionTypeSafeAnswer().trim();
 
-    final bool noAnswer = effectiveAnswer.isEmpty ||
+    final bool noAnswer =
+        effectiveAnswer.isEmpty ||
         effectiveAnswer.toLowerCase() == 'no answer' ||
         effectiveAnswer.toLowerCase() == 'unanswered';
     final displayAnswer = noAnswer ? "No answer" : effectiveAnswer;
@@ -4673,8 +4811,9 @@ class _QuizScreenState extends State<QuizScreen> {
       activeLevel = pos.level;
     }
     if (activeLevel <= 0) {
-      final parsed =
-          int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '');
+      final parsed = int.tryParse(
+        _latestQuizData['currentLevel']?.toString() ?? '',
+      );
       if (parsed != null && parsed > 0) activeLevel = parsed;
     }
     if (activeLevel <= 0) activeLevel = 1;
@@ -4815,9 +4954,9 @@ class _QuizScreenState extends State<QuizScreen> {
       return const SizedBox.shrink();
     }
 
-    final bool isTieBreakerActive =
-        _latestQuizData['tieBreakerActive'] == true;
-    final bool isTieBreakerEnded = _latestQuizData['tieBreakerEnded'] == true ||
+    final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
+    final bool isTieBreakerEnded =
+        _latestQuizData['tieBreakerEnded'] == true ||
         (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
             'tie_breaker_ended' ||
         _latestQuizData['tieBreakerResolved'] == true;
@@ -4826,9 +4965,9 @@ class _QuizScreenState extends State<QuizScreen> {
       final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
       final List<String> tiedUids = rawTieUids is List
           ? rawTieUids
-              .map((e) => e.toString().trim())
-              .where((e) => e.isNotEmpty)
-              .toList()
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
           : <String>[];
       final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
       final bool isContestPending = contestStatus == "pending";
@@ -4882,10 +5021,7 @@ class _QuizScreenState extends State<QuizScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: primaryGreen,
-                  width: 1.8,
-                ),
+                border: Border.all(color: primaryGreen, width: 1.8),
                 boxShadow: [
                   BoxShadow(
                     color: primaryGreen.withValues(alpha: 0.08),
@@ -4999,7 +5135,8 @@ class _QuizScreenState extends State<QuizScreen> {
           }
 
           // If still tied:
-          final isConfirmed = !isContestPending &&
+          final isConfirmed =
+              !isContestPending &&
               nextReadyConfirmed &&
               (confirmedQuestionIndex == currentQuestion);
           return Container(
@@ -5050,8 +5187,8 @@ class _QuizScreenState extends State<QuizScreen> {
                   isContestPending
                       ? "CONTEST UNDER REVIEW"
                       : (isConfirmed
-                          ? "ANDAM NA PARA SA SUNOD!"
-                          : "TIE BREAKER CONTINUES"),
+                            ? "ANDAM NA PARA SA SUNOD!"
+                            : "TIE BREAKER CONTINUES"),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isContestPending
@@ -5066,16 +5203,17 @@ class _QuizScreenState extends State<QuizScreen> {
                   isContestPending
                       ? "Please wait for the Quiz Master to review your contest (approve or reject) before confirming."
                       : (isConfirmed
-                          ? "Waiting for the Quiz Master to start the next tie breaker question..."
-                          : "Both contestants are still tied! Click CONFIRM when you are ready for the next tie breaker question."),
+                            ? "Waiting for the Quiz Master to start the next tie breaker question..."
+                            : "Both contestants are still tied! Click CONFIRM when you are ready for the next tie breaker question."),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isContestPending
                         ? Colors.orange.shade900
                         : Colors.black54,
                     fontSize: 13.5,
-                    fontWeight:
-                        isContestPending ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isContestPending
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                     height: 1.4,
                   ),
                 ),
@@ -5095,16 +5233,16 @@ class _QuizScreenState extends State<QuizScreen> {
                                   .collection('join_requests')
                                   .doc(myUid)
                                   .set({
-                                'tieBreakerReady': true,
-                              }, SetOptions(merge: true));
+                                    'tieBreakerReady': true,
+                                  }, SetOptions(merge: true));
                             }
                           },
                     icon: Icon(
                       isContestPending
                           ? Icons.hourglass_top_rounded
                           : (isConfirmed
-                              ? Icons.check_circle_rounded
-                              : Icons.check),
+                                ? Icons.check_circle_rounded
+                                : Icons.check),
                       size: 20,
                     ),
                     label: Text(
@@ -5141,7 +5279,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
     final nextQuestionNumber = _getNextQuestionNumberInLevel();
     final bool isContestPending = contestStatus == "pending";
-    final bool isConfirmed = !isContestPending &&
+    final bool isConfirmed =
+        !isContestPending &&
         nextReadyConfirmed &&
         (confirmedQuestionIndex == currentQuestion);
 
@@ -5163,8 +5302,8 @@ class _QuizScreenState extends State<QuizScreen> {
             isContestPending
                 ? Icons.hourglass_top_rounded
                 : (isConfirmed
-                    ? Icons.check_circle_rounded
-                    : Icons.play_circle_outline_rounded),
+                      ? Icons.check_circle_rounded
+                      : Icons.play_circle_outline_rounded),
             color: isContestPending ? Colors.orange : primaryGreen,
             size: 44,
           ),
@@ -5187,12 +5326,12 @@ class _QuizScreenState extends State<QuizScreen> {
             isContestPending
                 ? "Please wait for the Quiz Master to review your contest (approve or reject) before confirming."
                 : (isLastQuestionInLevel
-                    ? (isConfirmed
-                        ? "Waiting for the Quiz Master to show the Level $currentLevel results."
-                        : "Please see the Level $currentLevel results.")
-                    : (isConfirmed
-                        ? "Waiting for the Quiz Master to start Question $nextQuestionNumber."
-                        : "Review the result above, then press CONFIRM when you are ready for the next question.")),
+                      ? (isConfirmed
+                            ? "Waiting for the Quiz Master to show the Level $currentLevel results."
+                            : "Please see the Level $currentLevel results.")
+                      : (isConfirmed
+                            ? "Waiting for the Quiz Master to start Question $nextQuestionNumber."
+                            : "Review the result above, then press CONFIRM when you are ready for the next question.")),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isContestPending ? Colors.orange.shade900 : Colors.grey,
@@ -5226,8 +5365,8 @@ class _QuizScreenState extends State<QuizScreen> {
                               .collection('join_requests')
                               .doc(myUid)
                               .set({
-                            'tieBreakerReady': true,
-                          }, SetOptions(merge: true));
+                                'tieBreakerReady': true,
+                              }, SetOptions(merge: true));
                         }
                       }
                     },
@@ -5241,8 +5380,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 isContestPending
                     ? "WAITING FOR REVIEW..."
                     : (isConfirmed
-                        ? (isLastQuestionInLevel ? "NEXT" : "READY")
-                        : (isLastQuestionInLevel ? "NEXT" : "CONFIRM")),
+                          ? (isLastQuestionInLevel ? "NEXT" : "READY")
+                          : (isLastQuestionInLevel ? "NEXT" : "CONFIRM")),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -5368,7 +5507,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 final text = contestExplanationController.text.trim();
 
                 if (text.isEmpty) {
-                  showTopSnackBar(dialogContext, 
+                  showTopSnackBar(
+                    dialogContext,
                     const SnackBar(
                       content: Text(
                         "Please explain why you "
@@ -5457,17 +5597,28 @@ class _QuizScreenState extends State<QuizScreen> {
         if (joinSnap.exists) {
           final jData = joinSnap.data();
           final rawTeam = (jData?['teamName'] ?? '').toString().trim();
-          final cType = (jData?['contestantType'] ?? '').toString().trim().toLowerCase();
+          final cType = (jData?['contestantType'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
           final rawMembers = jData?['teamMembers'] ?? jData?['members'];
           if (rawMembers is List) {
             for (final m in rawMembers) {
-              final s = m is Map ? (m['name'] ?? m['displayName'] ?? '').toString().trim() : m.toString().trim();
+              final s = m is Map
+                  ? (m['name'] ?? m['displayName'] ?? '').toString().trim()
+                  : m.toString().trim();
               if (s.isNotEmpty && !teamMembers.contains(s)) teamMembers.add(s);
             }
           }
-          isTeam = cType == 'team' || jData?['isTeam'] == true || rawTeam.isNotEmpty || teamMembers.isNotEmpty;
+          isTeam =
+              cType == 'team' ||
+              jData?['isTeam'] == true ||
+              rawTeam.isNotEmpty ||
+              teamMembers.isNotEmpty;
           teamName = rawTeam;
-          final rName = (jData?['realName'] ?? jData?['fullName'] ?? '').toString().trim();
+          final rName = (jData?['realName'] ?? jData?['fullName'] ?? '')
+              .toString()
+              .trim();
           if (rName.isNotEmpty) personalName = rName;
         }
 
@@ -5479,17 +5630,26 @@ class _QuizScreenState extends State<QuizScreen> {
           if (userDoc.exists) {
             final uData = userDoc.data();
             final rawTeam = (uData?['teamName'] ?? '').toString().trim();
-            final cType = (uData?['contestantType'] ?? '').toString().trim().toLowerCase();
+            final cType = (uData?['contestantType'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
             final rawMembers = uData?['teamMembers'] ?? uData?['members'];
             if (rawMembers is List) {
               for (final m in rawMembers) {
-                final s = m is Map ? (m['name'] ?? m['displayName'] ?? '').toString().trim() : m.toString().trim();
-                if (s.isNotEmpty && !teamMembers.contains(s)) teamMembers.add(s);
+                final s = m is Map
+                    ? (m['name'] ?? m['displayName'] ?? '').toString().trim()
+                    : m.toString().trim();
+                if (s.isNotEmpty && !teamMembers.contains(s))
+                  teamMembers.add(s);
               }
             }
             if (rawTeam.isNotEmpty) teamName = rawTeam;
-            if (cType == 'team' || rawTeam.isNotEmpty || teamMembers.isNotEmpty) isTeam = true;
-            final rName = (uData?['fullName'] ?? uData?['name'] ?? '').toString().trim();
+            if (cType == 'team' || rawTeam.isNotEmpty || teamMembers.isNotEmpty)
+              isTeam = true;
+            final rName = (uData?['fullName'] ?? uData?['name'] ?? '')
+                .toString()
+                .trim();
             if (rName.isNotEmpty) personalName = rName;
           }
         }
@@ -5540,11 +5700,12 @@ class _QuizScreenState extends State<QuizScreen> {
         try {
           final savedResp = await responseRef.get();
           if (savedResp.exists) {
-            contestantAnswer = (savedResp.data()?['selectedAnswer'] ??
-                    savedResp.data()?['answer'] ??
-                    '')
-                .toString()
-                .trim();
+            contestantAnswer =
+                (savedResp.data()?['selectedAnswer'] ??
+                        savedResp.data()?['answer'] ??
+                        '')
+                    .toString()
+                    .trim();
           }
         } catch (_) {}
       }
@@ -5602,7 +5763,8 @@ class _QuizScreenState extends State<QuizScreen> {
         confirmedQuestionIndex = -1;
       });
 
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         const SnackBar(
           content: Text(
             "Contest submitted. Please wait for "
@@ -5619,7 +5781,8 @@ class _QuizScreenState extends State<QuizScreen> {
           contestSubmitting = false;
         });
 
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text("Unable to submit contest: $e"),
             backgroundColor: Colors.red,
@@ -5663,8 +5826,10 @@ class _QuizScreenState extends State<QuizScreen> {
       currentQuestionData ?? {},
       fallbackQuestionNumber: questionNumber,
     );
-    final points =
-        getPointsForLevel(contestLevel, question: currentQuestionData);
+    final points = getPointsForLevel(
+      contestLevel,
+      question: currentQuestionData,
+    );
 
     final requestId = contestRequestId ?? '${uid}_question_$questionIndex';
 
@@ -5789,12 +5954,13 @@ class _QuizScreenState extends State<QuizScreen> {
           final data = snapshot.data!.data() as Map<String, dynamic>?;
 
           final status = data?['status']?.toString().toLowerCase() ?? "pending";
-          final comment = (data?['comment'] ??
-                  data?['quizmasterComment'] ??
-                  data?['rejectionReason'] ??
-                  '')
-              .toString()
-              .trim();
+          final comment =
+              (data?['comment'] ??
+                      data?['quizmasterComment'] ??
+                      data?['rejectionReason'] ??
+                      '')
+                  .toString()
+                  .trim();
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
@@ -5928,7 +6094,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: Text(
                   "Contest rejected. Your original answer "
                   "remains incorrect.",
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -6065,7 +6234,11 @@ class _QuizScreenState extends State<QuizScreen> {
         final rawMembers = userData?['teamMembers'] ?? userData?['members'];
         if (rawMembers is List) {
           teamMembers = rawMembers
-              .map((e) => e is Map ? (e['name'] ?? '').toString().trim() : e.toString().trim())
+              .map(
+                (e) => e is Map
+                    ? (e['name'] ?? '').toString().trim()
+                    : e.toString().trim(),
+              )
               .where((s) => s.isNotEmpty)
               .toList();
         }
@@ -6080,8 +6253,7 @@ class _QuizScreenState extends State<QuizScreen> {
         .collection('scores')
         .doc(uid);
 
-    final bool isTieBreakerActive =
-        _latestQuizData['tieBreakerActive'] == true;
+    final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
     final int targetLevel = level ?? getLevelFromQuestionNumber(questionNumber);
     if (!isTieBreakerActive) {
       _localLevelPoints[targetLevel] =
@@ -6096,7 +6268,8 @@ class _QuizScreenState extends State<QuizScreen> {
       final scoreData = scoreDoc.data() ?? {};
 
       if (scoreDoc.exists) {
-        final dynamic rawLvl = scoreData[levelKey] ??
+        final dynamic rawLvl =
+            scoreData[levelKey] ??
             scoreData['level_$targetLevel'] ??
             (scoreData['levelScores'] is Map
                 ? scoreData['levelScores']['Level $targetLevel']
@@ -6106,12 +6279,16 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
 
-      int calculatedLevelScore = ((oldLevelScore + points) < 0 ? 0 : (oldLevelScore + points));
+      int calculatedLevelScore = ((oldLevelScore + points) < 0
+          ? 0
+          : (oldLevelScore + points));
       final int localPts = _localLevelPoints[targetLevel] ?? 0;
       if (localPts > calculatedLevelScore) {
         calculatedLevelScore = localPts;
       }
-      final newLevelScore = isTieBreakerActive ? oldLevelScore : calculatedLevelScore;
+      final newLevelScore = isTieBreakerActive
+          ? oldLevelScore
+          : calculatedLevelScore;
 
       final Map<String, dynamic> mergedLevelScores = {};
       if (scoreData['levelScores'] is Map) {
@@ -6129,7 +6306,8 @@ class _QuizScreenState extends State<QuizScreen> {
         if (!isTieBreakerActive && l == targetLevel) {
           lVal = newLevelScore;
         } else {
-          final dynamic r = scoreData['level${l}Score'] ??
+          final dynamic r =
+              scoreData['level${l}Score'] ??
               scoreData['level_$l'] ??
               mergedLevelScores['Level $l'] ??
               mergedLevelScores['$l'];
@@ -6171,8 +6349,9 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (mounted) {
       setState(() {
-        currentScore =
-            (currentScore + points) < 0 ? 0 : (currentScore + points);
+        currentScore = (currentScore + points) < 0
+            ? 0
+            : (currentScore + points);
       });
     }
   }
@@ -6204,7 +6383,8 @@ class _QuizScreenState extends State<QuizScreen> {
       try {
         final sessionSnap = await _sessionRef.get();
         final officialRanks = sessionSnap.data()?['officialRanks'];
-        if (officialRanks is Map && officialRanks.containsKey(currentUser.uid)) {
+        if (officialRanks is Map &&
+            officialRanks.containsKey(currentUser.uid)) {
           final offRank = officialRanks[currentUser.uid];
           final parsed = offRank is num
               ? offRank.toInt()
@@ -6219,13 +6399,15 @@ class _QuizScreenState extends State<QuizScreen> {
         for (final doc in scoresSnapshot.docs) {
           if (doc.id == currentUser.uid) {
             final data = doc.data();
-            final raw = data['rank'] ??
+            final raw =
+                data['rank'] ??
                 data['levelRank'] ??
                 data['currentRank'] ??
                 data['rankAtProceed'];
             if (raw != null) {
-              directRank =
-                  raw is num ? raw.toInt() : int.tryParse(raw.toString());
+              directRank = raw is num
+                  ? raw.toInt()
+                  : int.tryParse(raw.toString());
             }
             break;
           }
@@ -6235,13 +6417,15 @@ class _QuizScreenState extends State<QuizScreen> {
         for (final doc in joinRequestsSnapshot.docs) {
           if (doc.id == currentUser.uid) {
             final data = doc.data();
-            final raw = data['rank'] ??
+            final raw =
+                data['rank'] ??
                 data['levelRank'] ??
                 data['currentRank'] ??
                 data['rankAtProceed'];
             if (raw != null) {
-              directRank =
-                  raw is num ? raw.toInt() : int.tryParse(raw.toString());
+              directRank = raw is num
+                  ? raw.toInt()
+                  : int.tryParse(raw.toString());
             }
             break;
           }
@@ -6258,9 +6442,8 @@ class _QuizScreenState extends State<QuizScreen> {
             ? rawScore.toInt()
             : int.tryParse(rawScore?.toString() ?? '') ?? 0;
 
-        final rawTime = data['updatedAt'] ??
-            data['answeredAt'] ??
-            data['lastAnsweredAt'];
+        final rawTime =
+            data['updatedAt'] ?? data['answeredAt'] ?? data['lastAnsweredAt'];
         if (rawTime is Timestamp) {
           submissionTimeByUid[doc.id] = rawTime.millisecondsSinceEpoch;
         } else if (rawTime is num) {
@@ -6632,7 +6815,11 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
           title: const Row(
             children: [
-              Icon(Icons.exit_to_app_rounded, color: Colors.redAccent, size: 24),
+              Icon(
+                Icons.exit_to_app_rounded,
+                color: Colors.redAccent,
+                size: 24,
+              ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -6649,19 +6836,21 @@ class _QuizScreenState extends State<QuizScreen> {
           content: const Text(
             "Are you sure you want to leave the quiz?\n\n"
             "Your submitted answers and score will remain saved.",
-            style: TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-              height: 1.45,
-            ),
+            style: TextStyle(color: Colors.black87, fontSize: 14, height: 1.45),
           ),
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.grey.shade700,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
               ),
               child: const Text(
                 "CANCEL",
@@ -6674,7 +6863,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -6732,7 +6924,9 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF16A34A).withValues(alpha: 0.22),
+                            color: const Color(
+                              0xFF16A34A,
+                            ).withValues(alpha: 0.22),
                             blurRadius: 30,
                             spreadRadius: 3,
                             offset: const Offset(0, 8),
@@ -6746,10 +6940,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
-                              colors: [
-                                Color(0xFF22C55E),
-                                Color(0xFF15803D),
-                              ],
+                              colors: [Color(0xFF22C55E), Color(0xFF15803D)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -6800,7 +6991,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         // 1. First check session levelQuestions mapping
                         final rawLevelQuestions =
                             sessionData['levelQuestions'] ??
-                                _latestQuizData['levelQuestions'];
+                            _latestQuizData['levelQuestions'];
                         if (rawLevelQuestions is Map) {
                           final target = 'level$currentLevel';
                           for (final entry in rawLevelQuestions.entries) {
@@ -6808,8 +6999,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 .toString()
                                 .toLowerCase()
                                 .replaceAll(RegExp(r'[^a-z0-9]'), '');
-                            if ((norm == target ||
-                                    norm == '$currentLevel') &&
+                            if ((norm == target || norm == '$currentLevel') &&
                                 entry.value is List) {
                               totalQuestionsInLevel =
                                   (entry.value as List).length;
@@ -6819,13 +7009,17 @@ class _QuizScreenState extends State<QuizScreen> {
                         }
 
                         // 2. Count questions in this level from _sortedSessionQuestions
-                        if (totalQuestionsInLevel == 0 && _sortedSessionQuestions.isNotEmpty) {
+                        if (totalQuestionsInLevel == 0 &&
+                            _sortedSessionQuestions.isNotEmpty) {
                           int count = 0;
-                          for (var i = 0;
-                              i < _sortedSessionQuestions.length;
-                              i++) {
-                            final qData = _sortedSessionQuestions[i].data()
-                                as Map<String, dynamic>?;
+                          for (
+                            var i = 0;
+                            i < _sortedSessionQuestions.length;
+                            i++
+                          ) {
+                            final qData =
+                                _sortedSessionQuestions[i].data()
+                                    as Map<String, dynamic>?;
                             if (qData == null) continue;
                             final qLvl = getLevelFromSessionQuestion(
                               qData,
@@ -6845,43 +7039,55 @@ class _QuizScreenState extends State<QuizScreen> {
                               totalQuestionsInLevel * ptsPerQ;
                         }
 
-                        final sessionStatus = sessionData['status']
+                        final sessionStatus =
+                            sessionData['status']
                                 ?.toString()
                                 .toLowerCase()
                                 .trim() ??
                             '';
                         final bool isQuizFinished =
                             sessionStatus == 'finished' ||
-                                sessionStatus == 'completed' ||
-                                sessionStatus == 'ended' ||
-                                sessionData['isFinished'] == true;
+                            sessionStatus == 'completed' ||
+                            sessionStatus == 'ended' ||
+                            sessionData['isFinished'] == true;
 
                         // Determine highest / last regular level configured by admin
                         final Set<int> allConfiguredLevels = {};
-                        final rawLQ = sessionData['levelQuestions'] ??
+                        final rawLQ =
+                            sessionData['levelQuestions'] ??
                             _latestQuizData['levelQuestions'];
                         if (rawLQ is Map) {
                           for (final key in rawLQ.keys) {
-                            if (key.toString().toLowerCase().contains('tie')) continue;
-                            final m = RegExp(r'(\d+)').firstMatch(key.toString());
+                            if (key.toString().toLowerCase().contains('tie'))
+                              continue;
+                            final m = RegExp(
+                              r'(\d+)',
+                            ).firstMatch(key.toString());
                             if (m != null) {
                               final l = int.tryParse(m.group(1)!);
-                              if (l != null && l > 0) allConfiguredLevels.add(l);
+                              if (l != null && l > 0)
+                                allConfiguredLevels.add(l);
                             }
                           }
                         }
-                        final rawLvls = sessionData['levels'] ?? _latestQuizData['levels'];
+                        final rawLvls =
+                            sessionData['levels'] ?? _latestQuizData['levels'];
                         if (rawLvls is List) {
                           for (final lvl in rawLvls) {
-                            if (lvl.toString().toLowerCase().contains('tie')) continue;
-                            final m = RegExp(r'(\d+)').firstMatch(lvl.toString());
+                            if (lvl.toString().toLowerCase().contains('tie'))
+                              continue;
+                            final m = RegExp(
+                              r'(\d+)',
+                            ).firstMatch(lvl.toString());
                             if (m != null) {
                               final l = int.tryParse(m.group(1)!);
-                              if (l != null && l > 0) allConfiguredLevels.add(l);
+                              if (l != null && l > 0)
+                                allConfiguredLevels.add(l);
                             }
                           }
                         }
-                        final expTotal = sessionData['totalLevels'] ??
+                        final expTotal =
+                            sessionData['totalLevels'] ??
                             sessionData['maxLevel'] ??
                             sessionData['numberOfLevels'] ??
                             sessionData['total_levels'];
@@ -6889,8 +7095,14 @@ class _QuizScreenState extends State<QuizScreen> {
                           allConfiguredLevels.add(expTotal.toInt());
                         }
                         if (_sortedSessionQuestions.isNotEmpty) {
-                          for (var i = 0; i < _sortedSessionQuestions.length; i++) {
-                            final qData = _sortedSessionQuestions[i].data() as Map<String, dynamic>?;
+                          for (
+                            var i = 0;
+                            i < _sortedSessionQuestions.length;
+                            i++
+                          ) {
+                            final qData =
+                                _sortedSessionQuestions[i].data()
+                                    as Map<String, dynamic>?;
                             if (qData == null) continue;
                             final qLvl = getLevelFromSessionQuestion(
                               qData,
@@ -6902,17 +7114,21 @@ class _QuizScreenState extends State<QuizScreen> {
                         if (allConfiguredLevels.isEmpty) {
                           allConfiguredLevels.addAll([1, 2, 3]);
                         }
-                        final int maxQuizLevel = allConfiguredLevels.reduce((a, b) => a > b ? a : b);
-                        final bool isLastLevel = currentLevel >= maxQuizLevel || isQuizFinished;
+                        final int maxQuizLevel = allConfiguredLevels.reduce(
+                          (a, b) => a > b ? a : b,
+                        );
+                        final bool isLastLevel =
+                            currentLevel >= maxQuizLevel || isQuizFinished;
 
                         return StreamBuilder<
-                            QuerySnapshot<Map<String, dynamic>>>(
+                          QuerySnapshot<Map<String, dynamic>>
+                        >(
                           stream: FirebaseAuth.instance.currentUser != null
                               ? _sessionRef
-                                  .collection('answers')
-                                  .doc(FirebaseAuth.instance.currentUser!.uid)
-                                  .collection('responses')
-                                  .snapshots()
+                                    .collection('answers')
+                                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                                    .collection('responses')
+                                    .snapshots()
                               : null,
                           builder: (context, responsesSnapshot) {
                             int correctCount = 0;
@@ -6922,32 +7138,42 @@ class _QuizScreenState extends State<QuizScreen> {
                                 responsesSnapshot.data != null) {
                               for (final doc in responsesSnapshot.data!.docs) {
                                 final data = doc.data();
-                                final rawLvl = data['level'] ?? data['sessionLevel'];
+                                final rawLvl =
+                                    data['level'] ?? data['sessionLevel'];
                                 int? itemLevel;
                                 if (rawLvl is num) {
                                   itemLevel = rawLvl.toInt();
                                 } else if (rawLvl != null) {
-                                  final match = RegExp(r'(\d+)').firstMatch(
-                                    rawLvl.toString(),
-                                  );
+                                  final match = RegExp(
+                                    r'(\d+)',
+                                  ).firstMatch(rawLvl.toString());
                                   if (match != null) {
                                     itemLevel = int.tryParse(match.group(1)!);
                                   }
                                 }
                                 if (itemLevel == null || itemLevel <= 0) {
-                                  final mQ = RegExp(r'question_(\d+)').firstMatch(doc.id);
-                                  final qIdx = mQ != null ? int.tryParse(mQ.group(1)!) : null;
-                                  final qNum = (data['questionNumber'] as num?)?.toInt() ?? (qIdx != null ? qIdx + 1 : null);
+                                  final mQ = RegExp(
+                                    r'question_(\d+)',
+                                  ).firstMatch(doc.id);
+                                  final qIdx = mQ != null
+                                      ? int.tryParse(mQ.group(1)!)
+                                      : null;
+                                  final qNum =
+                                      (data['questionNumber'] as num?)
+                                          ?.toInt() ??
+                                      (qIdx != null ? qIdx + 1 : null);
                                   if (qNum != null) {
-                                    itemLevel = getLevelFromQuestionNumber(qNum);
+                                    itemLevel = getLevelFromQuestionNumber(
+                                      qNum,
+                                    );
                                   }
                                 }
                                 if (itemLevel == currentLevel) {
                                   answeredCount++;
                                   final bool isCorrect =
                                       data['isCorrect'] == true ||
-                                          data['answerStatus'] == 'correct' ||
-                                          data['contestStatus'] == 'approved';
+                                      data['answerStatus'] == 'correct' ||
+                                      data['contestStatus'] == 'approved';
                                   if (isCorrect) {
                                     correctCount++;
                                   }
@@ -6968,12 +7194,18 @@ class _QuizScreenState extends State<QuizScreen> {
                             }
 
                             return StreamBuilder<
-                                DocumentSnapshot<Map<String, dynamic>>>(
+                              DocumentSnapshot<Map<String, dynamic>>
+                            >(
                               stream: FirebaseAuth.instance.currentUser != null
                                   ? _sessionRef
-                                      .collection('scores')
-                                      .doc(FirebaseAuth.instance.currentUser!.uid)
-                                      .snapshots()
+                                        .collection('scores')
+                                        .doc(
+                                          FirebaseAuth
+                                              .instance
+                                              .currentUser!
+                                              .uid,
+                                        )
+                                        .snapshots()
                                   : null,
                               builder: (context, scoreSnapshot) {
                                 final sData = scoreSnapshot.data?.data();
@@ -6985,14 +7217,15 @@ class _QuizScreenState extends State<QuizScreen> {
                                 if (correctCount == 0 &&
                                     (responsesSnapshot.data == null ||
                                         responsesSnapshot.data!.docs.isEmpty)) {
-                                  final dynamic rawLvl = sData?[levelKey] ??
+                                  final dynamic rawLvl =
+                                      sData?[levelKey] ??
                                       (sData?['levelScores'] is Map
-                                          ? sData!['levelScores']
-                                              ['Level $currentLevel']
+                                          ? sData!['levelScores']['Level $currentLevel']
                                           : null);
                                   if (rawLvl != null) {
-                                    final parsed =
-                                        int.tryParse(rawLvl.toString());
+                                    final parsed = int.tryParse(
+                                      rawLvl.toString(),
+                                    );
                                     if (parsed != null &&
                                         parsed <= levelTotalPossiblePoints) {
                                       finalPoints = parsed;
@@ -7007,14 +7240,19 @@ class _QuizScreenState extends State<QuizScreen> {
                                   final scoreRef = _sessionRef
                                       .collection('scores')
                                       .doc(currentUid);
-                                  final int existingLvlScore = int.tryParse(
-                                          sData?[levelKey]?.toString() ?? '') ??
+                                  final int existingLvlScore =
+                                      int.tryParse(
+                                        sData?[levelKey]?.toString() ?? '',
+                                      ) ??
                                       -1;
                                   if (finalPoints != existingLvlScore) {
-                                    final Map<String, dynamic> mergedScores = {};
+                                    final Map<String, dynamic> mergedScores =
+                                        {};
                                     if (sData?['levelScores'] is Map) {
-                                      (sData!['levelScores'] as Map)
-                                          .forEach((k, v) {
+                                      (sData!['levelScores'] as Map).forEach((
+                                        k,
+                                        v,
+                                      ) {
                                         mergedScores[k.toString()] = v;
                                       });
                                     }
@@ -7028,29 +7266,34 @@ class _QuizScreenState extends State<QuizScreen> {
                                       } else {
                                         final dynamic val =
                                             sData?['level${l}Score'] ??
-                                                sData?['level_$l'] ??
-                                                mergedScores['Level $l'] ??
-                                                mergedScores['$l'];
+                                            sData?['level_$l'] ??
+                                            mergedScores['Level $l'] ??
+                                            mergedScores['$l'];
                                         if (val != null) {
                                           recalculatedTotal +=
                                               int.tryParse(val.toString()) ?? 0;
                                         }
                                       }
                                     }
-                                    final int tb = int.tryParse(
-                                            sData?['tieBreakerScore']
-                                                    ?.toString() ??
-                                                '') ??
+                                    final int tb =
+                                        int.tryParse(
+                                          sData?['tieBreakerScore']
+                                                  ?.toString() ??
+                                              '',
+                                        ) ??
                                         0;
                                     recalculatedTotal += tb;
 
-                                    scoreRef.set({
-                                      levelKey: finalPoints,
-                                      'levelScores': mergedScores,
-                                      'score': recalculatedTotal,
-                                      'totalScore': recalculatedTotal,
-                                      'updatedAt': FieldValue.serverTimestamp(),
-                                    }, SetOptions(merge: true)).catchError((_) {});
+                                    scoreRef
+                                        .set({
+                                          levelKey: finalPoints,
+                                          'levelScores': mergedScores,
+                                          'score': recalculatedTotal,
+                                          'totalScore': recalculatedTotal,
+                                          'updatedAt':
+                                              FieldValue.serverTimestamp(),
+                                        }, SetOptions(merge: true))
+                                        .catchError((_) {});
                                   }
                                 }
 
@@ -7064,8 +7307,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
-                                        borderRadius:
-                                            BorderRadius.circular(22),
+                                        borderRadius: BorderRadius.circular(22),
                                         border: Border.all(
                                           color: const Color(0xFFBBF7D0),
                                           width: 1.5,
@@ -7134,13 +7376,16 @@ class _QuizScreenState extends State<QuizScreen> {
                                                     letterSpacing: -0.5,
                                                   ),
                                                 ),
-                                                if (levelTotalPossiblePoints > 0)
+                                                if (levelTotalPossiblePoints >
+                                                    0)
                                                   Text(
                                                     " / $levelTotalPossiblePoints",
                                                     style: TextStyle(
-                                                      color: Colors.grey.shade400,
+                                                      color:
+                                                          Colors.grey.shade400,
                                                       fontSize: 24,
-                                                      fontWeight: FontWeight.w800,
+                                                      fontWeight:
+                                                          FontWeight.w800,
                                                     ),
                                                   ),
                                                 const SizedBox(width: 8),
@@ -7150,7 +7395,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       : "POINTS",
                                                   style: TextStyle(
                                                     color: primaryGreen
-                                                        .withValues(alpha: 0.85),
+                                                        .withValues(
+                                                          alpha: 0.85,
+                                                        ),
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w800,
                                                     letterSpacing: 0.6,
@@ -7191,16 +7438,17 @@ class _QuizScreenState extends State<QuizScreen> {
                                                             Icons
                                                                 .check_circle_rounded,
                                                             size: 13,
-                                                            color:
-                                                                primaryGreen,
+                                                            color: primaryGreen,
                                                           ),
                                                           const SizedBox(
-                                                              width: 4),
+                                                            width: 4,
+                                                          ),
                                                           Text(
                                                             "CORRECT",
                                                             style: TextStyle(
                                                               color: Colors
-                                                                  .grey.shade600,
+                                                                  .grey
+                                                                  .shade600,
                                                               fontSize: 10.5,
                                                               fontWeight:
                                                                   FontWeight
@@ -7215,8 +7463,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       Text(
                                                         "$correctCount / $totalQuestionsInLevel",
                                                         style: const TextStyle(
-                                                          color:
-                                                              Color(0xFF14532D),
+                                                          color: Color(
+                                                            0xFF14532D,
+                                                          ),
                                                           fontSize: 14,
                                                           fontWeight:
                                                               FontWeight.w800,
@@ -7228,8 +7477,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 Container(
                                                   height: 24,
                                                   width: 1,
-                                                  color:
-                                                      const Color(0xFFBBF7D0),
+                                                  color: const Color(
+                                                    0xFFBBF7D0,
+                                                  ),
                                                 ),
                                                 Expanded(
                                                   child: Column(
@@ -7245,15 +7495,18 @@ class _QuizScreenState extends State<QuizScreen> {
                                                             Icons.bolt_rounded,
                                                             size: 14,
                                                             color: Colors
-                                                                .amber.shade700,
+                                                                .amber
+                                                                .shade700,
                                                           ),
                                                           const SizedBox(
-                                                              width: 3),
+                                                            width: 3,
+                                                          ),
                                                           Text(
                                                             "PER QUESTION",
                                                             style: TextStyle(
                                                               color: Colors
-                                                                  .grey.shade600,
+                                                                  .grey
+                                                                  .shade600,
                                                               fontSize: 10.5,
                                                               fontWeight:
                                                                   FontWeight
@@ -7271,7 +7524,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                                             : "$ptsPerQ ${ptsPerQ == 1 ? 'pt' : 'pts'}",
                                                         style: TextStyle(
                                                           color: Colors
-                                                              .amber.shade900,
+                                                              .amber
+                                                              .shade900,
                                                           fontSize: 14,
                                                           fontWeight:
                                                               FontWeight.w800,
@@ -7283,8 +7537,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 Container(
                                                   height: 24,
                                                   width: 1,
-                                                  color:
-                                                      const Color(0xFFBBF7D0),
+                                                  color: const Color(
+                                                    0xFFBBF7D0,
+                                                  ),
                                                 ),
                                                 Expanded(
                                                   child: Column(
@@ -7301,15 +7556,18 @@ class _QuizScreenState extends State<QuizScreen> {
                                                                 .military_tech_rounded,
                                                             size: 14,
                                                             color: Color(
-                                                                0xFF2563EB),
+                                                              0xFF2563EB,
+                                                            ),
                                                           ),
                                                           const SizedBox(
-                                                              width: 3),
+                                                            width: 3,
+                                                          ),
                                                           Text(
                                                             "TOTAL POOL",
                                                             style: TextStyle(
                                                               color: Colors
-                                                                  .grey.shade600,
+                                                                  .grey
+                                                                  .shade600,
                                                               fontSize: 10.5,
                                                               fontWeight:
                                                                   FontWeight
@@ -7322,13 +7580,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       ),
                                                       const SizedBox(height: 3),
                                                       Text(
-                                                        levelTotalPossiblePoints == 0
+                                                        levelTotalPossiblePoints ==
+                                                                0
                                                             ? "0"
                                                             : "$levelTotalPossiblePoints ${levelTotalPossiblePoints == 1 ? 'pt' : 'pts'}",
-                                                        style:
-                                                            const TextStyle(
-                                                          color:
-                                                              Color(0xFF1D4ED8),
+                                                        style: const TextStyle(
+                                                          color: Color(
+                                                            0xFF1D4ED8,
+                                                          ),
                                                           fontSize: 14,
                                                           fontWeight:
                                                               FontWeight.w800,
@@ -7344,7 +7603,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 18),
-                                    if (isQuizFinished && sessionData['publishedWinners'] == true)
+                                    if (isQuizFinished &&
+                                        sessionData['publishedWinners'] == true)
                                       Column(
                                         children: [
                                           Container(
@@ -7358,8 +7618,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                               borderRadius:
                                                   BorderRadius.circular(16),
                                               border: Border.all(
-                                                color:
-                                                    const Color(0xFF86EFAC),
+                                                color: const Color(0xFF86EFAC),
                                                 width: 1.5,
                                               ),
                                             ),
@@ -7376,11 +7635,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 Flexible(
                                                   child: Text(
                                                     "Quiz finished! You can view the final ranking now.",
-                                                    textAlign:
-                                                        TextAlign.center,
+                                                    textAlign: TextAlign.center,
                                                     style: TextStyle(
-                                                      color:
-                                                          Color(0xFF14532D),
+                                                      color: Color(0xFF14532D),
                                                       fontSize: 13,
                                                       fontWeight:
                                                           FontWeight.w700,
@@ -7424,9 +7681,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   MaterialPageRoute(
                                                     builder: (_) =>
                                                         ContestantOverallTallyScreen(
-                                                      quizCode: widget.quizCode,
-                                                      currentLevel: currentLevel,
-                                                    ),
+                                                          quizCode:
+                                                              widget.quizCode,
+                                                          currentLevel:
+                                                              currentLevel,
+                                                        ),
                                                   ),
                                                 );
                                               },
@@ -7453,8 +7712,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                               ),
                                               style: OutlinedButton.styleFrom(
                                                 side: const BorderSide(
-                                                    color: primaryGreen,
-                                                    width: 1.8),
+                                                  color: primaryGreen,
+                                                  width: 1.8,
+                                                ),
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius:
                                                       BorderRadius.circular(16),
@@ -7466,9 +7726,10 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   MaterialPageRoute(
                                                     builder: (_) =>
                                                         PartialRankingScreen(
-                                                      quizCode: widget.quizCode,
-                                                      isFinal: true,
-                                                    ),
+                                                          quizCode:
+                                                              widget.quizCode,
+                                                          isFinal: true,
+                                                        ),
                                                   ),
                                                 );
                                                 if (mounted) {
@@ -7487,10 +7748,12 @@ class _QuizScreenState extends State<QuizScreen> {
                                           vertical: 14,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.90),
-                                          borderRadius:
-                                              BorderRadius.circular(16),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.90,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                           border: Border.all(
                                             color: borderGreen,
                                             width: 1.3,
@@ -7532,13 +7795,13 @@ class _QuizScreenState extends State<QuizScreen> {
                                               vertical: 14,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.85),
+                                              color: Colors.white.withValues(
+                                                alpha: 0.85,
+                                              ),
                                               borderRadius:
                                                   BorderRadius.circular(16),
                                               border: Border.all(
-                                                color:
-                                                    const Color(0xFFD1FAE5),
+                                                color: const Color(0xFFD1FAE5),
                                                 width: 1.3,
                                               ),
                                               boxShadow: [
@@ -7560,9 +7823,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   height: 18,
                                                   child:
                                                       CircularProgressIndicator(
-                                                    strokeWidth: 2.2,
-                                                    color: primaryGreen,
-                                                  ),
+                                                        strokeWidth: 2.2,
+                                                        color: primaryGreen,
+                                                      ),
                                                 ),
                                                 const SizedBox(width: 12),
                                                 Flexible(
@@ -7570,11 +7833,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                     isLastLevel
                                                         ? "Waiting for Quiz Master to review final results..."
                                                         : "Waiting for Quiz Master to start next round...",
-                                                    textAlign:
-                                                        TextAlign.center,
+                                                    textAlign: TextAlign.center,
                                                     style: const TextStyle(
-                                                      color:
-                                                          Color(0xFF14532D),
+                                                      color: Color(0xFF14532D),
                                                       fontSize: 13,
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -7610,7 +7871,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                                       .withValues(alpha: 0.35),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
-                                                        BorderRadius.circular(16),
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
                                                   ),
                                                 ),
                                                 onPressed: () async {
@@ -7619,9 +7882,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                                     MaterialPageRoute(
                                                       builder: (_) =>
                                                           ContestantOverallTallyScreen(
-                                                        quizCode: widget.quizCode,
-                                                        currentLevel: currentLevel,
-                                                      ),
+                                                            quizCode:
+                                                                widget.quizCode,
+                                                            currentLevel:
+                                                                currentLevel,
+                                                          ),
                                                     ),
                                                   );
                                                 },
@@ -7720,7 +7985,11 @@ class _QuizScreenState extends State<QuizScreen> {
                   const Text(
                     "Please wait for the Quiz Master to resume.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey, fontSize: 16, height: 1.4),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 16,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 28),
                   const CircularProgressIndicator(color: primaryGreen),
@@ -7747,221 +8016,229 @@ class _QuizScreenState extends State<QuizScreen> {
         child: SafeArea(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: _sessionRef.collection('scores').snapshots(),
-        builder: (context, scoreSnap) {
-          int liveScore = currentScore;
-          int liveRank = currentRank;
+            builder: (context, scoreSnap) {
+              int liveScore = currentScore;
+              int liveRank = currentRank;
 
-          final docs = [...?scoreSnap.data?.docs];
-          if (docs.isNotEmpty) {
-            bool isElim(Map<String, dynamic> d) =>
-                d['eliminated'] == true ||
-                d['status']?.toString().toLowerCase() == 'eliminated';
-            int scoreOf(Map<String, dynamic> d) =>
-                int.tryParse(d['score']?.toString() ?? '') ?? 0;
+              final docs = [...?scoreSnap.data?.docs];
+              if (docs.isNotEmpty) {
+                bool isElim(Map<String, dynamic> d) =>
+                    d['eliminated'] == true ||
+                    d['status']?.toString().toLowerCase() == 'eliminated';
+                int scoreOf(Map<String, dynamic> d) =>
+                    int.tryParse(d['score']?.toString() ?? '') ?? 0;
 
-            docs.sort((a, b) {
-              final aElim = isElim(a.data());
-              final bElim = isElim(b.data());
-              if (aElim != bElim) return aElim ? 1 : -1;
-              final byScore = scoreOf(b.data()).compareTo(scoreOf(a.data()));
-              if (byScore != 0) return byScore;
-              return (a.data()['name']?.toString() ?? a.id).compareTo(
-                b.data()['name']?.toString() ?? b.id,
-              );
-            });
+                docs.sort((a, b) {
+                  final aElim = isElim(a.data());
+                  final bElim = isElim(b.data());
+                  if (aElim != bElim) return aElim ? 1 : -1;
+                  final byScore = scoreOf(
+                    b.data(),
+                  ).compareTo(scoreOf(a.data()));
+                  if (byScore != 0) return byScore;
+                  return (a.data()['name']?.toString() ?? a.id).compareTo(
+                    b.data()['name']?.toString() ?? b.id,
+                  );
+                });
 
-            final ranks = <int>[];
-            for (int i = 0; i < docs.length; i++) {
-              final raw = docs[i].data()['rank'] ??
-                  docs[i].data()['levelRank'] ??
-                  docs[i].data()['currentRank'];
-              final int? saved = raw is num
-                  ? raw.toInt()
-                  : int.tryParse(raw?.toString() ?? '');
-              ranks.add(saved ?? (i + 1));
-            }
+                final ranks = <int>[];
+                for (int i = 0; i < docs.length; i++) {
+                  final raw =
+                      docs[i].data()['rank'] ??
+                      docs[i].data()['levelRank'] ??
+                      docs[i].data()['currentRank'];
+                  final int? saved = raw is num
+                      ? raw.toInt()
+                      : int.tryParse(raw?.toString() ?? '');
+                  ranks.add(saved ?? (i + 1));
+                }
 
-            if (myUid != null) {
-              final myIndex = docs.indexWhere((d) => d.id == myUid);
-              if (myIndex >= 0) {
-                liveScore = scoreOf(docs[myIndex].data());
-                liveRank = ranks[myIndex];
+                if (myUid != null) {
+                  final myIndex = docs.indexWhere((d) => d.id == myUid);
+                  if (myIndex >= 0) {
+                    liveScore = scoreOf(docs[myIndex].data());
+                    liveRank = ranks[myIndex];
+                  }
+                }
               }
-            }
-          }
 
-          final String placementTitle = liveRank == 1
-              ? "CHAMPION • RANK #1"
-              : liveRank == 2
-              ? "1ST RUNNER-UP • RANK #2"
-              : liveRank == 3
-              ? "2ND RUNNER-UP • RANK #3"
-              : (liveRank > 0 ? "FINAL RANK: #$liveRank" : "FINAL RANK: --");
+              final String placementTitle = liveRank == 1
+                  ? "CHAMPION • RANK #1"
+                  : liveRank == 2
+                  ? "1ST RUNNER-UP • RANK #2"
+                  : liveRank == 3
+                  ? "2ND RUNNER-UP • RANK #3"
+                  : (liveRank > 0
+                        ? "FINAL RANK: #$liveRank"
+                        : "FINAL RANK: --");
 
-          return Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(25),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const TechArenaBadge(
-                      label: 'TECHNOWIZ • OFFICIAL QUIZ RESULT',
-                      icon: Icons.verified_rounded,
-                    ),
-                    const SizedBox(height: 18),
-                    Container(
-                      width: 110,
-                      height: 110,
-                      decoration: BoxDecoration(
-                        color: liveRank == 1
-                            ? const Color(0xFFFFFBEB)
-                            : softGreen,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: liveRank == 1
-                              ? Colors.amber.shade400
-                              : const Color(0xFFB7D8C0),
-                          width: 2.2,
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(25),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const TechArenaBadge(
+                          label: 'TECHNOWIZ • OFFICIAL QUIZ RESULT',
+                          icon: Icons.verified_rounded,
                         ),
-                      ),
-                      child: Icon(
-                        Icons.emoji_events_rounded,
-                        color: liveRank == 1
-                            ? Colors.amber.shade700
-                            : primaryGreen,
-                        size: 62,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      liveRank <= 3 && liveRank > 0
-                          ? "CONGRATULATIONS!"
-                          : "QUIZ FINISHED!",
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: darkGreen,
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      liveRank == 1
-                          ? "You finished at Rank #1 • Champion! 🏆"
-                          : liveRank == 2
-                              ? "You finished at Rank #2 • 1st Runner-Up! 🥈"
-                              : liveRank == 3
-                                  ? "You finished at Rank #3 • 2nd Runner-Up! 🥉"
-                                  : (liveRank > 0
-                                      ? "You finished at Rank #$liveRank! 🎖️"
-                                      : "Thank you for completing the quiz!"),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
-                    ),
-                    const SizedBox(height: 22),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: borderGreen),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            "YOUR FINAL SCORE",
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            "$liveScore",
-                            style: const TextStyle(
-                              color: primaryGreen,
-                              fontSize: 52,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 9,
-                            ),
-                            decoration: BoxDecoration(
+                        const SizedBox(height: 18),
+                        Container(
+                          width: 110,
+                          height: 110,
+                          decoration: BoxDecoration(
+                            color: liveRank == 1
+                                ? const Color(0xFFFFFBEB)
+                                : softGreen,
+                            shape: BoxShape.circle,
+                            border: Border.all(
                               color: liveRank == 1
-                                  ? const Color(0xFFFFFBEB)
-                                  : softGreen,
-                              borderRadius: BorderRadius.circular(20),
-                              border: liveRank == 1
-                                  ? Border.all(color: Colors.amber.shade300)
-                                  : null,
-                            ),
-                            child: Text(
-                              placementTitle,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: liveRank == 1
-                                    ? Colors.amber.shade900
-                                    : darkGreen,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  ? Colors.amber.shade400
+                                  : const Color(0xFFB7D8C0),
+                              width: 2.2,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 26),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 58,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.emoji_events_rounded),
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PartialRankingScreen(
-                                quizCode: widget.quizCode,
-                                isFinal: true,
-                              ),
-                            ),
-                          );
-                          if (mounted) {
-                            await _rememberQuizScreen();
-                          }
-                        },
-                        label: const Text(
-                          "FINAL RESULTS",
-                          style: TextStyle(
-                            fontSize: 17,
+                          child: Icon(
+                            Icons.emoji_events_rounded,
+                            color: liveRank == 1
+                                ? Colors.amber.shade700
+                                : primaryGreen,
+                            size: 62,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          liveRank <= 3 && liveRank > 0
+                              ? "CONGRATULATIONS!"
+                              : "QUIZ FINISHED!",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: darkGreen,
+                            fontSize: 30,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryGreen,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(17),
+                        const SizedBox(height: 8),
+                        Text(
+                          liveRank == 1
+                              ? "You finished at Rank #1 • Champion! 🏆"
+                              : liveRank == 2
+                              ? "You finished at Rank #2 • 1st Runner-Up! 🥈"
+                              : liveRank == 3
+                              ? "You finished at Rank #3 • 2nd Runner-Up! 🥉"
+                              : (liveRank > 0
+                                    ? "You finished at Rank #$liveRank! 🎖️"
+                                    : "Thank you for completing the quiz!"),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 15,
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 22),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(22),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: borderGreen),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                "YOUR FINAL SCORE",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                "$liveScore",
+                                style: const TextStyle(
+                                  color: primaryGreen,
+                                  fontSize: 52,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: liveRank == 1
+                                      ? const Color(0xFFFFFBEB)
+                                      : softGreen,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: liveRank == 1
+                                      ? Border.all(color: Colors.amber.shade300)
+                                      : null,
+                                ),
+                                child: Text(
+                                  placementTitle,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: liveRank == 1
+                                        ? Colors.amber.shade900
+                                        : darkGreen,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 26),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 58,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.emoji_events_rounded),
+                            onPressed: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PartialRankingScreen(
+                                    quizCode: widget.quizCode,
+                                    isFinal: true,
+                                  ),
+                                ),
+                              );
+                              if (mounted) {
+                                await _rememberQuizScreen();
+                              }
+                            },
+                            label: const Text(
+                              "FINAL RESULTS",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryGreen,
+                              foregroundColor: Colors.white,
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(17),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
           ),
         ),
       ),
@@ -8031,7 +8308,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.black54),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.black54,
+                    ),
                     tooltip: 'Close',
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -8046,11 +8326,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 stream: _sessionRef.collection('scores').snapshots(),
                 builder: (context, scoreSnap) {
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _sessionRef
-                        .collection('join_requests')
-                        .snapshots(),
+                    stream: _sessionRef.collection('join_requests').snapshots(),
                     builder: (context, contestantSnap) {
-                      if (scoreSnap.connectionState == ConnectionState.waiting &&
+                      if (scoreSnap.connectionState ==
+                              ConnectionState.waiting &&
                           !scoreSnap.hasData) {
                         return const Center(
                           child: CircularProgressIndicator(color: primaryGreen),
@@ -8075,12 +8354,25 @@ class _QuizScreenState extends State<QuizScreen> {
                       final rows = <Map<String, dynamic>>[];
 
                       for (final uid in allUids) {
-                        final cData = contestantById[uid] ?? const <String, dynamic>{};
-                        final sData = scoreById[uid] ?? const <String, dynamic>{};
-                        final uData = _userProfileCache[uid] ?? const <String, dynamic>{};
+                        final cData =
+                            contestantById[uid] ?? const <String, dynamic>{};
+                        final sData =
+                            scoreById[uid] ?? const <String, dynamic>{};
+                        final uData =
+                            _userProfileCache[uid] ?? const <String, dynamic>{};
 
-                        final status = (cData['status'] ?? sData['status'] ?? '').toString().trim().toLowerCase();
-                        final decision = (cData['contestantDecision'] ?? sData['contestantDecision'] ?? '').toString().trim().toLowerCase();
+                        final status =
+                            (cData['status'] ?? sData['status'] ?? '')
+                                .toString()
+                                .trim()
+                                .toLowerCase();
+                        final decision =
+                            (cData['contestantDecision'] ??
+                                    sData['contestantDecision'] ??
+                                    '')
+                                .toString()
+                                .trim()
+                                .toLowerCase();
 
                         // Skip users who left, were rejected, or are still pending
                         if (status == 'left' ||
@@ -8092,17 +8384,32 @@ class _QuizScreenState extends State<QuizScreen> {
                           continue;
                         }
 
-                        final isElim = cData['eliminated'] == true ||
+                        final isElim =
+                            cData['eliminated'] == true ||
                             cData['isEliminated'] == true ||
                             sData['eliminated'] == true ||
                             status == 'eliminated' ||
                             decision == 'eliminated';
                         if (isElim) continue;
 
-                        final rawTeam = (cData['teamName'] ?? sData['teamName'] ?? uData['teamName'] ?? '').toString().trim();
-                        final contestantType = (cData['contestantType'] ?? sData['contestantType'] ?? uData['contestantType'] ?? '').toString().trim().toLowerCase();
+                        final rawTeam =
+                            (cData['teamName'] ??
+                                    sData['teamName'] ??
+                                    uData['teamName'] ??
+                                    '')
+                                .toString()
+                                .trim();
+                        final contestantType =
+                            (cData['contestantType'] ??
+                                    sData['contestantType'] ??
+                                    uData['contestantType'] ??
+                                    '')
+                                .toString()
+                                .trim()
+                                .toLowerCase();
 
-                        final rawMembers = cData['teamMembers'] ??
+                        final rawMembers =
+                            cData['teamMembers'] ??
                             cData['members'] ??
                             sData['teamMembers'] ??
                             sData['members'] ??
@@ -8113,7 +8420,12 @@ class _QuizScreenState extends State<QuizScreen> {
                         if (rawMembers is List) {
                           for (final m in rawMembers) {
                             final s = m is Map
-                                ? (m['name'] ?? m['displayName'] ?? m['fullName'] ?? '').toString().trim()
+                                ? (m['name'] ??
+                                          m['displayName'] ??
+                                          m['fullName'] ??
+                                          '')
+                                      .toString()
+                                      .trim()
                                 : m.toString().trim();
                             if (s.isNotEmpty && !teamMembers.contains(s)) {
                               teamMembers.add(s);
@@ -8121,7 +8433,8 @@ class _QuizScreenState extends State<QuizScreen> {
                           }
                         }
 
-                        final bool isTeam = contestantType == 'team' ||
+                        final bool isTeam =
+                            contestantType == 'team' ||
                             cData['isTeam'] == true ||
                             sData['isTeam'] == true ||
                             uData['isTeam'] == true ||
@@ -8129,71 +8442,90 @@ class _QuizScreenState extends State<QuizScreen> {
                             teamMembers.isNotEmpty;
 
                         // If it's a team and we don't have members or team info yet, prefetch user profile
-                        if (isTeam && teamMembers.isEmpty && !uData.containsKey('teamMembers')) {
+                        if (isTeam &&
+                            teamMembers.isEmpty &&
+                            !uData.containsKey('teamMembers')) {
                           _prefetchUserProfile(uid);
                         }
 
-                        final personalName = (cData['realName'] ??
-                                cData['fullName'] ??
-                                uData['fullName'] ??
-                                uData['name'] ??
-                                sData['fullName'] ??
-                                cData['displayName'] ??
-                                cData['name'] ??
-                                sData['name'] ??
-                                cData['email'] ??
-                                uid)
-                            .toString()
-                            .trim();
+                        final personalName =
+                            (cData['realName'] ??
+                                    cData['fullName'] ??
+                                    uData['fullName'] ??
+                                    uData['name'] ??
+                                    sData['fullName'] ??
+                                    cData['displayName'] ??
+                                    cData['name'] ??
+                                    sData['name'] ??
+                                    cData['email'] ??
+                                    uid)
+                                .toString()
+                                .trim();
 
                         final teamName = rawTeam.isNotEmpty
                             ? rawTeam
-                            : (isTeam && teamMembers.isNotEmpty ? (rawTeam.isNotEmpty ? rawTeam : personalName) : '');
+                            : (isTeam && teamMembers.isNotEmpty
+                                  ? (rawTeam.isNotEmpty
+                                        ? rawTeam
+                                        : personalName)
+                                  : '');
 
                         final displayName = isTeam
                             ? (teamName.isNotEmpty ? teamName : personalName)
                             : personalName;
 
-                        final int rawStored = int.tryParse((sData['totalScore'] ??
-                                    sData['score'] ??
-                                    cData['finalScore'] ??
-                                    cData['totalScore'] ??
-                                    cData['score'])
-                                ?.toString() ??
-                            '') ??
+                        final int rawStored =
+                            int.tryParse(
+                              (sData['totalScore'] ??
+                                          sData['score'] ??
+                                          cData['finalScore'] ??
+                                          cData['totalScore'] ??
+                                          cData['score'])
+                                      ?.toString() ??
+                                  '',
+                            ) ??
                             0;
                         int lvlSum = 0;
                         for (int l = 1; l <= 20; l++) {
-                          final v = sData['level${l}Score'] ??
+                          final v =
+                              sData['level${l}Score'] ??
                               sData['level_$l'] ??
                               (sData['levelScores'] is Map
                                   ? (sData['levelScores']['Level $l'] ??
-                                      sData['levelScores']['$l'])
+                                        sData['levelScores']['$l'])
                                   : null) ??
                               (cData['levelScores'] is Map
                                   ? (cData['levelScores']['Level $l'] ??
-                                      cData['levelScores']['$l'])
+                                        cData['levelScores']['$l'])
                                   : null);
-                          if (v != null) lvlSum += int.tryParse(v.toString()) ?? 0;
+                          if (v != null)
+                            lvlSum += int.tryParse(v.toString()) ?? 0;
                         }
                         if (sData['levelScores'] is Map) {
                           int mSum = 0;
-                          for (final v in (sData['levelScores'] as Map).values) {
-                            if (v != null) mSum += int.tryParse(v.toString()) ?? 0;
+                          for (final v
+                              in (sData['levelScores'] as Map).values) {
+                            if (v != null)
+                              mSum += int.tryParse(v.toString()) ?? 0;
                           }
                           if (mSum > lvlSum) lvlSum = mSum;
                         }
                         if (cData['levelScores'] is Map) {
                           int cSum = 0;
-                          for (final v in (cData['levelScores'] as Map).values) {
-                            if (v != null) cSum += int.tryParse(v.toString()) ?? 0;
+                          for (final v
+                              in (cData['levelScores'] as Map).values) {
+                            if (v != null)
+                              cSum += int.tryParse(v.toString()) ?? 0;
                           }
                           if (cSum > lvlSum) lvlSum = cSum;
                         }
-                        final tiePts = int.tryParse((sData['tieBreakerScore'] ??
-                                cData['tieBreakerScore'])
-                            ?.toString() ??
-                            '') ??
+                        final tiePts =
+                            int.tryParse(
+                              (sData['tieBreakerScore'] ??
+                                          cData['tieBreakerScore'])
+                                      ?.toString() ??
+                                  '',
+                            ) ??
                             0;
 
                         int scoreVal = lvlSum + tiePts;
@@ -8206,8 +8538,10 @@ class _QuizScreenState extends State<QuizScreen> {
                             scoreVal = currentScore;
                           }
                           if (_localLevelPoints.isNotEmpty) {
-                            final localSum = _localLevelPoints.values
-                                .fold<int>(0, (acc, p) => acc + p);
+                            final localSum = _localLevelPoints.values.fold<int>(
+                              0,
+                              (acc, p) => acc + p,
+                            );
                             if (localSum + tiePts > scoreVal) {
                               scoreVal = localSum + tiePts;
                             }
@@ -8225,10 +8559,13 @@ class _QuizScreenState extends State<QuizScreen> {
                       }
 
                       rows.sort((a, b) {
-                        final byScore =
-                            (b['score'] as int).compareTo(a['score'] as int);
+                        final byScore = (b['score'] as int).compareTo(
+                          a['score'] as int,
+                        );
                         if (byScore != 0) return byScore;
-                        return (a['name'] as String).compareTo(b['name'] as String);
+                        return (a['name'] as String).compareTo(
+                          b['name'] as String,
+                        );
                       });
 
                       // Competition ranking: equal scores share the same rank
@@ -8246,19 +8583,41 @@ class _QuizScreenState extends State<QuizScreen> {
                       bool hasQuestion2Submission = false;
                       for (final s in scoreDocs) {
                         final data = s.data();
-                        final lq = int.tryParse(data['lastQuestion']?.toString() ?? '') ?? 0;
+                        final lq =
+                            int.tryParse(
+                              data['lastQuestion']?.toString() ?? '',
+                            ) ??
+                            0;
                         if (lq >= 2) {
                           hasQuestion2Submission = true;
                           break;
                         }
                       }
 
-                      final currentQ = int.tryParse(_latestQuizData['currentQuestion']?.toString() ?? '') ?? currentQuestion;
-                      final currentLvl = int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '') ?? 1;
-                      final qStatus = (_latestQuizData['status'] ?? '').toString().toLowerCase().trim();
-                      final qEventStatus = (_latestQuizData['eventStatus'] ?? '').toString().toLowerCase().trim();
+                      final currentQ =
+                          int.tryParse(
+                            _latestQuizData['currentQuestion']?.toString() ??
+                                '',
+                          ) ??
+                          currentQuestion;
+                      final currentLvl =
+                          int.tryParse(
+                            _latestQuizData['currentLevel']?.toString() ?? '',
+                          ) ??
+                          1;
+                      final qStatus = (_latestQuizData['status'] ?? '')
+                          .toString()
+                          .toLowerCase()
+                          .trim();
+                      final qEventStatus =
+                          (_latestQuizData['eventStatus'] ?? '')
+                              .toString()
+                              .toLowerCase()
+                              .trim();
 
-                      final hasAnyScore = rows.any((r) => (r['score'] as int) > 0);
+                      final hasAnyScore = rows.any(
+                        (r) => (r['score'] as int) > 0,
+                      );
                       bool showRankNumbers = false;
 
                       if (hasAnyScore) {
@@ -8268,11 +8627,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           showRankNumbers = true;
                         } else if (currentQ == 1 &&
                             (qStatus == 'contest_review' ||
-                             qStatus == 'level_pause' ||
-                             qStatus == 'review' ||
-                             qEventStatus == 'contest_review')) {
+                                qStatus == 'level_pause' ||
+                                qStatus == 'review' ||
+                                qEventStatus == 'contest_review')) {
                           showRankNumbers = true;
-                        } else if (qStatus == 'finished' || qStatus == 'completed') {
+                        } else if (qStatus == 'finished' ||
+                            qStatus == 'completed') {
                           showRankNumbers = true;
                         }
                       }
@@ -8336,13 +8696,16 @@ class _QuizScreenState extends State<QuizScreen> {
                                 vertical: 12,
                               ),
                               itemCount: rows.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 8),
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 8),
                               itemBuilder: (context, i) {
                                 final item = rows[i];
                                 final rank = ranks[i];
                                 final isMe = item['uid'] == myUid;
                                 final isTeam = item['isTeam'] == true;
-                                final List<String> members = (item['teamMembers'] as List<String>?) ?? [];
+                                final List<String> members =
+                                    (item['teamMembers'] as List<String>?) ??
+                                    [];
 
                                 Color rankBadgeColor;
                                 Color rankTextColor;
@@ -8366,10 +8729,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                     vertical: 10,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isMe ? const Color(0xFFF0FDF4) : Colors.white,
+                                    color: isMe
+                                        ? const Color(0xFFF0FDF4)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: isMe ? primaryGreen : const Color(0xFFE5E7EB),
+                                      color: isMe
+                                          ? primaryGreen
+                                          : const Color(0xFFE5E7EB),
                                       width: isMe ? 1.5 : 1.0,
                                     ),
                                   ),
@@ -8396,95 +8763,106 @@ class _QuizScreenState extends State<QuizScreen> {
                                           ),
                                         ),
                                       ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              item['name'],
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: textDark,
-                                                fontWeight: isMe
-                                                    ? FontWeight.w800
-                                                    : FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    item['name'],
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: textDark,
+                                                      fontWeight: isMe
+                                                          ? FontWeight.w800
+                                                          : FontWeight.w600,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isMe) ...[
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: primaryGreen,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            10,
+                                                          ),
+                                                    ),
+                                                    child: const Text(
+                                                      'YOU',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
-                                          ),
-                                          if (isMe) ...[
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: primaryGreen,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              child: const Text(
-                                                'YOU',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
+                                            if (isTeam && members.isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 2,
+                                                ),
+                                                child: Text(
+                                                  'Members: ${members.join(', ')}',
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF5B7A9C),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w500,
+                                                    height: 1.25,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
                                           ],
-                                        ],
-                                      ),
-                                      if (isTeam && members.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 2),
-                                          child: Text(
-                                            'Members: ${members.join(', ')}',
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: Color(0xFF5B7A9C),
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                              height: 1.25,
-                                            ),
-                                          ),
                                         ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Builder(
+                                        builder: (_) {
+                                          final int scoreVal =
+                                              (item['score'] as num?)
+                                                  ?.toInt() ??
+                                              0;
+                                          return Text(
+                                            scoreVal == 0
+                                                ? '0'
+                                                : '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
+                                            style: const TextStyle(
+                                              color: primaryGreen,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13,
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Builder(
-                                  builder: (_) {
-                                    final int scoreVal =
-                                        (item['score'] as num?)?.toInt() ?? 0;
-                                    return Text(
-                                      scoreVal == 0
-                                          ? '0'
-                                          : '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
-                                      style: const TextStyle(
-                                        color: primaryGreen,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
+                          ),
+                        ],
+                      );
                     },
                   );
                 },
@@ -8598,20 +8976,24 @@ class _QuizScreenState extends State<QuizScreen> {
             });
           }
 
-          final rawStatus =
-              (quizData['status'] ?? '').toString().trim().toLowerCase();
-          final bool isTieBreakerEnded = quizData['tieBreakerEnded'] == true ||
+          final rawStatus = (quizData['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final bool isTieBreakerEnded =
+              quizData['tieBreakerEnded'] == true ||
               rawStatus == 'tie_breaker_ended';
           final bool publishedWinners = quizData['publishedWinners'] == true;
 
-          final bool isQuizFinished = (rawStatus == 'finished' ||
-              rawStatus == 'ended' ||
-              rawStatus == 'completed' ||
-              rawStatus == 'closed' ||
-              quizData['isFinished'] == true ||
-              quizData['finished'] == true ||
-              quizData['completed'] == true ||
-              quizData['isCompleted'] == true) &&
+          final bool isQuizFinished =
+              (rawStatus == 'finished' ||
+                  rawStatus == 'ended' ||
+                  rawStatus == 'completed' ||
+                  rawStatus == 'closed' ||
+                  quizData['isFinished'] == true ||
+                  quizData['finished'] == true ||
+                  quizData['completed'] == true ||
+                  quizData['isCompleted'] == true) &&
               (!isTieBreakerEnded || publishedWinners);
 
           final isTieBreakerActive = quizData['tieBreakerActive'] == true;
@@ -8620,11 +9002,15 @@ class _QuizScreenState extends State<QuizScreen> {
           final List<String> tieBreakerContestantUids = rawTieUids is List
               ? rawTieUids.map((e) => e.toString()).toList()
               : <String>[];
-          final bool isTiedContestant =
-              tieBreakerContestantUids.contains(currentUid);
+          final bool isTiedContestant = tieBreakerContestantUids.contains(
+            currentUid,
+          );
 
           // Reset finished state if Quiz Master started or resumed a Tie Breaker for this tied contestant!
-          if (isTieBreakerActive && !isTieBreakerEnded && isTiedContestant && !_showTieBreakerOverallTally) {
+          if (isTieBreakerActive &&
+              !isTieBreakerEnded &&
+              isTiedContestant &&
+              !_showTieBreakerOverallTally) {
             _quizFinishedForContestant = false;
           }
 
@@ -8632,7 +9018,8 @@ class _QuizScreenState extends State<QuizScreen> {
           if (publishedWinners &&
               (_showTieBreakerOverallTally ||
                   _quizFinishedForContestant ||
-                  (isQuizFinished && (!isTieBreakerActive || !isTiedContestant)))) {
+                  (isQuizFinished &&
+                      (!isTieBreakerActive || !isTiedContestant)))) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
@@ -8794,7 +9181,8 @@ class _QuizScreenState extends State<QuizScreen> {
             sessionTimer = rawSessionTimer;
           }
 
-          final int? targetNextLevel = _nextLevelInstructionsLevel ??
+          final int? targetNextLevel =
+              _nextLevelInstructionsLevel ??
               (_lastProceededDecisionLevel != null
                   ? _lastProceededDecisionLevel! + 1
                   : null);
@@ -8811,7 +9199,9 @@ class _QuizScreenState extends State<QuizScreen> {
           } else if (_nextLevelInstructionsLevel != null &&
               _nextLevelInstructionsLevel! > currentLevel) {
             effectiveContestantLevel = _nextLevelInstructionsLevel!;
-          } else if (status == 'active' || countdownActive || status == 'countdown') {
+          } else if (status == 'active' ||
+              countdownActive ||
+              status == 'countdown') {
             effectiveContestantLevel = currentLevel;
           } else {
             effectiveContestantLevel = sessionEffectiveLevel;
@@ -8823,9 +9213,12 @@ class _QuizScreenState extends State<QuizScreen> {
           final myContestantUid = FirebaseAuth.instance.currentUser?.uid ?? '';
           final officialRanksRaw = quizData['officialRanks'];
           int? sessionOfficialRank;
-          if (officialRanksRaw is Map && officialRanksRaw.containsKey(myContestantUid)) {
+          if (officialRanksRaw is Map &&
+              officialRanksRaw.containsKey(myContestantUid)) {
             final raw = officialRanksRaw[myContestantUid];
-            sessionOfficialRank = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '');
+            sessionOfficialRank = raw is num
+                ? raw.toInt()
+                : int.tryParse(raw?.toString() ?? '');
           }
 
           if (_contestantDecision == 'eliminated') {
@@ -8836,11 +9229,16 @@ class _QuizScreenState extends State<QuizScreen> {
             );
           }
 
-          final bool alreadyProceededForLevel = _contestantDecisionLevel != null && (
-            (_lastProceededDecisionLevel != null && _lastProceededDecisionLevel! >= _contestantDecisionLevel!) ||
-            (_nextLevelInstructionsLevel != null && _nextLevelInstructionsLevel! > _contestantDecisionLevel!) ||
-            (_showNextLevelInstructions && effectiveContestantLevel > _contestantDecisionLevel!)
-          );
+          final bool alreadyProceededForLevel =
+              _contestantDecisionLevel != null &&
+              ((_lastProceededDecisionLevel != null &&
+                      _lastProceededDecisionLevel! >=
+                          _contestantDecisionLevel!) ||
+                  (_nextLevelInstructionsLevel != null &&
+                      _nextLevelInstructionsLevel! >
+                          _contestantDecisionLevel!) ||
+                  (_showNextLevelInstructions &&
+                      effectiveContestantLevel > _contestantDecisionLevel!));
 
           if (_contestantDecision == 'proceeding' &&
               _contestantDecisionLevel != null &&
@@ -8874,13 +9272,16 @@ class _QuizScreenState extends State<QuizScreen> {
               ?.toString()
               .trim()
               .toLowerCase();
-          final int effectivePreparedLevel = preparedLevel ??
+          final int effectivePreparedLevel =
+              preparedLevel ??
               int.tryParse(quizData['currentLevel']?.toString() ?? '') ??
               currentLevel;
-          final int targetInstructionsLevel = targetNextLevel ?? effectiveContestantLevel;
+          final int targetInstructionsLevel =
+              targetNextLevel ?? effectiveContestantLevel;
           final bool isLevelPreparationCommand =
               eventStatus == 'preparing_to_begin' &&
-              (readyCheckType == 'level' || quizData['readyCheckType'] == null) &&
+              (readyCheckType == 'level' ||
+                  quizData['readyCheckType'] == null) &&
               status == 'waiting' &&
               !countdownActive &&
               effectivePreparedLevel >= targetInstructionsLevel;
@@ -8912,7 +9313,8 @@ class _QuizScreenState extends State<QuizScreen> {
           // When the contestant clicks PROCEED to advance to the next level:
           // They MUST see the next level instructions screen directly, while waiting
           // for the Quiz Master to start the next level preparation from contestant readiness.
-          final bool nextLevelHasActuallyStarted = targetNextLevel != null &&
+          final bool nextLevelHasActuallyStarted =
+              targetNextLevel != null &&
               currentLevel >= targetNextLevel &&
               (status == 'active' || status == 'countdown' || countdownActive);
 
@@ -8931,7 +9333,8 @@ class _QuizScreenState extends State<QuizScreen> {
           // Once the level begins (Level 2, 3, etc.), mark the transition as complete.
           // The contestant is now actively playing this level and must never be shown
           // the level instructions screen again during gameplay or results.
-          final bool levelHasBegun = currentLevel >= effectiveContestantLevel &&
+          final bool levelHasBegun =
+              currentLevel >= effectiveContestantLevel &&
               (status == 'active' || status == 'countdown' || countdownActive);
 
           if (levelHasBegun) {
@@ -8941,7 +9344,10 @@ class _QuizScreenState extends State<QuizScreen> {
           }
 
           // If sessionTimer reaches 0 during an active question, ensure result is revealed immediately
-          if (status == 'active' && sessionTimer <= 0 && !readyCheckActive && !countdownActive) {
+          if (status == 'active' &&
+              sessionTimer <= 0 &&
+              !readyCheckActive &&
+              !countdownActive) {
             if (answered && !resultRevealed) {
               resultRevealed = true;
             } else if (!answered && !submitting) {
@@ -8961,7 +9367,10 @@ class _QuizScreenState extends State<QuizScreen> {
           // joins the 3-2-1-GO countdown together with everyone else.
           if (previousQuestion >= 0 &&
               previousQuestion != currentQuestion &&
-              (countdownActive || status == "countdown" || status == "active" || status == "finished")) {
+              (countdownActive ||
+                  status == "countdown" ||
+                  status == "active" ||
+                  status == "finished")) {
             previousQuestion = currentQuestion;
             _tieBreakerNextQuestionConfirmed = false;
             nextQuestionConfirmed = false;
@@ -9059,7 +9468,9 @@ class _QuizScreenState extends State<QuizScreen> {
           if (publishedWinners &&
               (_showTieBreakerOverallTally ||
                   (_quizFinishedForContestant &&
-                      (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant)))) {
+                      (!isTieBreakerActive ||
+                          isTieBreakerEnded ||
+                          !isTiedContestant)))) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
@@ -9079,7 +9490,8 @@ class _QuizScreenState extends State<QuizScreen> {
           if (answered && resultRevealed) {
             final isTieBreakerActive =
                 _latestQuizData['tieBreakerActive'] == true;
-            final isTieBreakerEnded = _latestQuizData['tieBreakerEnded'] == true ||
+            final isTieBreakerEnded =
+                _latestQuizData['tieBreakerEnded'] == true ||
                 (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
                     'tie_breaker_ended' ||
                 _latestQuizData['tieBreakerResolved'] == true;
@@ -9103,15 +9515,25 @@ class _QuizScreenState extends State<QuizScreen> {
                           currentQuestionData!.isNotEmpty
                       ? getLevelFromSessionQuestion(
                           currentQuestionData!,
-                          fallbackQuestionNumber: (previousQuestion >= 0 ? previousQuestion : currentQuestion) + 1,
+                          fallbackQuestionNumber:
+                              (previousQuestion >= 0
+                                  ? previousQuestion
+                                  : currentQuestion) +
+                              1,
                         )
-                      : getLevelFromQuestionNumber((previousQuestion >= 0 ? previousQuestion : currentQuestion) + 1));
+                      : getLevelFromQuestionNumber(
+                          (previousQuestion >= 0
+                                  ? previousQuestion
+                                  : currentQuestion) +
+                              1,
+                        ));
 
-            final resultQuestionData = currentQuestionData ??
+            final resultQuestionData =
+                currentQuestionData ??
                 (previousQuestion >= 0 &&
                         previousQuestion < _sortedSessionQuestions.length
                     ? _sortedSessionQuestions[previousQuestion].data()
-                        as Map<String, dynamic>?
+                          as Map<String, dynamic>?
                     : null);
             final resultPoints = isTieBreakerActive
                 ? 1
@@ -9230,8 +9652,8 @@ class _QuizScreenState extends State<QuizScreen> {
               countdown,
               questionNumber: isTieBreakerActive
                   ? ((quizData['tieBreakerQuestionIndex'] is int)
-                      ? ((quizData['tieBreakerQuestionIndex'] as int) + 1)
-                      : ((currentQuestion >= 0) ? (currentQuestion + 1) : 1))
+                        ? ((quizData['tieBreakerQuestionIndex'] as int) + 1)
+                        : ((currentQuestion >= 0) ? (currentQuestion + 1) : 1))
                   : _getQuestionNumberWithinLevel(currentQuestion),
             );
           }
@@ -9299,7 +9721,8 @@ class _QuizScreenState extends State<QuizScreen> {
           if (status != "active" &&
               !(_firstQuestionCountdownHandoff && currentQuestion == 0)) {
             final int targetWaitingLevel = effectiveContestantLevel;
-            final isFirstQuestionInLevel = _getQuestionNumberWithinLevel(currentQuestion) <= 1;
+            final isFirstQuestionInLevel =
+                _getQuestionNumberWithinLevel(currentQuestion) <= 1;
             if (isFirstQuestionInLevel &&
                 !instructionsShownThisSession &&
                 currentQuestion == 0 &&
@@ -9487,8 +9910,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 'QUESTION $levelQuestionNumber',
               );
 
-              final points =
-                  getPointsForLevel(currentLevel, question: questionData);
+              final points = getPointsForLevel(
+                currentLevel,
+                question: questionData,
+              );
 
               // Cache the level-specific question position for resultScreen,
               // which is checked earlier in the build method.
@@ -9547,19 +9972,19 @@ class _QuizScreenState extends State<QuizScreen> {
                           color: isTieBreakerActive
                               ? const Color(0xFFFEF3C7)
                               : (currentLevel == 1
-                                  ? const Color(0xFFE8F7EC)
-                                  : currentLevel == 2
-                                      ? const Color(0xFFEDE7FF)
-                                      : const Color(0xFFFFF3D6)),
+                                    ? const Color(0xFFE8F7EC)
+                                    : currentLevel == 2
+                                    ? const Color(0xFFEDE7FF)
+                                    : const Color(0xFFFFF3D6)),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isTieBreakerActive
                                 ? const Color(0xFFF59E0B)
                                 : (currentLevel == 1
-                                    ? const Color(0xFFB7E4C7)
-                                    : currentLevel == 2
-                                        ? const Color(0xFFD5C7FF)
-                                        : const Color(0xFFFFD98A)),
+                                      ? const Color(0xFFB7E4C7)
+                                      : currentLevel == 2
+                                      ? const Color(0xFFD5C7FF)
+                                      : const Color(0xFFFFD98A)),
                           ),
                         ),
                         child: Text(
@@ -9571,10 +9996,10 @@ class _QuizScreenState extends State<QuizScreen> {
                             color: isTieBreakerActive
                                 ? const Color(0xFF92400E)
                                 : (currentLevel == 1
-                                    ? const Color(0xFF168447)
-                                    : currentLevel == 2
-                                        ? const Color(0xFF7038C9)
-                                        : const Color(0xFF9A6700)),
+                                      ? const Color(0xFF168447)
+                                      : currentLevel == 2
+                                      ? const Color(0xFF7038C9)
+                                      : const Color(0xFF9A6700)),
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                             letterSpacing: 0.3,
@@ -9590,9 +10015,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFFFDE68A),
-                          ),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
                         ),
                         child: Text(
                           isTieBreakerActive
@@ -9753,10 +10176,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                 Builder(
                                   builder: (context) {
                                     final yourCurrentAnswer =
-                                        currentQuestionType == "Identification" ||
-                                                currentQuestionType == "Enumeration"
-                                            ? answerInputController.text.trim()
-                                            : (selectedAnswer?.trim() ?? '');
+                                        currentQuestionType ==
+                                                "Identification" ||
+                                            currentQuestionType == "Enumeration"
+                                        ? answerInputController.text.trim()
+                                        : (selectedAnswer?.trim() ?? '');
                                     return Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -9944,1090 +10368,1267 @@ class _QuizScreenState extends State<QuizScreen> {
           body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: _joinRequestRef(uid).snapshots(),
             builder: (context, joinSnap) {
-          final jData = joinSnap.data?.data() ?? const <String, dynamic>{};
-
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('quiz_sessions')
-                .doc(widget.quizCode)
-                .collection('join_requests')
-                .snapshots(),
-            builder: (context, requestsSnap) {
-              final requestDocs = requestsSnap.data?.docs ?? [];
+              final jData = joinSnap.data?.data() ?? const <String, dynamic>{};
 
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('quiz_sessions')
                     .doc(widget.quizCode)
-                    .collection('scores')
+                    .collection('join_requests')
                     .snapshots(),
-                builder: (context, scoresSnap) {
-                  final scoreDocs = scoresSnap.data?.docs ?? [];
+                builder: (context, requestsSnap) {
+                  final requestDocs = requestsSnap.data?.docs ?? [];
 
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('quiz_sessions')
                         .doc(widget.quizCode)
-                        .collection('answers')
-                        .doc(uid)
-                        .collection('responses')
+                        .collection('scores')
                         .snapshots(),
-                    builder: (context, responsesSnap) {
-                      final responseDocs = responsesSnap.data?.docs ?? [];
-                      final Map<int, int> myLevelScores = {};
-                      int responsesTotal = 0;
-                      for (final r in responseDocs) {
-                        final rData = r.data();
-                        final lvl = (rData['level'] as num?)?.toInt() ?? 1;
-                        final pts = (rData['points'] as num?)?.toInt() ?? 0;
-                        myLevelScores[lvl] = (myLevelScores[lvl] ?? 0) + pts;
-                        responsesTotal += pts;
-                      }
+                    builder: (context, scoresSnap) {
+                      final scoreDocs = scoresSnap.data?.docs ?? [];
 
-                      // Compute accurate overall score across all levels for current user
-                      final rawTeam = (jData['teamName'] ?? '').toString().trim();
-                      int finalScore = 0;
-                      for (final d in scoreDocs) {
-                        if (d.id == uid || d.data()['uid'] == uid) {
-                          final s =
-                              int.tryParse(d.data()['score']?.toString() ?? '') ??
-                                  0;
-                          if (s > finalScore) finalScore = s;
-                        }
-                      }
-                      if (rawTeam.isNotEmpty) {
-                        for (final d in scoreDocs) {
-                          final tName =
-                              (d.data()['teamName'] ?? '').toString().trim();
-                          if (tName.isNotEmpty &&
-                              tName.toLowerCase() == rawTeam.toLowerCase()) {
-                            final s =
-                                int.tryParse(d.data()['score']?.toString() ?? '') ??
-                                    0;
-                            if (s > finalScore) finalScore = s;
+                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('quiz_sessions')
+                            .doc(widget.quizCode)
+                            .collection('answers')
+                            .doc(uid)
+                            .collection('responses')
+                            .snapshots(),
+                        builder: (context, responsesSnap) {
+                          final responseDocs = responsesSnap.data?.docs ?? [];
+                          final Map<int, int> myLevelScores = {};
+                          int responsesTotal = 0;
+                          for (final r in responseDocs) {
+                            final rData = r.data();
+                            final lvl = (rData['level'] as num?)?.toInt() ?? 1;
+                            final pts = (rData['points'] as num?)?.toInt() ?? 0;
+                            myLevelScores[lvl] =
+                                (myLevelScores[lvl] ?? 0) + pts;
+                            responsesTotal += pts;
                           }
-                        }
-                      }
-                      if (responsesTotal > finalScore) {
-                        finalScore = responsesTotal;
-                      }
-                      final jFinal =
-                          int.tryParse((jData['finalScore'] ?? '').toString()) ??
+
+                          // Compute accurate overall score across all levels for current user
+                          final rawTeam = (jData['teamName'] ?? '')
+                              .toString()
+                              .trim();
+                          int finalScore = 0;
+                          for (final d in scoreDocs) {
+                            if (d.id == uid || d.data()['uid'] == uid) {
+                              final s =
+                                  int.tryParse(
+                                    d.data()['score']?.toString() ?? '',
+                                  ) ??
+                                  0;
+                              if (s > finalScore) finalScore = s;
+                            }
+                          }
+                          if (rawTeam.isNotEmpty) {
+                            for (final d in scoreDocs) {
+                              final tName = (d.data()['teamName'] ?? '')
+                                  .toString()
+                                  .trim();
+                              if (tName.isNotEmpty &&
+                                  tName.toLowerCase() ==
+                                      rawTeam.toLowerCase()) {
+                                final s =
+                                    int.tryParse(
+                                      d.data()['score']?.toString() ?? '',
+                                    ) ??
+                                    0;
+                                if (s > finalScore) finalScore = s;
+                              }
+                            }
+                          }
+                          if (responsesTotal > finalScore) {
+                            finalScore = responsesTotal;
+                          }
+                          final jFinal =
+                              int.tryParse(
+                                (jData['finalScore'] ?? '').toString(),
+                              ) ??
                               0;
-                      final jScore =
-                          int.tryParse((jData['score'] ?? '').toString()) ?? 0;
-                      if (jFinal > finalScore) finalScore = jFinal;
-                      if (jScore > finalScore) finalScore = jScore;
-                      if (currentScore > finalScore) {
-                        finalScore = currentScore;
-                      }
+                          final jScore =
+                              int.tryParse((jData['score'] ?? '').toString()) ??
+                              0;
+                          if (jFinal > finalScore) finalScore = jFinal;
+                          if (jScore > finalScore) finalScore = jScore;
+                          if (currentScore > finalScore) {
+                            finalScore = currentScore;
+                          }
 
-                      // Build the complete Overall Tally of all contestants
-                      final Map<String, DocumentSnapshot<Map<String, dynamic>>> requestDocById = {
-                        for (final c in requestDocs) c.id: c,
-                      };
-                      final Map<String, DocumentSnapshot<Map<String, dynamic>>> scoreDocById = {
-                        for (final s in scoreDocs) s.id: s,
-                      };
-                      final Map<String, Map<String, dynamic>> contestantById = {
-                        for (final c in requestDocs) c.id: c.data(),
-                      };
-                      final Map<String, Map<String, dynamic>> scoreById = {
-                        for (final s in scoreDocs) s.id: s.data(),
-                      };
-                      final Set<String> allUids = {
-                        ...contestantById.keys,
-                        ...scoreById.keys,
-                      };
+                          // Build the complete Overall Tally of all contestants
+                          final Map<
+                            String,
+                            DocumentSnapshot<Map<String, dynamic>>
+                          >
+                          requestDocById = {
+                            for (final c in requestDocs) c.id: c,
+                          };
+                          final Map<
+                            String,
+                            DocumentSnapshot<Map<String, dynamic>>
+                          >
+                          scoreDocById = {for (final s in scoreDocs) s.id: s};
+                          final Map<String, Map<String, dynamic>>
+                          contestantById = {
+                            for (final c in requestDocs) c.id: c.data(),
+                          };
+                          final Map<String, Map<String, dynamic>> scoreById = {
+                            for (final s in scoreDocs) s.id: s.data(),
+                          };
+                          final Set<String> allUids = {
+                            ...contestantById.keys,
+                            ...scoreById.keys,
+                          };
 
-                      final List<_FinishedTallyRowData> tallyList = [];
-                      final Set<int> allQuizLevels = {};
+                          final List<_FinishedTallyRowData> tallyList = [];
+                          final Set<int> allQuizLevels = {};
 
-                      for (final cUid in allUids) {
-                        final cData =
-                            contestantById[cUid] ?? const <String, dynamic>{};
-                        final sData =
-                            scoreById[cUid] ?? const <String, dynamic>{};
-                        final uData =
-                            _userProfileCache[cUid] ?? const <String, dynamic>{};
+                          for (final cUid in allUids) {
+                            final cData =
+                                contestantById[cUid] ??
+                                const <String, dynamic>{};
+                            final sData =
+                                scoreById[cUid] ?? const <String, dynamic>{};
+                            final uData =
+                                _userProfileCache[cUid] ??
+                                const <String, dynamic>{};
 
-                        final status =
-                            (cData['status'] ?? sData['status'] ?? '')
-                                .toString()
-                                .trim()
-                                .toLowerCase();
-                        if (status == 'left' ||
-                            status == 'rejected' ||
-                            status == 'declined' ||
-                            cData['leftQuiz'] == true ||
-                            sData['leftQuiz'] == true ||
-                            status == 'pending') {
-                          continue;
-                        }
+                            final status =
+                                (cData['status'] ?? sData['status'] ?? '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase();
+                            if (status == 'left' ||
+                                status == 'rejected' ||
+                                status == 'declined' ||
+                                cData['leftQuiz'] == true ||
+                                sData['leftQuiz'] == true ||
+                                status == 'pending') {
+                              continue;
+                            }
 
-                        final cRawTeam = (cData['teamName'] ??
-                                sData['teamName'] ??
-                                uData['teamName'] ??
-                                '')
-                            .toString()
-                            .trim();
-                        final contestantType = (cData['contestantType'] ??
-                                sData['contestantType'] ??
-                                uData['contestantType'] ??
-                                '')
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-
-                        final rawMembers = cData['teamMembers'] ??
-                            cData['members'] ??
-                            sData['teamMembers'] ??
-                            sData['members'] ??
-                            uData['teamMembers'] ??
-                            uData['members'];
-
-                        final List<String> teamMembers = [];
-                        if (rawMembers is List) {
-                          for (final m in rawMembers) {
-                            final s = m is Map
-                                ? (m['name'] ??
-                                        m['displayName'] ??
-                                        m['fullName'] ??
+                            final cRawTeam =
+                                (cData['teamName'] ??
+                                        sData['teamName'] ??
+                                        uData['teamName'] ??
+                                        '')
+                                    .toString()
+                                    .trim();
+                            final contestantType =
+                                (cData['contestantType'] ??
+                                        sData['contestantType'] ??
+                                        uData['contestantType'] ??
                                         '')
                                     .toString()
                                     .trim()
-                                : m.toString().trim();
-                            if (s.isNotEmpty && !teamMembers.contains(s)) {
-                              teamMembers.add(s);
-                            }
-                          }
-                        }
+                                    .toLowerCase();
 
-                        final bool isTeam = contestantType == 'team' ||
-                            cData['isTeam'] == true ||
-                            sData['isTeam'] == true ||
-                            uData['isTeam'] == true ||
-                            cRawTeam.isNotEmpty ||
-                            teamMembers.isNotEmpty;
+                            final rawMembers =
+                                cData['teamMembers'] ??
+                                cData['members'] ??
+                                sData['teamMembers'] ??
+                                sData['members'] ??
+                                uData['teamMembers'] ??
+                                uData['members'];
 
-                        final personalName = (cData['realName'] ??
-                                cData['fullName'] ??
-                                uData['fullName'] ??
-                                uData['name'] ??
-                                sData['fullName'] ??
-                                cData['displayName'] ??
-                                cData['name'] ??
-                                sData['name'] ??
-                                cData['email'] ??
-                                cUid)
-                            .toString()
-                            .trim();
-
-                        final teamName = cRawTeam.isNotEmpty
-                            ? cRawTeam
-                            : (isTeam && teamMembers.isNotEmpty
-                                ? personalName
-                                : '');
-
-                        final displayName = isTeam
-                            ? (teamName.isNotEmpty ? teamName : personalName)
-                            : personalName;
-
-                        final bool isMe = cUid == uid ||
-                            (cRawTeam.isNotEmpty &&
-                                rawTeam.isNotEmpty &&
-                                cRawTeam.toLowerCase() ==
-                                    rawTeam.toLowerCase());
-
-                        final Map<int, int> cLevelScores = {};
-                        for (int l = 1; l <= 20; l++) {
-                          final v = sData['level${l}Score'] ??
-                              sData['level_$l'] ??
-                              cData['level${l}Score'] ??
-                              cData['level_$l'];
-                          if (v != null) {
-                            final pts = int.tryParse(v.toString()) ?? 0;
-                            if (pts > 0) {
-                              cLevelScores[l] = pts;
-                              allQuizLevels.add(l);
-                            }
-                          }
-                        }
-
-                        if (sData['levelScores'] is Map) {
-                          for (final entry
-                              in (sData['levelScores'] as Map).entries) {
-                            final key = entry.key.toString();
-                            final numStr =
-                                key.replaceAll(RegExp(r'[^0-9]'), '');
-                            final lvl = int.tryParse(numStr);
-                            final val =
-                                int.tryParse(entry.value?.toString() ?? '') ?? 0;
-                            if (lvl != null && val > 0) {
-                              if ((cLevelScores[lvl] ?? 0) < val) {
-                                cLevelScores[lvl] = val;
+                            final List<String> teamMembers = [];
+                            if (rawMembers is List) {
+                              for (final m in rawMembers) {
+                                final s = m is Map
+                                    ? (m['name'] ??
+                                              m['displayName'] ??
+                                              m['fullName'] ??
+                                              '')
+                                          .toString()
+                                          .trim()
+                                    : m.toString().trim();
+                                if (s.isNotEmpty && !teamMembers.contains(s)) {
+                                  teamMembers.add(s);
+                                }
                               }
-                              allQuizLevels.add(lvl);
                             }
-                          }
-                        }
 
-                        if (cData['levelScores'] is Map) {
-                          for (final entry
-                              in (cData['levelScores'] as Map).entries) {
-                            final key = entry.key.toString();
-                            final numStr =
-                                key.replaceAll(RegExp(r'[^0-9]'), '');
-                            final lvl = int.tryParse(numStr);
-                            final val =
-                                int.tryParse(entry.value?.toString() ?? '') ?? 0;
-                            if (lvl != null && val > 0) {
-                              if ((cLevelScores[lvl] ?? 0) < val) {
-                                cLevelScores[lvl] = val;
+                            final bool isTeam =
+                                contestantType == 'team' ||
+                                cData['isTeam'] == true ||
+                                sData['isTeam'] == true ||
+                                uData['isTeam'] == true ||
+                                cRawTeam.isNotEmpty ||
+                                teamMembers.isNotEmpty;
+
+                            final personalName =
+                                (cData['realName'] ??
+                                        cData['fullName'] ??
+                                        uData['fullName'] ??
+                                        uData['name'] ??
+                                        sData['fullName'] ??
+                                        cData['displayName'] ??
+                                        cData['name'] ??
+                                        sData['name'] ??
+                                        cData['email'] ??
+                                        cUid)
+                                    .toString()
+                                    .trim();
+
+                            final teamName = cRawTeam.isNotEmpty
+                                ? cRawTeam
+                                : (isTeam && teamMembers.isNotEmpty
+                                      ? personalName
+                                      : '');
+
+                            final displayName = isTeam
+                                ? (teamName.isNotEmpty
+                                      ? teamName
+                                      : personalName)
+                                : personalName;
+
+                            final bool isMe =
+                                cUid == uid ||
+                                (cRawTeam.isNotEmpty &&
+                                    rawTeam.isNotEmpty &&
+                                    cRawTeam.toLowerCase() ==
+                                        rawTeam.toLowerCase());
+
+                            final Map<int, int> cLevelScores = {};
+                            for (int l = 1; l <= 20; l++) {
+                              final v =
+                                  sData['level${l}Score'] ??
+                                  sData['level_$l'] ??
+                                  cData['level${l}Score'] ??
+                                  cData['level_$l'];
+                              if (v != null) {
+                                final pts = int.tryParse(v.toString()) ?? 0;
+                                if (pts > 0) {
+                                  cLevelScores[l] = pts;
+                                  allQuizLevels.add(l);
+                                }
                               }
-                              allQuizLevels.add(lvl);
                             }
-                          }
-                        }
 
-                        if (isMe && myLevelScores.isNotEmpty) {
-                          for (final entry in myLevelScores.entries) {
-                            if ((cLevelScores[entry.key] ?? 0) < entry.value) {
-                              cLevelScores[entry.key] = entry.value;
+                            if (sData['levelScores'] is Map) {
+                              for (final entry
+                                  in (sData['levelScores'] as Map).entries) {
+                                final key = entry.key.toString();
+                                final numStr = key.replaceAll(
+                                  RegExp(r'[^0-9]'),
+                                  '',
+                                );
+                                final lvl = int.tryParse(numStr);
+                                final val =
+                                    int.tryParse(
+                                      entry.value?.toString() ?? '',
+                                    ) ??
+                                    0;
+                                if (lvl != null && val > 0) {
+                                  if ((cLevelScores[lvl] ?? 0) < val) {
+                                    cLevelScores[lvl] = val;
+                                  }
+                                  allQuizLevels.add(lvl);
+                                }
+                              }
                             }
-                            allQuizLevels.add(entry.key);
-                          }
-                        }
 
-                        int calculatedSum = 0;
-                        for (final pts in cLevelScores.values) {
-                          calculatedSum += pts;
-                        }
+                            if (cData['levelScores'] is Map) {
+                              for (final entry
+                                  in (cData['levelScores'] as Map).entries) {
+                                final key = entry.key.toString();
+                                final numStr = key.replaceAll(
+                                  RegExp(r'[^0-9]'),
+                                  '',
+                                );
+                                final lvl = int.tryParse(numStr);
+                                final val =
+                                    int.tryParse(
+                                      entry.value?.toString() ?? '',
+                                    ) ??
+                                    0;
+                                if (lvl != null && val > 0) {
+                                  if ((cLevelScores[lvl] ?? 0) < val) {
+                                    cLevelScores[lvl] = val;
+                                  }
+                                  allQuizLevels.add(lvl);
+                                }
+                              }
+                            }
 
-                        final tiePts = int.tryParse((sData['tieBreakerScore'] ??
-                                    cData['tieBreakerScore'])
-                                ?.toString() ??
-                            '') ??
-                            0;
+                            if (isMe && myLevelScores.isNotEmpty) {
+                              for (final entry in myLevelScores.entries) {
+                                if ((cLevelScores[entry.key] ?? 0) <
+                                    entry.value) {
+                                  cLevelScores[entry.key] = entry.value;
+                                }
+                                allQuizLevels.add(entry.key);
+                              }
+                            }
 
-                        final storedScore = int.tryParse((sData['score'] ??
-                                    sData['totalScore'] ??
-                                    cData['finalScore'] ??
-                                    cData['score'])
-                                ?.toString() ??
-                            '') ??
-                            0;
+                            int calculatedSum = 0;
+                            for (final pts in cLevelScores.values) {
+                              calculatedSum += pts;
+                            }
 
-                        int scoreVal = 0;
-                        if (calculatedSum > 0) {
-                          scoreVal = calculatedSum + tiePts;
-                        } else {
-                          scoreVal = storedScore > 0 ? (storedScore + tiePts) : 0;
-                        }
+                            final tiePts =
+                                int.tryParse(
+                                  (sData['tieBreakerScore'] ??
+                                              cData['tieBreakerScore'])
+                                          ?.toString() ??
+                                      '',
+                                ) ??
+                                0;
 
-                        if (isMe && myLevelScores.isNotEmpty) {
-                          final mySum =
-                              myLevelScores.values.fold<int>(0, (a, b) => a + b);
-                          if (mySum + tiePts > scoreVal) {
-                            scoreVal = mySum + tiePts;
-                          }
-                        }
+                            final storedScore =
+                                int.tryParse(
+                                  (sData['score'] ??
+                                              sData['totalScore'] ??
+                                              cData['finalScore'] ??
+                                              cData['score'])
+                                          ?.toString() ??
+                                      '',
+                                ) ??
+                                0;
 
-                        // Auto-heal stale/corrupt scores in Firestore asynchronously
-                        final scoreDocSnap = scoreDocById[cUid];
-                        final requestDocSnap = requestDocById[cUid];
-                        if (scoreDocSnap != null &&
-                            storedScore != scoreVal &&
-                            scoreVal > 0) {
-                          scoreDocSnap.reference.update({
-                            'score': scoreVal,
-                            'totalScore': scoreVal,
-                          }).catchError((_) {});
-                        }
-                        if (requestDocSnap != null &&
-                            ((cData['finalScore'] ?? cData['score']) != scoreVal) &&
-                            scoreVal > 0) {
-                          requestDocSnap.reference.update({
-                            'finalScore': scoreVal,
-                            'score': scoreVal,
-                          }).catchError((_) {});
-                        }
+                            int scoreVal = 0;
+                            if (calculatedSum > 0) {
+                              scoreVal = calculatedSum + tiePts;
+                            } else {
+                              scoreVal = storedScore > 0
+                                  ? (storedScore + tiePts)
+                                  : 0;
+                            }
 
-                        final rawRankVal = cData['finalRank'] ??
-                            cData['rank'] ??
-                            sData['finalRank'] ??
-                            sData['rank'];
-                        final int? explicitRank =
-                            (rawRankVal is num && rawRankVal > 0)
+                            if (isMe && myLevelScores.isNotEmpty) {
+                              final mySum = myLevelScores.values.fold<int>(
+                                0,
+                                (a, b) => a + b,
+                              );
+                              if (mySum + tiePts > scoreVal) {
+                                scoreVal = mySum + tiePts;
+                              }
+                            }
+
+                            // Auto-heal stale/corrupt scores in Firestore asynchronously
+                            final scoreDocSnap = scoreDocById[cUid];
+                            final requestDocSnap = requestDocById[cUid];
+                            if (scoreDocSnap != null &&
+                                storedScore != scoreVal &&
+                                scoreVal > 0) {
+                              scoreDocSnap.reference
+                                  .update({
+                                    'score': scoreVal,
+                                    'totalScore': scoreVal,
+                                  })
+                                  .catchError((_) {});
+                            }
+                            if (requestDocSnap != null &&
+                                ((cData['finalScore'] ?? cData['score']) !=
+                                    scoreVal) &&
+                                scoreVal > 0) {
+                              requestDocSnap.reference
+                                  .update({
+                                    'finalScore': scoreVal,
+                                    'score': scoreVal,
+                                  })
+                                  .catchError((_) {});
+                            }
+
+                            final rawRankVal =
+                                cData['finalRank'] ??
+                                cData['rank'] ??
+                                sData['finalRank'] ??
+                                sData['rank'];
+                            final int? explicitRank =
+                                (rawRankVal is num && rawRankVal > 0)
                                 ? rawRankVal.toInt()
                                 : null;
 
-                        tallyList.add(_FinishedTallyRowData(
-                          uid: cUid,
-                          name: displayName,
-                          isTeam: isTeam,
-                          teamMembers: teamMembers,
-                          levelScores: cLevelScores,
-                          tieBreakerScore: tiePts,
-                          totalScore: scoreVal,
-                          explicitRank: explicitRank,
-                          isMe: isMe,
-                        ));
-                      }
+                            tallyList.add(
+                              _FinishedTallyRowData(
+                                uid: cUid,
+                                name: displayName,
+                                isTeam: isTeam,
+                                teamMembers: teamMembers,
+                                levelScores: cLevelScores,
+                                tieBreakerScore: tiePts,
+                                totalScore: scoreVal,
+                                explicitRank: explicitRank,
+                                isMe: isMe,
+                              ),
+                            );
+                          }
 
-                      // Sort Overall Tally descending by score, tieBreaker, then name
-                      tallyList.sort((a, b) {
-                        if (b.totalScore != a.totalScore) {
-                          return b.totalScore.compareTo(a.totalScore);
-                        }
-                        if (b.tieBreakerScore != a.tieBreakerScore) {
-                          return b.tieBreakerScore
-                              .compareTo(a.tieBreakerScore);
-                        }
-                        return a.name.compareTo(b.name);
-                      });
+                          // Sort Overall Tally descending by score, tieBreaker, then name
+                          tallyList.sort((a, b) {
+                            if (b.totalScore != a.totalScore) {
+                              return b.totalScore.compareTo(a.totalScore);
+                            }
+                            if (b.tieBreakerScore != a.tieBreakerScore) {
+                              return b.tieBreakerScore.compareTo(
+                                a.tieBreakerScore,
+                              );
+                            }
+                            return a.name.compareTo(b.name);
+                          });
 
-                      // Compute ranks
-                      for (int i = 0; i < tallyList.length; i++) {
-                        if (tallyList[i].explicitRank != null) {
-                          tallyList[i].rank = tallyList[i].explicitRank!;
-                        } else if (i > 0 &&
-                            tallyList[i].totalScore ==
-                                tallyList[i - 1].totalScore &&
-                            tallyList[i].tieBreakerScore ==
-                                tallyList[i - 1].tieBreakerScore) {
-                          tallyList[i].rank = tallyList[i - 1].rank;
-                        } else {
-                          tallyList[i].rank = i + 1;
-                        }
-                      }
+                          // Compute ranks
+                          for (int i = 0; i < tallyList.length; i++) {
+                            if (tallyList[i].explicitRank != null) {
+                              tallyList[i].rank = tallyList[i].explicitRank!;
+                            } else if (i > 0 &&
+                                tallyList[i].totalScore ==
+                                    tallyList[i - 1].totalScore &&
+                                tallyList[i].tieBreakerScore ==
+                                    tallyList[i - 1].tieBreakerScore) {
+                              tallyList[i].rank = tallyList[i - 1].rank;
+                            } else {
+                              tallyList[i].rank = i + 1;
+                            }
+                          }
 
-                      // Ensure default sorted levels are at least 1, 2, 3 if empty
-                      final List<int> sortedLevels = allQuizLevels.isNotEmpty
-                          ? (allQuizLevels.toList()..sort())
-                          : [1, 2, 3];
+                          // Ensure default sorted levels are at least 1, 2, 3 if empty
+                          final List<int> sortedLevels =
+                              allQuizLevels.isNotEmpty
+                              ? (allQuizLevels.toList()..sort())
+                              : [1, 2, 3];
 
-                      // Calculate current contestant's final rank & total score
-                      int computedRank = 1;
-                      final myTallyIdx = tallyList.indexWhere((t) => t.isMe);
-                      if (myTallyIdx >= 0) {
-                        computedRank = tallyList[myTallyIdx].rank;
-                        finalScore = tallyList[myTallyIdx].totalScore;
-                      }
-                      final int myTieBreakerScore = myTallyIdx >= 0
-                          ? tallyList[myTallyIdx].tieBreakerScore
-                          : (int.tryParse((jData['tieBreakerScore'] ?? '')
-                                  .toString()) ??
-                              0);
-                      final rawRank = jData['finalRank'] ?? jData['rank'];
-                      final int finalRank = (rawRank is num && rawRank > 0)
-                          ? rawRank.toInt()
-                          : computedRank;
+                          // Calculate current contestant's final rank & total score
+                          int computedRank = 1;
+                          final myTallyIdx = tallyList.indexWhere(
+                            (t) => t.isMe,
+                          );
+                          if (myTallyIdx >= 0) {
+                            computedRank = tallyList[myTallyIdx].rank;
+                            finalScore = tallyList[myTallyIdx].totalScore;
+                          }
+                          final int myTieBreakerScore = myTallyIdx >= 0
+                              ? tallyList[myTallyIdx].tieBreakerScore
+                              : (int.tryParse(
+                                      (jData['tieBreakerScore'] ?? '')
+                                          .toString(),
+                                    ) ??
+                                    0);
+                          final rawRank = jData['finalRank'] ?? jData['rank'];
+                          final int finalRank = (rawRank is num && rawRank > 0)
+                              ? rawRank.toInt()
+                              : computedRank;
 
-                      final rawMembers =
-                          jData['teamMembers'] ?? jData['members'];
-                      final List<String> myMembers = [];
-                      if (rawMembers is List) {
-                        for (final m in rawMembers) {
-                          final s = m is Map
-                              ? (m['name'] ?? m['displayName'] ?? '')
-                                  .toString()
-                                  .trim()
-                              : m.toString().trim();
-                          if (s.isNotEmpty) myMembers.add(s);
-                        }
-                      }
-                      final bool isTeam = jData['isTeam'] == true ||
-                          jData['contestantType'] == 'team' ||
-                          rawTeam.isNotEmpty ||
-                          myMembers.isNotEmpty;
-                      final String myDisplayName = isTeam
-                          ? (rawTeam.isNotEmpty
-                              ? rawTeam
-                              : (jData['name'] ?? 'Team'))
-                          : (jData['realName'] ??
-                              jData['fullName'] ??
-                              jData['name'] ??
-                              'Contestant');
+                          final rawMembers =
+                              jData['teamMembers'] ?? jData['members'];
+                          final List<String> myMembers = [];
+                          if (rawMembers is List) {
+                            for (final m in rawMembers) {
+                              final s = m is Map
+                                  ? (m['name'] ?? m['displayName'] ?? '')
+                                        .toString()
+                                        .trim()
+                                  : m.toString().trim();
+                              if (s.isNotEmpty) myMembers.add(s);
+                            }
+                          }
+                          final bool isTeam =
+                              jData['isTeam'] == true ||
+                              jData['contestantType'] == 'team' ||
+                              rawTeam.isNotEmpty ||
+                              myMembers.isNotEmpty;
+                          final String myDisplayName = isTeam
+                              ? (rawTeam.isNotEmpty
+                                    ? rawTeam
+                                    : (jData['name'] ?? 'Team'))
+                              : (jData['realName'] ??
+                                    jData['fullName'] ??
+                                    jData['name'] ??
+                                    'Contestant');
 
-                      final isTop3 = finalRank >= 1 && finalRank <= 3;
+                          final isTop3 = finalRank >= 1 && finalRank <= 3;
 
-                      String trophyAsset;
-                      Color rankColor;
-                      String rankSubtitle;
-                      if (finalRank == 1) {
-                        trophyAsset = 'assets/trophies/gold_trophy_3d.jpg';
-                        rankColor = const Color(0xFFF59E0B);
-                        rankSubtitle = "CHAMPION • 1ST PLACE";
-                      } else if (finalRank == 2) {
-                        trophyAsset = 'assets/trophies/silver_trophy_3d.jpg';
-                        rankColor = const Color(0xFF94A3B8);
-                        rankSubtitle = "1ST RUNNER-UP • 2ND PLACE";
-                      } else if (finalRank == 3) {
-                        trophyAsset = 'assets/trophies/bronze_trophy_3d.jpg';
-                        rankColor = const Color(0xFFD97706);
-                        rankSubtitle = "2ND RUNNER-UP • 3RD PLACE";
-                      } else {
-                        trophyAsset = 'assets/trophies/top10_badge_3d.jpg';
-                        rankColor = const Color(0xFF3B82F6);
-                        rankSubtitle = "COMPETITOR • RANK #$finalRank";
-                      }
+                          String trophyAsset;
+                          Color rankColor;
+                          String rankSubtitle;
+                          if (finalRank == 1) {
+                            trophyAsset = 'assets/trophies/gold_trophy_3d.jpg';
+                            rankColor = const Color(0xFFF59E0B);
+                            rankSubtitle = "CHAMPION • 1ST PLACE";
+                          } else if (finalRank == 2) {
+                            trophyAsset =
+                                'assets/trophies/silver_trophy_3d.jpg';
+                            rankColor = const Color(0xFF94A3B8);
+                            rankSubtitle = "1ST RUNNER-UP • 2ND PLACE";
+                          } else if (finalRank == 3) {
+                            trophyAsset =
+                                'assets/trophies/bronze_trophy_3d.jpg';
+                            rankColor = const Color(0xFFD97706);
+                            rankSubtitle = "2ND RUNNER-UP • 3RD PLACE";
+                          } else {
+                            trophyAsset = 'assets/trophies/top10_badge_3d.jpg';
+                            rankColor = const Color(0xFF3B82F6);
+                            rankSubtitle = "COMPETITOR • RANK #$finalRank";
+                          }
 
-                      return TechCircuitBackground(
-                        child: SafeArea(
-                          child: Center(
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 20),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth:
-                                      _finishedCongratulationsTabIndex == 1
+                          return TechCircuitBackground(
+                            child: SafeArea(
+                              child: Center(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 20,
+                                  ),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth:
+                                          _finishedCongratulationsTabIndex == 1
                                           ? 500
                                           : 440,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // ==========================================
-                                    // TOP NAVIGATION BAR (My Result vs Overall Tally)
-                                    // ==========================================
-                                    Container(
-                                      margin:
-                                          const EdgeInsets.only(bottom: 16),
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius:
-                                            BorderRadius.circular(30),
-                                        border: Border.all(
-                                          color: const Color(0xFFE2E8F0),
-                                          width: 1.2,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black
-                                                .withValues(alpha: 0.08),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // ==========================================
+                                        // TOP NAVIGATION BAR (My Result vs Overall Tally)
+                                        // ==========================================
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 16,
                                           ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: InkWell(
-                                              borderRadius:
-                                                  BorderRadius.circular(26),
-                                              onTap: () {
-                                                if (_finishedCongratulationsTabIndex !=
-                                                    0) {
-                                                  setState(() =>
-                                                      _finishedCongratulationsTabIndex =
-                                                          0);
-                                                }
-                                              },
-                                              child: AnimatedContainer(
-                                                duration: const Duration(
-                                                    milliseconds: 200),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 10),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      _finishedCongratulationsTabIndex ==
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
+                                            border: Border.all(
+                                              color: const Color(0xFFE2E8F0),
+                                              width: 1.2,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.08,
+                                                ),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: InkWell(
+                                                  borderRadius:
+                                                      BorderRadius.circular(26),
+                                                  onTap: () {
+                                                    if (_finishedCongratulationsTabIndex !=
+                                                        0) {
+                                                      setState(
+                                                        () =>
+                                                            _finishedCongratulationsTabIndex =
+                                                                0,
+                                                      );
+                                                    }
+                                                  },
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 10,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          _finishedCongratulationsTabIndex ==
                                                               0
                                                           ? primaryGreen
                                                           : Colors.transparent,
-                                                  borderRadius:
-                                                      BorderRadius.circular(26),
-                                                  boxShadow:
-                                                      _finishedCongratulationsTabIndex ==
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            26,
+                                                          ),
+                                                      boxShadow:
+                                                          _finishedCongratulationsTabIndex ==
                                                               0
                                                           ? [
                                                               BoxShadow(
                                                                 color: primaryGreen
                                                                     .withValues(
-                                                                        alpha:
-                                                                            0.35),
+                                                                      alpha:
+                                                                          0.35,
+                                                                    ),
                                                                 blurRadius: 8,
                                                                 offset:
                                                                     const Offset(
-                                                                        0, 2),
+                                                                      0,
+                                                                      2,
+                                                                    ),
                                                               ),
                                                             ]
                                                           : null,
-                                                ),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.emoji_events_rounded,
-                                                      size: 18,
-                                                      color:
-                                                          _finishedCongratulationsTabIndex ==
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(
+                                                          Icons
+                                                              .emoji_events_rounded,
+                                                          size: 18,
+                                                          color:
+                                                              _finishedCongratulationsTabIndex ==
                                                                   0
                                                               ? Colors.white
                                                               : const Color(
-                                                                  0xFF64748B),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      "MY RESULT",
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        letterSpacing: 0.5,
-                                                        color:
-                                                            _finishedCongratulationsTabIndex ==
+                                                                  0xFF64748B,
+                                                                ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Text(
+                                                          "MY RESULT",
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                            letterSpacing: 0.5,
+                                                            color:
+                                                                _finishedCongratulationsTabIndex ==
                                                                     0
                                                                 ? Colors.white
                                                                 : const Color(
-                                                                    0xFF64748B),
-                                                      ),
+                                                                    0xFF64748B,
+                                                                  ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                  ],
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: InkWell(
-                                              borderRadius:
-                                                  BorderRadius.circular(26),
-                                              onTap: () {
-                                                if (_finishedCongratulationsTabIndex !=
-                                                    1) {
-                                                  setState(() =>
-                                                      _finishedCongratulationsTabIndex =
-                                                          1);
-                                                }
-                                              },
-                                              child: AnimatedContainer(
-                                                duration: const Duration(
-                                                    milliseconds: 200),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 10),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      _finishedCongratulationsTabIndex ==
+                                              Expanded(
+                                                child: InkWell(
+                                                  borderRadius:
+                                                      BorderRadius.circular(26),
+                                                  onTap: () {
+                                                    if (_finishedCongratulationsTabIndex !=
+                                                        1) {
+                                                      setState(
+                                                        () =>
+                                                            _finishedCongratulationsTabIndex =
+                                                                1,
+                                                      );
+                                                    }
+                                                  },
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 10,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          _finishedCongratulationsTabIndex ==
                                                               1
                                                           ? primaryGreen
                                                           : Colors.transparent,
-                                                  borderRadius:
-                                                      BorderRadius.circular(26),
-                                                  boxShadow:
-                                                      _finishedCongratulationsTabIndex ==
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            26,
+                                                          ),
+                                                      boxShadow:
+                                                          _finishedCongratulationsTabIndex ==
                                                               1
                                                           ? [
                                                               BoxShadow(
                                                                 color: primaryGreen
                                                                     .withValues(
-                                                                        alpha:
-                                                                            0.35),
+                                                                      alpha:
+                                                                          0.35,
+                                                                    ),
                                                                 blurRadius: 8,
                                                                 offset:
                                                                     const Offset(
-                                                                        0, 2),
+                                                                      0,
+                                                                      2,
+                                                                    ),
                                                               ),
                                                             ]
                                                           : null,
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(
+                                                          Icons
+                                                              .leaderboard_rounded,
+                                                          size: 18,
+                                                          color:
+                                                              _finishedCongratulationsTabIndex ==
+                                                                  1
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF64748B,
+                                                                ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Text(
+                                                          "OVERALL TALLY",
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                            letterSpacing: 0.5,
+                                                            color:
+                                                                _finishedCongratulationsTabIndex ==
+                                                                    1
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                    0xFF64748B,
+                                                                  ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
-                                                child: Row(
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // ==========================================
+                                        // TAB 0: MY RESULT CARD
+                                        // ==========================================
+                                        if (_finishedCongratulationsTabIndex ==
+                                            0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 24,
+                                              vertical: 28,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(28),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: rankColor.withValues(
+                                                    alpha: 0.25,
+                                                  ),
+                                                  blurRadius: 28,
+                                                  offset: const Offset(0, 10),
+                                                ),
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.08),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                              border: Border.all(
+                                                color: rankColor.withValues(
+                                                  alpha: 0.4,
+                                                ),
+                                                width: 1.8,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Top Tag: QUIZ COMPLETED
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 5,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFFF1F5F9,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFFCBD5E1,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.flag_rounded,
+                                                        color: Color(
+                                                          0xFF0F172A,
+                                                        ),
+                                                        size: 14,
+                                                      ),
+                                                      SizedBox(width: 6),
+                                                      Text(
+                                                        "QUIZ COMPLETED",
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          letterSpacing: 1.0,
+                                                          color: Color(
+                                                            0xFF0F172A,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+
+                                                const SizedBox(height: 18),
+
+                                                // Trophy / Badge Image with glow
+                                                Container(
+                                                  width: 130,
+                                                  height: 130,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: rankColor
+                                                            .withValues(
+                                                              alpha: 0.35,
+                                                            ),
+                                                        blurRadius: 24,
+                                                        spreadRadius: 2,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: ClipOval(
+                                                    child: Image.asset(
+                                                      trophyAsset,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (_, _, _) =>
+                                                          Container(
+                                                            color: rankColor
+                                                                .withValues(
+                                                                  alpha: 0.15,
+                                                                ),
+                                                            child: Icon(
+                                                              isTop3
+                                                                  ? Icons
+                                                                        .emoji_events_rounded
+                                                                  : Icons
+                                                                        .military_tech_rounded,
+                                                              size: 72,
+                                                              color: rankColor,
+                                                            ),
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ),
+
+                                                const SizedBox(height: 16),
+
+                                                // Header: CONGRATULATIONS!
+                                                Text(
+                                                  isTop3
+                                                      ? "CONGRATULATIONS!"
+                                                      : "WELL DONE!",
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 24,
+                                                    fontWeight: FontWeight.w900,
+                                                    letterSpacing: 0.8,
+                                                    color: isTop3
+                                                        ? const Color(
+                                                            0xFFD97706,
+                                                          )
+                                                        : const Color(
+                                                            0xFF1E3A8A,
+                                                          ),
+                                                  ),
+                                                ),
+
+                                                const SizedBox(height: 6),
+
+                                                // Big Rank Banner: "YOU'RE RANK 1!"
+                                                Container(
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 6,
+                                                      ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 20,
+                                                        vertical: 8,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      colors: isTop3
+                                                          ? [
+                                                              rankColor,
+                                                              rankColor
+                                                                  .withValues(
+                                                                    alpha: 0.8,
+                                                                  ),
+                                                            ]
+                                                          : [
+                                                              const Color(
+                                                                0xFF2563EB,
+                                                              ),
+                                                              const Color(
+                                                                0xFF1D4ED8,
+                                                              ),
+                                                            ],
+                                                      begin: Alignment.topLeft,
+                                                      end:
+                                                          Alignment.bottomRight,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          20,
+                                                        ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: rankColor
+                                                            .withValues(
+                                                              alpha: 0.4,
+                                                            ),
+                                                        blurRadius: 12,
+                                                        offset: const Offset(
+                                                          0,
+                                                          4,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Text(
+                                                    "YOU'RE RANK $finalRank!",
+                                                    textAlign: TextAlign.center,
+                                                    style: const TextStyle(
+                                                      fontSize: 22,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: Colors.white,
+                                                      letterSpacing: 0.6,
+                                                    ),
+                                                  ),
+                                                ),
+
+                                                Text(
+                                                  rankSubtitle,
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: rankColor,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+
+                                                const SizedBox(height: 18),
+                                                const Divider(
+                                                  height: 1,
+                                                  color: Color(0xFFE2E8F0),
+                                                ),
+                                                const SizedBox(height: 16),
+
+                                                // Name / Team
+                                                Row(
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.center,
                                                   children: [
                                                     Icon(
-                                                      Icons.leaderboard_rounded,
-                                                      size: 18,
-                                                      color:
-                                                          _finishedCongratulationsTabIndex ==
-                                                                  1
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF64748B),
+                                                      isTeam
+                                                          ? Icons.groups_rounded
+                                                          : Icons
+                                                                .person_rounded,
+                                                      size: 20,
+                                                      color: primaryGreen,
                                                     ),
                                                     const SizedBox(width: 8),
-                                                    Text(
-                                                      "OVERALL TALLY",
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        letterSpacing: 0.5,
-                                                        color:
-                                                            _finishedCongratulationsTabIndex ==
-                                                                    1
-                                                                ? Colors.white
-                                                                : const Color(
-                                                                    0xFF64748B),
+                                                    Flexible(
+                                                      child: Text(
+                                                        myDisplayName,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: const TextStyle(
+                                                          fontSize: 18,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          color: Color(
+                                                            0xFF0F172A,
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
 
-                                    // ==========================================
-                                    // TAB 0: MY RESULT CARD
-                                    // ==========================================
-                                    if (_finishedCongratulationsTabIndex == 0)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 24, vertical: 28),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(28),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: rankColor.withValues(
-                                                  alpha: 0.25),
-                                              blurRadius: 28,
-                                              offset: const Offset(0, 10),
-                                            ),
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.08),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                          border: Border.all(
-                                            color: rankColor.withValues(
-                                                alpha: 0.4),
-                                            width: 1.8,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // Top Tag: QUIZ COMPLETED
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 14,
-                                                      vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF1F5F9),
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                border: Border.all(
-                                                    color: const Color(
-                                                        0xFFCBD5E1)),
-                                              ),
-                                              child: const Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.flag_rounded,
-                                                      color: Color(0xFF0F172A),
-                                                      size: 14),
-                                                  SizedBox(width: 6),
+                                                if (isTeam &&
+                                                    myMembers.isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
                                                   Text(
-                                                    "QUIZ COMPLETED",
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      letterSpacing: 1.0,
-                                                      color: Color(0xFF0F172A),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 18),
-
-                                            // Trophy / Badge Image with glow
-                                            Container(
-                                              width: 130,
-                                              height: 130,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: rankColor.withValues(
-                                                        alpha: 0.35),
-                                                    blurRadius: 24,
-                                                    spreadRadius: 2,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: ClipOval(
-                                                child: Image.asset(
-                                                  trophyAsset,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, _, _) =>
-                                                      Container(
-                                                    color: rankColor.withValues(
-                                                        alpha: 0.15),
-                                                    child: Icon(
-                                                      isTop3
-                                                          ? Icons
-                                                              .emoji_events_rounded
-                                                          : Icons
-                                                              .military_tech_rounded,
-                                                      size: 72,
-                                                      color: rankColor,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 16),
-
-                                            // Header: CONGRATULATIONS!
-                                            Text(
-                                              isTop3
-                                                  ? "CONGRATULATIONS!"
-                                                  : "WELL DONE!",
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 0.8,
-                                                color: isTop3
-                                                  ? const Color(0xFFD97706)
-                                                  : const Color(0xFF1E3A8A),
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 6),
-
-                                            // Big Rank Banner: "YOU'RE RANK 1!"
-                                            Container(
-                                              margin:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 6),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 20,
-                                                      vertical: 8),
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: isTop3
-                                                      ? [
-                                                          rankColor,
-                                                          rankColor.withValues(
-                                                              alpha: 0.8)
-                                                        ]
-                                                      : [
-                                                          const Color(
-                                                              0xFF2563EB),
-                                                          const Color(
-                                                              0xFF1D4ED8)
-                                                        ],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: rankColor.withValues(
-                                                        alpha: 0.4),
-                                                    blurRadius: 12,
-                                                    offset:
-                                                        const Offset(0, 4),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Text(
-                                                "YOU'RE RANK $finalRank!",
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                  fontSize: 22,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: Colors.white,
-                                                  letterSpacing: 0.6,
-                                                ),
-                                              ),
-                                            ),
-
-                                            Text(
-                                              rankSubtitle,
-                                              style: TextStyle(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: rankColor,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 18),
-                                            const Divider(
-                                                height: 1,
-                                                color: Color(0xFFE2E8F0)),
-                                            const SizedBox(height: 16),
-
-                                            // Name / Team
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  isTeam
-                                                      ? Icons.groups_rounded
-                                                      : Icons.person_rounded,
-                                                  size: 20,
-                                                  color: primaryGreen,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Flexible(
-                                                  child: Text(
-                                                    myDisplayName,
-                                                    textAlign:
-                                                        TextAlign.center,
+                                                    "Members: ${myMembers.join(', ')}",
+                                                    textAlign: TextAlign.center,
                                                     style: const TextStyle(
-                                                      fontSize: 18,
+                                                      fontSize: 12,
+                                                      color: Color(0xFF64748B),
                                                       fontWeight:
-                                                          FontWeight.w800,
-                                                      color: Color(0xFF0F172A),
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+
+                                                const SizedBox(height: 16),
+
+                                                // Score Box: OVERALL SCORE across all levels
+                                                Container(
+                                                  width: double.infinity,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 14,
+                                                        horizontal: 16,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFFF8FAFC,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFFE2E8F0,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  child: Column(
+                                                    children: [
+                                                      const Text(
+                                                        "OVERALL SCORE",
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          letterSpacing: 1.0,
+                                                          color: Color(
+                                                            0xFF64748B,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        "$finalScore ${finalScore == 1 ? 'PT' : 'PTS'}",
+                                                        style: const TextStyle(
+                                                          fontSize: 28,
+                                                          fontWeight:
+                                                              FontWeight.w900,
+                                                          color: primaryGreen,
+                                                        ),
+                                                      ),
+                                                      if (myLevelScores
+                                                              .isNotEmpty ||
+                                                          myTieBreakerScore >
+                                                              0) ...[
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                        const Divider(
+                                                          height: 1,
+                                                          color: Color(
+                                                            0xFFE2E8F0,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                        Wrap(
+                                                          alignment:
+                                                              WrapAlignment
+                                                                  .center,
+                                                          spacing: 8,
+                                                          runSpacing: 6,
+                                                          children: [
+                                                            ...(myLevelScores.keys.toList()..sort()).map((
+                                                              lvl,
+                                                            ) {
+                                                              final pts =
+                                                                  myLevelScores[lvl] ??
+                                                                  0;
+                                                              return Container(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          10,
+                                                                      vertical:
+                                                                          4,
+                                                                    ),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(
+                                                                    0xFFE8F5E9,
+                                                                  ),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        8,
+                                                                      ),
+                                                                  border: Border.all(
+                                                                    color: const Color(
+                                                                      0xFFA5D6A7,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                child: Text(
+                                                                  pts == 0
+                                                                      ? "Level $lvl: 0"
+                                                                      : "Level $lvl: $pts ${pts == 1 ? 'pt' : 'pts'}",
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        12,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                    color: Color(
+                                                                      0xFF1B5E20,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            }),
+                                                            if (myTieBreakerScore >
+                                                                0)
+                                                              Container(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          10,
+                                                                      vertical:
+                                                                          4,
+                                                                    ),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(
+                                                                    0xFFFEF3C7,
+                                                                  ),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        8,
+                                                                      ),
+                                                                  border: Border.all(
+                                                                    color: const Color(
+                                                                      0xFFFDE68A,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                child: Text(
+                                                                  "TB: +$myTieBreakerScore ${myTieBreakerScore == 1 ? 'pt' : 'pts'}",
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        12,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                    color: Color(
+                                                                      0xFFB45309,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                ),
+
+                                                const SizedBox(height: 22),
+
+                                                // Action: Return to Dashboard button
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  height: 50,
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () async {
+                                                      await _clearQuizScreenPersistence();
+                                                      if (!context.mounted)
+                                                        return;
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pushAndRemoveUntil(
+                                                        MaterialPageRoute(
+                                                          builder: (_) =>
+                                                              const CompetitorDashboard(),
+                                                        ),
+                                                        (route) => false,
+                                                      );
+                                                    },
+                                                    icon: const Icon(
+                                                      Icons.dashboard_rounded,
+                                                      color: Colors.white,
+                                                      size: 20,
+                                                    ),
+                                                    label: const Text(
+                                                      "RETURN TO DASHBOARD",
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        fontSize: 14.5,
+                                                        letterSpacing: 0.5,
+                                                      ),
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          primaryGreen,
+                                                      foregroundColor:
+                                                          Colors.white,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              25,
+                                                            ),
+                                                      ),
+                                                      elevation: 4,
+                                                      shadowColor: primaryGreen
+                                                          .withValues(
+                                                            alpha: 0.4,
+                                                          ),
                                                     ),
                                                   ),
                                                 ),
                                               ],
                                             ),
-
-                                            if (isTeam &&
-                                                myMembers.isNotEmpty) ...[
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                "Members: ${myMembers.join(', ')}",
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: Color(0xFF64748B),
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-
-                                            const SizedBox(height: 16),
-
-                                            // Score Box: OVERALL SCORE across all levels
-                                            Container(
-                                              width: double.infinity,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 14,
-                                                      horizontal: 16),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    const Color(0xFFF8FAFC),
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                border: Border.all(
-                                                    color:
-                                                        const Color(0xFFE2E8F0)),
-                                              ),
-                                              child: Column(
-                                                children: [
-                                                  const Text(
-                                                    "OVERALL SCORE",
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      letterSpacing: 1.0,
-                                                      color: Color(0xFF64748B),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    "$finalScore ${finalScore == 1 ? 'PT' : 'PTS'}",
-                                                    style: const TextStyle(
-                                                      fontSize: 28,
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                      color: primaryGreen,
-                                                    ),
-                                                  ),
-                                                  if (myLevelScores.isNotEmpty ||
-                                                      myTieBreakerScore > 0) ...[
-                                                    const SizedBox(height: 10),
-                                                    const Divider(
-                                                      height: 1,
-                                                      color: Color(0xFFE2E8F0),
-                                                    ),
-                                                    const SizedBox(height: 10),
-                                                    Wrap(
-                                                      alignment:
-                                                          WrapAlignment.center,
-                                                      spacing: 8,
-                                                      runSpacing: 6,
-                                                      children: [
-                                                        ...(myLevelScores.keys
-                                                                .toList()
-                                                              ..sort())
-                                                            .map((lvl) {
-                                                          final pts =
-                                                              myLevelScores[lvl] ??
-                                                                  0;
-                                                          return Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .symmetric(
-                                                              horizontal: 10,
-                                                              vertical: 4,
-                                                            ),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              color: const Color(
-                                                                  0xFFE8F5E9),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          8),
-                                                              border: Border.all(
-                                                                color: const Color(
-                                                                    0xFFA5D6A7),
-                                                              ),
-                                                            ),
-                                                            child: Text(
-                                                              pts == 0
-                                                                  ? "Level $lvl: 0"
-                                                                  : "Level $lvl: $pts ${pts == 1 ? 'pt' : 'pts'}",
-                                                              style:
-                                                                  const TextStyle(
-                                                                fontSize: 12,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w700,
-                                                                color: Color(
-                                                                    0xFF1B5E20),
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }),
-                                                        if (myTieBreakerScore > 0)
-                                                          Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .symmetric(
-                                                              horizontal: 10,
-                                                              vertical: 4,
-                                                            ),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              color: const Color(
-                                                                  0xFFFEF3C7),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          8),
-                                                              border: Border.all(
-                                                                color: const Color(
-                                                                    0xFFFDE68A),
-                                                              ),
-                                                            ),
-                                                            child: Text(
-                                                              "TB: +$myTieBreakerScore ${myTieBreakerScore == 1 ? 'pt' : 'pts'}",
-                                                              style:
-                                                                  const TextStyle(
-                                                                fontSize: 12,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w700,
-                                                                color: Color(
-                                                                    0xFFB45309),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                 ],
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 22),
-
-                                            // Action: Return to Dashboard button
-                                            SizedBox(
-                                              width: double.infinity,
-                                              height: 50,
-                                              child: ElevatedButton.icon(
-                                                onPressed: () async {
-                                                  await _clearQuizScreenPersistence();
-                                                  if (!context.mounted) return;
-                                                  Navigator.of(context)
-                                                      .pushAndRemoveUntil(
-                                                    MaterialPageRoute(
-                                                        builder: (_) =>
-                                                            const CompetitorDashboard()),
-                                                    (route) => false,
-                                                  );
-                                                },
-                                                icon: const Icon(
-                                                    Icons.dashboard_rounded,
-                                                    color: Colors.white,
-                                                    size: 20),
-                                                label: const Text(
-                                                  "RETURN TO DASHBOARD",
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight:
-                                                        FontWeight.w800,
-                                                    fontSize: 14.5,
-                                                    letterSpacing: 0.5,
-                                                  ),
-                                                ),
-                                                style:
-                                                    ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      primaryGreen,
-                                                  foregroundColor:
-                                                      Colors.white,
-                                                  shape:
-                                                      RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            25),
-                                                  ),
-                                                  elevation: 4,
-                                                  shadowColor: primaryGreen
-                                                      .withValues(alpha: 0.4),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    // ==========================================
-                                    // TAB 1: OVERALL TALLY CARD
-                                    // ==========================================
-                                    else
-                                      _buildFinishedOverallTallyCard(
-                                        context: context,
-                                        tallyList: tallyList,
-                                        sortedLevels: sortedLevels,
-                                      ),
-                                  ],
+                                          )
+                                        // ==========================================
+                                        // TAB 1: OVERALL TALLY CARD
+                                        // ==========================================
+                                        else
+                                          _buildFinishedOverallTallyCard(
+                                            context: context,
+                                            tallyList: tallyList,
+                                            sortedLevels: sortedLevels,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
                   );
                 },
               );
             },
-          );
-        },
-      ),
-    );
+          ),
+        );
       },
     );
   }
@@ -11052,10 +11653,7 @@ class _QuizScreenState extends State<QuizScreen> {
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.5,
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -11069,7 +11667,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFF59E0B), width: 1.8),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B),
+                    width: 1.8,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
@@ -11130,7 +11731,9 @@ class _QuizScreenState extends State<QuizScreen> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 14),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
@@ -11144,8 +11747,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFF59E0B)
-                            .withValues(alpha: 0.12),
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -11164,8 +11766,9 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFF59E0B)
-                                  .withValues(alpha: 0.35),
+                              color: const Color(
+                                0xFFF59E0B,
+                              ).withValues(alpha: 0.35),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -11279,8 +11882,11 @@ class _QuizScreenState extends State<QuizScreen> {
                   (route) => false,
                 );
               },
-              icon: const Icon(Icons.dashboard_rounded,
-                  color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.dashboard_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               label: const Text(
                 "RETURN TO DASHBOARD",
                 style: TextStyle(
@@ -11308,19 +11914,23 @@ class _QuizScreenState extends State<QuizScreen> {
 
   // Row for Each Contestant in Finished Overall Tally
   Widget _buildFinishedTallyRow(
-      _FinishedTallyRowData item, List<int> sortedLevels) {
+    _FinishedTallyRowData item,
+    List<int> sortedLevels,
+  ) {
     Widget rankBadge;
 
     if (item.rank <= 3) {
       final String trophyAsset = item.rank == 1
           ? 'assets/trophies/gold_trophy_3d.jpg'
           : (item.rank == 2
-              ? 'assets/trophies/silver_trophy_3d.jpg'
-              : 'assets/trophies/bronze_trophy_3d.jpg');
+                ? 'assets/trophies/silver_trophy_3d.jpg'
+                : 'assets/trophies/bronze_trophy_3d.jpg');
 
       final Color rankColor = item.rank == 1
           ? const Color(0xFFF59E0B)
-          : (item.rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+          : (item.rank == 2
+                ? const Color(0xFF94A3B8)
+                : const Color(0xFFD97706));
 
       rankBadge = Stack(
         clipBehavior: Clip.none,
@@ -11491,12 +12101,9 @@ class _QuizScreenState extends State<QuizScreen> {
                 Row(
                   children: [
                     Icon(
-                      item.isTeam
-                          ? Icons.groups_rounded
-                          : Icons.person_rounded,
+                      item.isTeam ? Icons.groups_rounded : Icons.person_rounded,
                       size: 15,
-                      color:
-                          item.isMe ? primaryGreen : const Color(0xFF64748B),
+                      color: item.isMe ? primaryGreen : const Color(0xFF64748B),
                     ),
                     const SizedBox(width: 6),
                     Flexible(
@@ -11517,7 +12124,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFDCFCE7),
                           borderRadius: BorderRadius.circular(6),
@@ -11536,7 +12145,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEDE9FE),
                           borderRadius: BorderRadius.circular(5),
@@ -11578,7 +12189,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     for (final lvl in sortedLevels) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: item.isMe
                               ? const Color(0xFFE8F5E9)
@@ -11608,7 +12221,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     if (item.tieBreakerScore > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(6),
@@ -11658,9 +12273,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
-                    color: item.isMe
-                        ? Colors.white
-                        : const Color(0xFF0F172A),
+                    color: item.isMe ? Colors.white : const Color(0xFF0F172A),
                     height: 1.0,
                   ),
                 ),
@@ -11671,9 +12284,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
-                    color: item.isMe
-                        ? Colors.white70
-                        : const Color(0xFF64748B),
+                    color: item.isMe ? Colors.white70 : const Color(0xFF64748B),
                     height: 1.0,
                   ),
                 ),
@@ -11736,7 +12347,10 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
   void initState() {
     super.initState();
     if (widget.isFinal) {
-      CompetitorNavPersistence.savePage('final_ranking', quizCode: widget.quizCode);
+      CompetitorNavPersistence.savePage(
+        'final_ranking',
+        quizCode: widget.quizCode,
+      );
     }
   }
 
@@ -11760,7 +12374,10 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
             icon: const Icon(Icons.arrow_back_rounded, color: primaryGreen),
             tooltip: 'Back',
             onPressed: () async {
-              await CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+              await CompetitorNavPersistence.savePage(
+                'dashboard',
+                clearQuiz: true,
+              );
               if (!context.mounted) return;
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -11797,7 +12414,10 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
           builder: (context, sessSnap) {
             if (sessSnap.hasData && !sessSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) async {
-                await CompetitorNavPersistence.savePage('dashboard', clearQuiz: true);
+                await CompetitorNavPersistence.savePage(
+                  'dashboard',
+                  clearQuiz: true,
+                );
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -11819,7 +12439,8 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
             }
 
             final sessionData = sessSnap.data?.data();
-            if (sessionData != null && sessionData['tieBreakerActive'] == true) {
+            if (sessionData != null &&
+                sessionData['tieBreakerActive'] == true) {
               final rawUids = sessionData['tieBreakerContestantUids'];
               final isTiedContestant =
                   rawUids is List && rawUids.contains(myUid);
@@ -11834,7 +12455,8 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
 
             final sessionStatus =
                 sessionData?['status']?.toString().toLowerCase().trim() ?? '';
-            final bool isActuallyFinal = isFinal ||
+            final bool isActuallyFinal =
+                isFinal ||
                 sessionStatus == 'finished' ||
                 sessionStatus == 'completed';
             final officialRanks = sessionData?['officialRanks'];
@@ -11852,9 +12474,7 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                 // have 0 points (no score document yet). If it cannot be read,
                 // the ranking still works using the scores only.
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: session
-                      .collection('join_requests')
-                      .snapshots(),
+                  stream: session.collection('join_requests').snapshots(),
                   builder: (context, contestantSnap) {
                     final scoreDocs = scoreSnap.data?.docs ?? [];
                     final contestants = contestantSnap.hasError
@@ -11876,14 +12496,22 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
 
                     for (final uid in allUids) {
                       final sData = scoreById[uid] ?? const <String, dynamic>{};
-                      final cData = contestantById[uid] ?? const <String, dynamic>{};
+                      final cData =
+                          contestantById[uid] ?? const <String, dynamic>{};
 
-                      final status = (cData['status'] ?? sData['status'] ?? '').toString().trim().toLowerCase();
-                      if (status == 'left' || status == 'rejected' || status == 'declined' || status == 'pending') {
+                      final status = (cData['status'] ?? sData['status'] ?? '')
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+                      if (status == 'left' ||
+                          status == 'rejected' ||
+                          status == 'declined' ||
+                          status == 'pending') {
                         continue;
                       }
 
-                      final rawR = sData['rank'] ??
+                      final rawR =
+                          sData['rank'] ??
                           sData['levelRank'] ??
                           sData['currentRank'] ??
                           sData['rankAtProceed'] ??
@@ -11894,7 +12522,8 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                       int? assignedR = rawR is num
                           ? rawR.toInt()
                           : int.tryParse(rawR?.toString() ?? '');
-                      if (officialRanks is Map && officialRanks.containsKey(uid)) {
+                      if (officialRanks is Map &&
+                          officialRanks.containsKey(uid)) {
                         final offR = officialRanks[uid];
                         final parsed = offR is num
                             ? offR.toInt()
@@ -11902,14 +12531,16 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                         if (parsed != null && parsed > 0) assignedR = parsed;
                       }
 
-                      final rawTime = sData['updatedAt'] ??
+                      final rawTime =
+                          sData['updatedAt'] ??
                           sData['answeredAt'] ??
                           sData['lastAnsweredAt'];
                       final int timeVal = rawTime is Timestamp
                           ? rawTime.millisecondsSinceEpoch
                           : (rawTime is num ? rawTime.toInt() : 0);
 
-                      final rawMembers = cData['teamMembers'] ??
+                      final rawMembers =
+                          cData['teamMembers'] ??
                           cData['members'] ??
                           sData['teamMembers'] ??
                           sData['members'];
@@ -11917,46 +12548,71 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                       if (rawMembers is List) {
                         for (final m in rawMembers) {
                           final s = m is Map
-                              ? (m['name'] ?? m['displayName'] ?? m['fullName'] ?? '').toString().trim()
+                              ? (m['name'] ??
+                                        m['displayName'] ??
+                                        m['fullName'] ??
+                                        '')
+                                    .toString()
+                                    .trim()
                               : m.toString().trim();
-                          if (s.isNotEmpty && !membersList.contains(s)) membersList.add(s);
+                          if (s.isNotEmpty && !membersList.contains(s))
+                            membersList.add(s);
                         }
                       }
 
-                      final rawTeam = (cData['teamName'] ?? sData['teamName'] ?? '').toString().trim();
-                      final cType = (cData['contestantType'] ?? sData['contestantType'] ?? '').toString().trim().toLowerCase();
-                      final bool isTeam = cType == 'team' ||
+                      final rawTeam =
+                          (cData['teamName'] ?? sData['teamName'] ?? '')
+                              .toString()
+                              .trim();
+                      final cType =
+                          (cData['contestantType'] ??
+                                  sData['contestantType'] ??
+                                  '')
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+                      final bool isTeam =
+                          cType == 'team' ||
                           cData['isTeam'] == true ||
                           sData['isTeam'] == true ||
                           rawTeam.isNotEmpty ||
                           membersList.isNotEmpty;
 
-                      final personalName = (cData['realName'] ??
-                              cData['fullName'] ??
-                              sData['fullName'] ??
-                              cData['displayName'] ??
-                              cData['name'] ??
-                              sData['name'] ??
-                              cData['email'] ??
-                              uid)
-                          .toString()
-                          .trim();
+                      final personalName =
+                          (cData['realName'] ??
+                                  cData['fullName'] ??
+                                  sData['fullName'] ??
+                                  cData['displayName'] ??
+                                  cData['name'] ??
+                                  sData['name'] ??
+                                  cData['email'] ??
+                                  uid)
+                              .toString()
+                              .trim();
 
                       final teamName = rawTeam.isNotEmpty
                           ? rawTeam
-                          : (isTeam && membersList.isNotEmpty ? (rawTeam.isNotEmpty ? rawTeam : personalName) : '');
+                          : (isTeam && membersList.isNotEmpty
+                                ? (rawTeam.isNotEmpty ? rawTeam : personalName)
+                                : '');
 
                       final displayName = isTeam
                           ? (teamName.isNotEmpty ? teamName : personalName)
                           : personalName;
 
-                      final isElim = sData['eliminated'] == true ||
+                      final isElim =
+                          sData['eliminated'] == true ||
                           sData['isEliminated'] == true ||
-                          sData['status']?.toString().toLowerCase() == 'eliminated' ||
+                          sData['status']?.toString().toLowerCase() ==
+                              'eliminated' ||
                           cData['eliminated'] == true ||
                           cData['isEliminated'] == true ||
-                          cData['contestantDecision']?.toString().toLowerCase() == 'eliminated' ||
-                          cData['status']?.toString().toLowerCase() == 'eliminated';
+                          cData['contestantDecision']
+                                  ?.toString()
+                                  .toLowerCase() ==
+                              'eliminated' ||
+                          cData['status']?.toString().toLowerCase() ==
+                              'eliminated';
 
                       rows.add({
                         'uid': uid,
@@ -11965,350 +12621,712 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                         'team': isTeam ? teamName : '',
                         'isTeam': isTeam,
                         'members': membersList,
-                        'score': int.tryParse((sData['score'] ?? cData['score'])?.toString() ?? '') ?? 0,
+                        'score':
+                            int.tryParse(
+                              (sData['score'] ?? cData['score'])?.toString() ??
+                                  '',
+                            ) ??
+                            0,
                         'rank': assignedR,
                         'time': timeVal,
                         'eliminated': isElim,
                       });
                     }
 
-              rows.sort((a, b) {
-                final aElim = a['eliminated'] == true;
-                final bElim = b['eliminated'] == true;
-                if (aElim != bElim) return aElim ? 1 : -1;
-                final byScore = (b['score'] as int).compareTo(
-                  a['score'] as int,
-                );
-                if (byScore != 0) return byScore;
+                    rows.sort((a, b) {
+                      final aElim = a['eliminated'] == true;
+                      final bElim = b['eliminated'] == true;
+                      if (aElim != bElim) return aElim ? 1 : -1;
+                      final byScore = (b['score'] as int).compareTo(
+                        a['score'] as int,
+                      );
+                      if (byScore != 0) return byScore;
 
-                final rA = a['rank'] as int?;
-                final rB = b['rank'] as int?;
-                if (rA != null && rB != null && rA != rB) {
-                  return rA.compareTo(rB);
-                } else if (rA != null) {
-                  return -1;
-                } else if (rB != null) {
-                  return 1;
-                }
+                      final rA = a['rank'] as int?;
+                      final rB = b['rank'] as int?;
+                      if (rA != null && rB != null && rA != rB) {
+                        return rA.compareTo(rB);
+                      } else if (rA != null) {
+                        return -1;
+                      } else if (rB != null) {
+                        return 1;
+                      }
 
-                final tA = a['time'] as int? ?? 0;
-                final tB = b['time'] as int? ?? 0;
-                if (tA > 0 && tB > 0 && tA != tB) {
-                  return tA.compareTo(tB);
-                } else if (tA > 0 && tB == 0) {
-                  return -1;
-                } else if (tB > 0 && tA == 0) {
-                  return 1;
-                }
+                      final tA = a['time'] as int? ?? 0;
+                      final tB = b['time'] as int? ?? 0;
+                      if (tA > 0 && tB > 0 && tA != tB) {
+                        return tA.compareTo(tB);
+                      } else if (tA > 0 && tB == 0) {
+                        return -1;
+                      } else if (tB > 0 && tA == 0) {
+                        return 1;
+                      }
 
-                return (a['name'] as String).compareTo(b['name'] as String);
-              });
+                      return (a['name'] as String).compareTo(
+                        b['name'] as String,
+                      );
+                    });
 
-              // Competition ranking: equal scores share the same rank
-              final ranks = <int>[];
-              int activeRankCounter = 0;
-              for (int i = 0; i < rows.length; i++) {
-                final bool isElim = rows[i]['eliminated'] == true;
-                if (officialRanks is Map && officialRanks.containsKey(rows[i]['uid'])) {
-                  final offR = officialRanks[rows[i]['uid']];
-                  final parsed = offR is num ? offR.toInt() : int.tryParse(offR?.toString() ?? '');
-                  if (parsed != null && parsed > 0) {
-                    ranks.add(parsed);
-                    continue;
-                  }
-                }
-                if (isElim) {
-                  ranks.add(i + 1);
-                } else {
-                  activeRankCounter++;
-                  if (i > 0 && rows[i]['score'] == rows[i - 1]['score'] && rows[i - 1]['eliminated'] != true) {
-                    ranks.add(ranks[i - 1]);
-                  } else {
-                    ranks.add(activeRankCounter);
-                  }
-                }
-              }
+                    // Competition ranking: equal scores share the same rank
+                    final ranks = <int>[];
+                    int activeRankCounter = 0;
+                    for (int i = 0; i < rows.length; i++) {
+                      final bool isElim = rows[i]['eliminated'] == true;
+                      if (officialRanks is Map &&
+                          officialRanks.containsKey(rows[i]['uid'])) {
+                        final offR = officialRanks[rows[i]['uid']];
+                        final parsed = offR is num
+                            ? offR.toInt()
+                            : int.tryParse(offR?.toString() ?? '');
+                        if (parsed != null && parsed > 0) {
+                          ranks.add(parsed);
+                          continue;
+                        }
+                      }
+                      if (isElim) {
+                        ranks.add(i + 1);
+                      } else {
+                        activeRankCounter++;
+                        if (i > 0 &&
+                            rows[i]['score'] == rows[i - 1]['score'] &&
+                            rows[i - 1]['eliminated'] != true) {
+                          ranks.add(ranks[i - 1]);
+                        } else {
+                          ranks.add(activeRankCounter);
+                        }
+                      }
+                    }
 
-              final myIndex = rows.indexWhere((r) => r['uid'] == myUid);
-              final myRow = myIndex >= 0 ? rows[myIndex] : null;
-              final myRank = myIndex >= 0 ? ranks[myIndex] : null;
-              final isMyEliminated =
-                  myIndex >= 0 && rows[myIndex]['eliminated'] == true;
+                    final myIndex = rows.indexWhere((r) => r['uid'] == myUid);
+                    final myRow = myIndex >= 0 ? rows[myIndex] : null;
+                    final myRank = myIndex >= 0 ? ranks[myIndex] : null;
+                    final isMyEliminated =
+                        myIndex >= 0 && rows[myIndex]['eliminated'] == true;
 
-              return SafeArea(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.all(18),
+                    return SafeArea(
+                      child: Column(
                         children: [
-                          if (isActuallyFinal && myRank != null) ...[
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 20,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isMyEliminated
-                                      ? [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)]
-                                      : (myRank == 1
-                                          ? [const Color(0xFFFEF3C7), const Color(0xFFFDE68A)]
-                                          : (myRank == 2
-                                              ? [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)]
-                                              : (myRank == 3
-                                                  ? [const Color(0xFFFFEDD5), const Color(0xFFFED7AA)]
-                                                  : [const Color(0xFFDCFCE7), const Color(0xFFBBF7D0)]))),
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(
-                                  color: isMyEliminated
-                                      ? Colors.grey.shade400
-                                      : (myRank == 1
-                                          ? const Color(0xFFF59E0B)
-                                          : (myRank == 2
-                                              ? const Color(0xFF94A3B8)
-                                              : (myRank == 3
-                                                  ? const Color(0xFFF97316)
-                                                  : const Color(0xFF86EFAC)))),
-                                  width: 2.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (myRank == 1
-                                            ? const Color(0xFFF59E0B)
-                                            : primaryGreen)
-                                        .withValues(alpha: 0.16),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
+                          Expanded(
+                            child: ListView(
+                              padding: const EdgeInsets.all(18),
+                              children: [
+                                if (isActuallyFinal && myRank != null) ...[
                                   Container(
-                                    width: 70,
-                                    height: 70,
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 20,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        colors: isMyEliminated
+                                            ? [
+                                                const Color(0xFFF1F5F9),
+                                                const Color(0xFFE2E8F0),
+                                              ]
+                                            : (myRank == 1
+                                                  ? [
+                                                      const Color(0xFFFEF3C7),
+                                                      const Color(0xFFFDE68A),
+                                                    ]
+                                                  : (myRank == 2
+                                                        ? [
+                                                            const Color(
+                                                              0xFFF1F5F9,
+                                                            ),
+                                                            const Color(
+                                                              0xFFE2E8F0,
+                                                            ),
+                                                          ]
+                                                        : (myRank == 3
+                                                              ? [
+                                                                  const Color(
+                                                                    0xFFFFEDD5,
+                                                                  ),
+                                                                  const Color(
+                                                                    0xFFFED7AA,
+                                                                  ),
+                                                                ]
+                                                              : [
+                                                                  const Color(
+                                                                    0xFFDCFCE7,
+                                                                  ),
+                                                                  const Color(
+                                                                    0xFFBBF7D0,
+                                                                  ),
+                                                                ]))),
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(22),
                                       border: Border.all(
                                         color: isMyEliminated
                                             ? Colors.grey.shade400
                                             : (myRank == 1
-                                                ? const Color(0xFFF59E0B)
-                                                : (myRank == 2
-                                                    ? const Color(0xFF94A3B8)
-                                                    : (myRank == 3
-                                                        ? const Color(0xFFF97316)
-                                                        : primaryGreen))),
-                                        width: 2.5,
+                                                  ? const Color(0xFFF59E0B)
+                                                  : (myRank == 2
+                                                        ? const Color(
+                                                            0xFF94A3B8,
+                                                          )
+                                                        : (myRank == 3
+                                                              ? const Color(
+                                                                  0xFFF97316,
+                                                                )
+                                                              : const Color(
+                                                                  0xFF86EFAC,
+                                                                )))),
+                                        width: 2.0,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.08),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 3),
+                                          color:
+                                              (myRank == 1
+                                                      ? const Color(0xFFF59E0B)
+                                                      : primaryGreen)
+                                                  .withValues(alpha: 0.16),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
                                         ),
                                       ],
                                     ),
-                                    child: Center(
-                                      child: Icon(
-                                        isMyEliminated
-                                            ? Icons.sentiment_neutral_rounded
-                                            : (myRank == 1
-                                                ? Icons.emoji_events_rounded
-                                                : (myRank == 2 || myRank == 3
-                                                    ? Icons.military_tech_rounded
-                                                    : Icons.stars_rounded)),
-                                        size: 40,
-                                        color: isMyEliminated
-                                            ? Colors.grey.shade600
-                                            : (myRank == 1
-                                                ? const Color(0xFFD97706)
-                                                : (myRank == 2
-                                                    ? const Color(0xFF475569)
-                                                    : (myRank == 3
-                                                        ? const Color(0xFFC2410C)
-                                                        : primaryGreen))),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    isMyEliminated
-                                        ? "QUIZ COMPLETED"
-                                        : (myRank <= 3
-                                            ? "CONGRATULATIONS!"
-                                            : "GREAT EFFORT!"),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: isMyEliminated
-                                          ? Colors.grey.shade800
-                                          : (myRank == 1
-                                              ? const Color(0xFF78350F)
-                                              : (myRank == 2
-                                                  ? const Color(0xFF1E293B)
-                                                  : (myRank == 3
-                                                      ? const Color(0xFF7C2D12)
-                                                      : darkGreen))),
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: isMyEliminated
-                                            ? Colors.grey.shade400
-                                            : (myRank == 1
-                                                ? const Color(0xFFF59E0B)
-                                                : (myRank == 2
-                                                    ? const Color(0xFF94A3B8)
-                                                    : (myRank == 3
-                                                        ? const Color(0xFFF97316)
-                                                        : primaryGreen))),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      isMyEliminated
-                                          ? "CONTESTANT"
-                                          : (myRank == 1
-                                              ? "YOU ARE RANK 1 • CHAMPION 🏆"
-                                              : (myRank == 2
-                                                  ? "YOU ARE RANK 2 • 1ST RUNNER-UP 🥈"
-                                                  : (myRank == 3
-                                                      ? "YOU ARE RANK 3 • 2ND RUNNER-UP 🥉"
-                                                      : "YOU ARE RANK $myRank 🎖️"))),
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: isMyEliminated
-                                            ? Colors.grey.shade700
-                                            : (myRank == 1
-                                                ? const Color(0xFF92400E)
-                                                : (myRank == 2
-                                                    ? const Color(0xFF1E293B)
-                                                    : (myRank == 3
-                                                        ? const Color(0xFF9A3412)
-                                                        : darkGreen))),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                  if (myRow != null) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      "Final Score: ${(myRow['score'] as num?)?.toInt() == 0 ? '0' : "${myRow['score']} ${(myRow['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}"}",
-                                      style: TextStyle(
-                                        color: Colors.black.withValues(alpha: 0.7),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                          if (isActuallyFinal) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Color(0xFF064E25),
-                                    Color(0xFF07883D),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(22),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: primaryGreen.withValues(alpha: 0.22),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 42,
-                                        height: 42,
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber.withValues(alpha: 0.18),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.amber.shade300,
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          width: 70,
+                                          height: 70,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: isMyEliminated
+                                                  ? Colors.grey.shade400
+                                                  : (myRank == 1
+                                                        ? const Color(
+                                                            0xFFF59E0B,
+                                                          )
+                                                        : (myRank == 2
+                                                              ? const Color(
+                                                                  0xFF94A3B8,
+                                                                )
+                                                              : (myRank == 3
+                                                                    ? const Color(
+                                                                        0xFFF97316,
+                                                                      )
+                                                                    : primaryGreen))),
+                                              width: 2.5,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.08,
+                                                ),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              isMyEliminated
+                                                  ? Icons
+                                                        .sentiment_neutral_rounded
+                                                  : (myRank == 1
+                                                        ? Icons
+                                                              .emoji_events_rounded
+                                                        : (myRank == 2 ||
+                                                                  myRank == 3
+                                                              ? Icons
+                                                                    .military_tech_rounded
+                                                              : Icons
+                                                                    .stars_rounded)),
+                                              size: 40,
+                                              color: isMyEliminated
+                                                  ? Colors.grey.shade600
+                                                  : (myRank == 1
+                                                        ? const Color(
+                                                            0xFFD97706,
+                                                          )
+                                                        : (myRank == 2
+                                                              ? const Color(
+                                                                  0xFF475569,
+                                                                )
+                                                              : (myRank == 3
+                                                                    ? const Color(
+                                                                        0xFFC2410C,
+                                                                      )
+                                                                    : primaryGreen))),
+                                            ),
                                           ),
                                         ),
-                                        child: const Icon(
-                                          Icons.emoji_events_rounded,
-                                          color: Colors.amber,
-                                          size: 26,
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          isMyEliminated
+                                              ? "QUIZ COMPLETED"
+                                              : (myRank <= 3
+                                                    ? "CONGRATULATIONS!"
+                                                    : "GREAT EFFORT!"),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: isMyEliminated
+                                                ? Colors.grey.shade800
+                                                : (myRank == 1
+                                                      ? const Color(0xFF78350F)
+                                                      : (myRank == 2
+                                                            ? const Color(
+                                                                0xFF1E293B,
+                                                              )
+                                                            : (myRank == 3
+                                                                  ? const Color(
+                                                                      0xFF7C2D12,
+                                                                    )
+                                                                  : darkGreen))),
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
+                                          ),
                                         ),
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: isMyEliminated
+                                                  ? Colors.grey.shade400
+                                                  : (myRank == 1
+                                                        ? const Color(
+                                                            0xFFF59E0B,
+                                                          )
+                                                        : (myRank == 2
+                                                              ? const Color(
+                                                                  0xFF94A3B8,
+                                                                )
+                                                              : (myRank == 3
+                                                                    ? const Color(
+                                                                        0xFFF97316,
+                                                                      )
+                                                                    : primaryGreen))),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isMyEliminated
+                                                ? "CONTESTANT"
+                                                : (myRank == 1
+                                                      ? "YOU ARE RANK 1 • CHAMPION 🏆"
+                                                      : (myRank == 2
+                                                            ? "YOU ARE RANK 2 • 1ST RUNNER-UP 🥈"
+                                                            : (myRank == 3
+                                                                  ? "YOU ARE RANK 3 • 2ND RUNNER-UP 🥉"
+                                                                  : "YOU ARE RANK $myRank 🎖️"))),
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: isMyEliminated
+                                                  ? Colors.grey.shade700
+                                                  : (myRank == 1
+                                                        ? const Color(
+                                                            0xFF92400E,
+                                                          )
+                                                        : (myRank == 2
+                                                              ? const Color(
+                                                                  0xFF1E293B,
+                                                                )
+                                                              : (myRank == 3
+                                                                    ? const Color(
+                                                                        0xFF9A3412,
+                                                                      )
+                                                                    : darkGreen))),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                        if (myRow != null) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            "Final Score: ${(myRow['score'] as num?)?.toInt() == 0 ? '0' : "${myRow['score']} ${(myRow['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}"}",
+                                            style: TextStyle(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.7,
+                                              ),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (isActuallyFinal) ...[
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(18),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFF064E25),
+                                          Color(0xFF07883D),
+                                        ],
                                       ),
-                                      const SizedBox(width: 12),
-                                      const Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                      borderRadius: BorderRadius.circular(22),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: primaryGreen.withValues(
+                                            alpha: 0.22,
+                                          ),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Text(
-                                              "OFFICIAL WINNERS PODIUM",
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 0.6,
+                                            Container(
+                                              width: 42,
+                                              height: 42,
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.withValues(
+                                                  alpha: 0.18,
+                                                ),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: Colors.amber.shade300,
+                                                ),
+                                              ),
+                                              child: const Icon(
+                                                Icons.emoji_events_rounded,
+                                                color: Colors.amber,
+                                                size: 26,
                                               ),
                                             ),
-                                            SizedBox(height: 2),
-                                            Text(
-                                              "Congratulations to our top performers!",
-                                              style: TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
+                                            const SizedBox(width: 12),
+                                            const Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    "OFFICIAL WINNERS PODIUM",
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      letterSpacing: 0.6,
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 2),
+                                                  Text(
+                                                    "Congratulations to our top performers!",
+                                                    style: TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 16),
+                                        if (rows.isEmpty)
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 20,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                "No scores yet.",
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          ...List.generate(rows.length, (i) {
+                                            final row = rows[i];
+                                            final rank = ranks[i];
+                                            final isMe = row['uid'] == myUid;
+                                            final eliminated =
+                                                row['eliminated'] == true;
+
+                                            final String titleLabel = eliminated
+                                                ? 'ELIMINATED'
+                                                : rank == 1
+                                                ? 'CHAMPION • RANK 1'
+                                                : rank == 2
+                                                ? '1ST RUNNER-UP • RANK 2'
+                                                : rank == 3
+                                                ? '2ND RUNNER-UP • RANK 3'
+                                                : 'FINALIST • RANK $rank';
+
+                                            final Color badgeColor = eliminated
+                                                ? Colors.grey.shade600
+                                                : rank == 1
+                                                ? Colors.amber.shade600
+                                                : rank == 2
+                                                ? Colors.blueGrey.shade300
+                                                : rank == 3
+                                                ? Colors.orange.shade400
+                                                : Colors.white24;
+
+                                            return Container(
+                                              width: double.infinity,
+                                              margin: const EdgeInsets.only(
+                                                bottom: 10,
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 14,
+                                                    vertical: 13,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withValues(
+                                                  alpha: rank == 1
+                                                      ? 0.20
+                                                      : 0.12,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: rank == 1
+                                                      ? Colors.amber.shade300
+                                                      : isMe
+                                                      ? Colors
+                                                            .greenAccent
+                                                            .shade200
+                                                      : Colors.white24,
+                                                  width: (rank == 1 || isMe)
+                                                      ? 1.6
+                                                      : 1.0,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  if (eliminated)
+                                                    Container(
+                                                      width: 42,
+                                                      height: 42,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors
+                                                            .grey
+                                                            .shade600,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const Center(
+                                                        child: Icon(
+                                                          Icons.close_rounded,
+                                                          color: Colors.white,
+                                                          size: 20,
+                                                        ),
+                                                      ),
+                                                    )
+                                                  else if (rank <= 10)
+                                                    TechRankLeaderboardIcon(
+                                                      rank: rank,
+                                                      size: 34,
+                                                    )
+                                                  else
+                                                    Container(
+                                                      width: 42,
+                                                      height: 42,
+                                                      decoration: BoxDecoration(
+                                                        color: badgeColor,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          '#$rank',
+                                                          style:
+                                                              const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w900,
+                                                                fontSize: 15,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            if (!eliminated &&
+                                                                rank <= 3) ...[
+                                                              Icon(
+                                                                Icons
+                                                                    .workspace_premium_rounded,
+                                                                size: 14,
+                                                                color: rank == 1
+                                                                    ? Colors
+                                                                          .amber
+                                                                          .shade300
+                                                                    : Colors
+                                                                          .white70,
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
+                                                            ],
+                                                            Flexible(
+                                                              child: Text(
+                                                                titleLabel,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      rank == 1
+                                                                      ? Colors
+                                                                            .amber
+                                                                            .shade300
+                                                                      : Colors
+                                                                            .white70,
+                                                                  fontSize: 10,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w800,
+                                                                  letterSpacing:
+                                                                      0.5,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 3,
+                                                        ),
+                                                        Text(
+                                                          isMe
+                                                              ? '${row['name']} (You)'
+                                                              : row['name']
+                                                                    as String,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style:
+                                                              const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                        ),
+                                                        if (row['isTeam'] ==
+                                                                true &&
+                                                            (row['members']
+                                                                        as List<
+                                                                          String
+                                                                        >?)
+                                                                    ?.isNotEmpty ==
+                                                                true) ...[
+                                                          Padding(
+                                                            padding:
+                                                                const EdgeInsets.only(
+                                                                  top: 2,
+                                                                ),
+                                                            child: Text(
+                                                              'Members: ${(row['members'] as List<String>).join(', ')}',
+                                                              maxLines: 2,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style:
+                                                                  const TextStyle(
+                                                                    color: Colors
+                                                                        .white70,
+                                                                    fontSize:
+                                                                        11,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 11,
+                                                          vertical: 6,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: rank == 1
+                                                          ? Colors
+                                                                .amber
+                                                                .shade400
+                                                          : Colors.white
+                                                                .withValues(
+                                                                  alpha: 0.16,
+                                                                ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            20,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      (row['score'] as num?)
+                                                                  ?.toInt() ==
+                                                              0
+                                                          ? '0'
+                                                          : '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
+                                                      style: TextStyle(
+                                                        color: rank == 1
+                                                            ? const Color(
+                                                                0xFF173426,
+                                                              )
+                                                            : Colors.white,
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w900,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 16),
+                                ] else ...[
                                   if (rows.isEmpty)
                                     const Padding(
                                       padding: EdgeInsets.symmetric(
-                                        vertical: 20,
+                                        vertical: 30,
                                       ),
                                       child: Center(
                                         child: Text(
                                           "No scores yet.",
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                          ),
+                                          style: TextStyle(color: Colors.grey),
                                         ),
                                       ),
                                     )
@@ -12320,92 +13338,124 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                       final eliminated =
                                           row['eliminated'] == true;
 
-                                      final String titleLabel = eliminated
-                                          ? 'ELIMINATED'
-                                          : rank == 1
-                                          ? 'CHAMPION • RANK 1'
-                                          : rank == 2
-                                          ? '1ST RUNNER-UP • RANK 2'
-                                          : rank == 3
-                                          ? '2ND RUNNER-UP • RANK 3'
-                                          : 'FINALIST • RANK $rank';
+                                      Color rankBadgeColor;
+                                      Color rankBorderColor;
+                                      Color rankTextColor;
 
-                                      final Color badgeColor = eliminated
-                                          ? Colors.grey.shade600
-                                          : rank == 1
-                                          ? Colors.amber.shade600
-                                          : rank == 2
-                                          ? Colors.blueGrey.shade300
-                                          : rank == 3
-                                          ? Colors.orange.shade400
-                                          : Colors.white24;
+                                      if (eliminated) {
+                                        rankBadgeColor = const Color(
+                                          0xFFFEE2E2,
+                                        );
+                                        rankBorderColor = const Color(
+                                          0xFFEF4444,
+                                        );
+                                        rankTextColor = const Color(0xFFB91C1C);
+                                      } else if (rank == 1) {
+                                        rankBadgeColor = const Color(
+                                          0xFFFEF3C7,
+                                        );
+                                        rankBorderColor = const Color(
+                                          0xFFF59E0B,
+                                        );
+                                        rankTextColor = const Color(0xFFB45309);
+                                      } else if (rank == 2) {
+                                        rankBadgeColor = const Color(
+                                          0xFFF1F5F9,
+                                        );
+                                        rankBorderColor = const Color(
+                                          0xFF94A3B8,
+                                        );
+                                        rankTextColor = const Color(0xFF334155);
+                                      } else if (rank == 3) {
+                                        rankBadgeColor = const Color(
+                                          0xFFFFEDD5,
+                                        );
+                                        rankBorderColor = const Color(
+                                          0xFFF97316,
+                                        );
+                                        rankTextColor = const Color(0xFFC2410C);
+                                      } else {
+                                        rankBadgeColor = const Color(
+                                          0xFFDCFCE7,
+                                        );
+                                        rankBorderColor = primaryGreen;
+                                        rankTextColor = darkGreen;
+                                      }
 
                                       return Container(
-                                        width: double.infinity,
                                         margin: const EdgeInsets.only(
                                           bottom: 10,
                                         ),
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 14,
-                                          vertical: 13,
+                                          vertical: 12,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 
-                                            rank == 1 ? 0.20 : 0.12,
-                                          ),
+                                          color: eliminated
+                                              ? const Color(0xFFFDF2F2)
+                                              : (isMe
+                                                    ? softGreen
+                                                    : Colors.white),
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
                                           border: Border.all(
-                                            color: rank == 1
-                                                ? Colors.amber.shade300
-                                                : isMe
-                                                ? Colors.greenAccent.shade200
-                                                : Colors.white24,
-                                            width: (rank == 1 || isMe)
-                                                ? 1.6
-                                                : 1.0,
+                                            color: eliminated
+                                                ? Colors.red.shade300
+                                                : (isMe
+                                                      ? primaryGreen
+                                                      : borderGreen),
+                                            width: isMe ? 1.8 : 1.2,
                                           ),
                                         ),
                                         child: Row(
                                           children: [
                                             if (eliminated)
                                               Container(
-                                                width: 42,
-                                                height: 42,
+                                                width: 34,
+                                                height: 34,
                                                 decoration: BoxDecoration(
-                                                  color: Colors.grey.shade600,
+                                                  color: Colors.red.shade50,
                                                   shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.red.shade300,
+                                                    width: 1.5,
+                                                  ),
                                                 ),
-                                                child: const Center(
+                                                child: Center(
                                                   child: Icon(
                                                     Icons.close_rounded,
-                                                    color: Colors.white,
-                                                    size: 20,
+                                                    color: Colors.red.shade700,
+                                                    size: 19,
                                                   ),
                                                 ),
                                               )
                                             else if (rank <= 10)
                                               TechRankLeaderboardIcon(
                                                 rank: rank,
-                                                size: 34,
+                                                size: 32,
                                               )
                                             else
                                               Container(
-                                                width: 42,
-                                                height: 42,
+                                                width: 40,
+                                                height: 40,
+                                                alignment: Alignment.center,
                                                 decoration: BoxDecoration(
-                                                  color: badgeColor,
+                                                  color: primaryGreen,
                                                   shape: BoxShape.circle,
-                                                ),
-                                                child: Center(
-                                                  child: Text(
-                                                    '#$rank',
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight: FontWeight.w900,
-                                                      fontSize: 15,
+                                                  border: Border.all(
+                                                    color: const Color(
+                                                      0xFF86EFAC,
                                                     ),
+                                                    width: 1.5,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  '$rank',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
                                                   ),
                                                 ),
                                               ),
@@ -12417,67 +13467,114 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                 children: [
                                                   Row(
                                                     children: [
-                                                      if (!eliminated &&
-                                                          rank <= 3) ...[
-                                                        Icon(
-                                                          Icons
-                                                              .workspace_premium_rounded,
-                                                          size: 14,
-                                                          color: rank == 1
-                                                              ? Colors
-                                                                    .amber
-                                                                    .shade300
-                                                              : Colors.white70,
-                                                        ),
-                                                        const SizedBox(width: 4),
-                                                      ],
-                                                      Flexible(
-                                                        child: Text(
-                                                          titleLabel,
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: TextStyle(
-                                                            color: rank == 1
-                                                                ? Colors
-                                                                      .amber
-                                                                      .shade300
-                                                                : Colors
-                                                                      .white70,
-                                                            fontSize: 10,
-                                                            fontWeight:
-                                                                FontWeight.w800,
-                                                            letterSpacing: 0.5,
+                                                      Container(
+                                                        margin:
+                                                            const EdgeInsets.only(
+                                                              bottom: 3,
+                                                            ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 1.5,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: rankBadgeColor,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
+                                                          border: Border.all(
+                                                            color:
+                                                                rankBorderColor
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.5,
+                                                                    ),
+                                                            width: 0.8,
                                                           ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            if (eliminated) ...[
+                                                              Icon(
+                                                                Icons
+                                                                    .cancel_rounded,
+                                                                size: 11,
+                                                                color:
+                                                                    rankTextColor,
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 3,
+                                                              ),
+                                                            ],
+                                                            Text(
+                                                              eliminated
+                                                                  ? 'ELIMINATED'
+                                                                  : (rank == 1
+                                                                        ? '🏆 RANK 1 • 1ST'
+                                                                        : (rank == 2
+                                                                              ? '🥈 RANK 2 • 2ND'
+                                                                              : (rank == 3
+                                                                                    ? '🥉 RANK 3 • 3RD'
+                                                                                    : 'RANK $rank'))),
+                                                              style: TextStyle(
+                                                                color:
+                                                                    rankTextColor,
+                                                                fontSize: 9.5,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                letterSpacing:
+                                                                    0.3,
+                                                              ),
+                                                            ),
+                                                          ],
                                                         ),
                                                       ),
                                                     ],
                                                   ),
-                                                  const SizedBox(height: 3),
                                                   Text(
                                                     isMe
                                                         ? '${row['name']} (You)'
                                                         : row['name'] as String,
-                                                    maxLines: 1,
                                                     overflow:
                                                         TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16,
+                                                    style: TextStyle(
+                                                      color: eliminated
+                                                          ? Colors.red.shade900
+                                                          : textDark,
                                                       fontWeight:
                                                           FontWeight.bold,
+                                                      fontSize: 15,
                                                     ),
                                                   ),
                                                   if (row['isTeam'] == true &&
-                                                      (row['members'] as List<String>?)?.isNotEmpty == true) ...[
+                                                      (row['members']
+                                                                  as List<
+                                                                    String
+                                                                  >?)
+                                                              ?.isNotEmpty ==
+                                                          true) ...[
                                                     Padding(
-                                                      padding: const EdgeInsets.only(top: 2),
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            top: 2,
+                                                          ),
                                                       child: Text(
                                                         'Members: ${(row['members'] as List<String>).join(', ')}',
                                                         maxLines: 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(
-                                                          color: Colors.white70,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          color: eliminated
+                                                              ? Colors
+                                                                    .grey
+                                                                    .shade600
+                                                              : const Color(
+                                                                  0xFF5B7A9C,
+                                                                ),
                                                           fontSize: 11,
                                                         ),
                                                       ),
@@ -12486,300 +13583,77 @@ class _PartialRankingScreenState extends State<PartialRankingScreen> {
                                                 ],
                                               ),
                                             ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 11,
-                                                    vertical: 6,
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  (row['score'] as num?)
+                                                              ?.toInt() ==
+                                                          0
+                                                      ? '0'
+                                                      : '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
+                                                  style: TextStyle(
+                                                    color: eliminated
+                                                        ? Colors.red.shade700
+                                                        : darkGreen,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
                                                   ),
-                                              decoration: BoxDecoration(
-                                                color: rank == 1
-                                                    ? Colors.amber.shade400
-                                                    : Colors.white.withValues(alpha: 
-                                                        0.16,
-                                                      ),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                              ),
-                                              child: Text(
-                                                (row['score'] as num?)?.toInt() == 0
-                                                    ? '0'
-                                                    : '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
-                                                style: TextStyle(
-                                                  color: rank == 1
-                                                      ? const Color(0xFF173426)
-                                                      : Colors.white,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w900,
                                                 ),
-                                              ),
+                                                if (eliminated) ...[
+                                                  const SizedBox(height: 2),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 5,
+                                                          vertical: 1.5,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          Colors.red.shade100,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                      border: Border.all(
+                                                        color:
+                                                            Colors.red.shade200,
+                                                        width: 0.8,
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      'Eliminated',
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.red.shade800,
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ],
                                         ),
                                       );
                                     }),
                                 ],
-                              ),
+                              ],
                             ),
-                          ] else ...[
-                            if (rows.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 30),
-                                child: Center(
-                                  child: Text(
-                                    "No scores yet.",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                              )
-                            else
-                              ...List.generate(rows.length, (i) {
-                                final row = rows[i];
-                                final rank = ranks[i];
-                                final isMe = row['uid'] == myUid;
-                                final eliminated = row['eliminated'] == true;
-
-                                Color rankBadgeColor;
-                                Color rankBorderColor;
-                                Color rankTextColor;
-
-                                if (eliminated) {
-                                  rankBadgeColor = const Color(0xFFFEE2E2);
-                                  rankBorderColor = const Color(0xFFEF4444);
-                                  rankTextColor = const Color(0xFFB91C1C);
-                                } else if (rank == 1) {
-                                  rankBadgeColor = const Color(0xFFFEF3C7);
-                                  rankBorderColor = const Color(0xFFF59E0B);
-                                  rankTextColor = const Color(0xFFB45309);
-                                } else if (rank == 2) {
-                                  rankBadgeColor = const Color(0xFFF1F5F9);
-                                  rankBorderColor = const Color(0xFF94A3B8);
-                                  rankTextColor = const Color(0xFF334155);
-                                } else if (rank == 3) {
-                                  rankBadgeColor = const Color(0xFFFFEDD5);
-                                  rankBorderColor = const Color(0xFFF97316);
-                                  rankTextColor = const Color(0xFFC2410C);
-                                } else {
-                                  rankBadgeColor = const Color(0xFFDCFCE7);
-                                  rankBorderColor = primaryGreen;
-                                  rankTextColor = darkGreen;
-                                }
-
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: eliminated
-                                        ? const Color(0xFFFDF2F2)
-                                        : (isMe ? softGreen : Colors.white),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: eliminated
-                                          ? Colors.red.shade300
-                                          : (isMe ? primaryGreen : borderGreen),
-                                      width: isMe ? 1.8 : 1.2,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      if (eliminated)
-                                        Container(
-                                          width: 34,
-                                          height: 34,
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.shade50,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.red.shade300,
-                                              width: 1.5,
-                                            ),
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.close_rounded,
-                                              color: Colors.red.shade700,
-                                              size: 19,
-                                            ),
-                                          ),
-                                        )
-                                      else if (rank <= 10)
-                                        TechRankLeaderboardIcon(
-                                          rank: rank,
-                                          size: 32,
-                                        )
-                                      else
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          alignment: Alignment.center,
-                                          decoration: BoxDecoration(
-                                            color: primaryGreen,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: const Color(0xFF86EFAC),
-                                              width: 1.5,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '$rank',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                        ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  margin: const EdgeInsets.only(bottom: 3),
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 1.5,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: rankBadgeColor,
-                                                    borderRadius: BorderRadius.circular(4),
-                                                    border: Border.all(
-                                                      color: rankBorderColor.withValues(alpha: 0.5),
-                                                      width: 0.8,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      if (eliminated) ...[
-                                                        Icon(
-                                                          Icons.cancel_rounded,
-                                                          size: 11,
-                                                          color: rankTextColor,
-                                                        ),
-                                                        const SizedBox(width: 3),
-                                                      ],
-                                                      Text(
-                                                        eliminated
-                                                            ? 'ELIMINATED'
-                                                            : (rank == 1
-                                                                ? '🏆 RANK 1 • 1ST'
-                                                                : (rank == 2
-                                                                    ? '🥈 RANK 2 • 2ND'
-                                                                    : (rank == 3
-                                                                        ? '🥉 RANK 3 • 3RD'
-                                                                        : 'RANK $rank'))),
-                                                        style: TextStyle(
-                                                          color: rankTextColor,
-                                                          fontSize: 9.5,
-                                                          fontWeight: FontWeight.w800,
-                                                          letterSpacing: 0.3,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Text(
-                                              isMe
-                                                  ? '${row['name']} (You)'
-                                                  : row['name'] as String,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: eliminated
-                                                    ? Colors.red.shade900
-                                                    : textDark,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                            if (row['isTeam'] == true &&
-                                                (row['members'] as List<String>?)?.isNotEmpty == true) ...[
-                                              Padding(
-                                                padding: const EdgeInsets.only(top: 2),
-                                                child: Text(
-                                                  'Members: ${(row['members'] as List<String>).join(', ')}',
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color: eliminated
-                                                        ? Colors.grey.shade600
-                                                        : const Color(0xFF5B7A9C),
-                                                    fontSize: 11,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            (row['score'] as num?)?.toInt() == 0
-                                                    ? '0'
-                                                    : '${row['score']} ${(row['score'] as num?)?.toInt() == 1 ? 'pt' : 'pts'}',
-                                            style: TextStyle(
-                                              color: eliminated
-                                                  ? Colors.red.shade700
-                                                  : darkGreen,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          if (eliminated) ...[
-                                            const SizedBox(height: 2),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 5,
-                                                vertical: 1.5,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red.shade100,
-                                                borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(
-                                                  color: Colors.red.shade200,
-                                                  width: 0.8,
-                                                ),
-                                              ),
-                                              child: Text(
-                                                'Eliminated',
-                                                style: TextStyle(
-                                                  color: Colors.red.shade800,
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                          ],
+                          ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              );
+                    );
+                  },
+                );
               },
             );
           },
-        );
-      },
-    ),
+        ),
       ),
     );
   }
