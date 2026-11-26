@@ -4406,10 +4406,8 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             };
             final int tiePts = _asInt(data['tieBreakerScore']) ?? 0;
             final int realTotal = totalRespPoints + tiePts;
-            final int existingDocScore = _asInt(data['score']) ?? _asInt(data['totalScore']) ?? 0;
-            final int bestTotal = realTotal >= existingDocScore ? realTotal : existingDocScore;
-            updateData['score'] = bestTotal;
-            updateData['totalScore'] = bestTotal;
+            updateData['score'] = realTotal;
+            updateData['totalScore'] = realTotal;
             doc.reference
                 .set(updateData, SetOptions(merge: true))
                 .catchError((_) {});
@@ -4440,7 +4438,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       if (cached != null) {
         final cachedSum = cached.values.fold<int>(0, (acc, val) => acc + val);
         final int calculated = cachedSum + tiePts;
-        return calculated > stored ? calculated : stored;
+        return calculated;
       }
     }
 

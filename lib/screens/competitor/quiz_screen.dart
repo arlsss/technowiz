@@ -776,6 +776,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _currentLevelQuestionTotal = 0;
   int _currentQuestionLevel = 1;
   final Map<int, int> _localLevelPoints = {};
+  final Set<String> _scoredQuestionKeys = <String>{};
   bool _showLocalLevelResults = false;
 
   // ==========================================================
@@ -2626,10 +2627,9 @@ class _QuizScreenState extends State<QuizScreen> {
       });
 
       if (correct) {
-        if (!isTieBreakerActive) {
-          _localLevelPoints[sessionLevel] =
-              (_localLevelPoints[sessionLevel] ?? 0) + earnedPoints;
-        }
+        final scoreKey =
+            '${isTieBreakerActive ? "tb_" : "lvl_"}${sessionLevel}_q$questionNumber';
+        _scoredQuestionKeys.add(scoreKey);
         await updateScore(
           uid,
           earnedPoints,
@@ -4577,6 +4577,14 @@ class _QuizScreenState extends State<QuizScreen> {
           final isTB = _latestQuizData['tieBreakerActive'] == true;
           final targetQIdx =
               previousQuestion >= 0 ? previousQuestion : currentQuestion;
+          final scoreKey =
+              '${isTB ? "tb_" : "lvl_"}${_currentQuestionLevel}_q${targetQIdx + 1}';
+          if (_scoredQuestionKeys.contains(scoreKey)) {
+            // Already scored by saveAnswer - avoid double counting
+            return;
+          }
+          _scoredQuestionKeys.add(scoreKey);
+
           final docId = _getResponseDocId(targetQIdx, isTieBreaker: isTB);
           FirebaseFirestore.instance
               .collection('quiz_sessions')
@@ -6380,6 +6388,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ((_localLevelPoints[targetLevel] ?? 0) + points).clamp(0, 999999);
     }
     final String levelKey = 'level${targetLevel}Score';
+    int calculatedEffectiveScore = 0;
 
     await FirebaseFirestore.instance.runTransaction((transaction) async {
       final scoreDoc = await transaction.get(scoreRef);
@@ -6409,6 +6418,10 @@ class _QuizScreenState extends State<QuizScreen> {
       final newLevelScore = isTieBreakerActive
           ? oldLevelScore
           : calculatedLevelScore;
+
+      if (!isTieBreakerActive) {
+        _localLevelPoints[targetLevel] = newLevelScore;
+      }
 
       final Map<String, dynamic> mergedLevelScores = {};
       if (scoreData['levelScores'] is Map) {
@@ -6444,6 +6457,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ? (oldTieBreaker + points).clamp(0, 999999)
           : oldTieBreaker;
       final effectiveScore = sumOfLevels + newTieBreaker;
+      calculatedEffectiveScore = effectiveScore;
 
       final Map<String, dynamic> scoreUpdate = {
         'uid': uid,
@@ -6469,9 +6483,9 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (mounted) {
       setState(() {
-        currentScore = (currentScore + points) < 0
-            ? 0
-            : (currentScore + points);
+        currentScore = calculatedEffectiveScore > 0
+            ? calculatedEffectiveScore
+            : ((currentScore + points) < 0 ? 0 : (currentScore + points));
       });
     }
   }
