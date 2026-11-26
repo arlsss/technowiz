@@ -4766,6 +4766,7 @@ class _QuizScreenState extends State<QuizScreen> {
               .toList()
           : <String>[];
       final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final bool isContestPending = contestStatus == "pending";
 
       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _sessionRef.collection('scores').snapshots(),
@@ -4867,12 +4868,19 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    "Click CONFIRM to view your overall points from each level plus your tie breaker points.",
+                  Text(
+                    isContestPending
+                        ? "Please wait for the Quiz Master to review your contest (approve or reject) before proceeding."
+                        : "Click CONFIRM to view your overall points from each level plus your tie breaker points.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Color(0xFF64748B),
+                      color: isContestPending
+                          ? Colors.orange.shade900
+                          : const Color(0xFF64748B),
                       fontSize: 13,
+                      fontWeight: isContestPending
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                       height: 1.4,
                     ),
                   ),
@@ -4880,16 +4888,23 @@ class _QuizScreenState extends State<QuizScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _quizFinishedForContestant = true;
-                          _finishedCongratulationsTabIndex = 0;
-                        });
-                      },
-                      icon: const Icon(Icons.check_circle_rounded, size: 22),
-                      label: const Text(
-                        "CONFIRM",
-                        style: TextStyle(
+                      onPressed: isContestPending
+                          ? null
+                          : () {
+                              setState(() {
+                                _quizFinishedForContestant = true;
+                                _finishedCongratulationsTabIndex = 0;
+                              });
+                            },
+                      icon: Icon(
+                        isContestPending
+                            ? Icons.hourglass_top_rounded
+                            : Icons.check_circle_rounded,
+                        size: 22,
+                      ),
+                      label: Text(
+                        isContestPending ? "WAITING FOR REVIEW..." : "CONFIRM",
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.8,
@@ -4898,6 +4913,12 @@ class _QuizScreenState extends State<QuizScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryGreen,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: isContestPending
+                            ? const Color(0xFFFDE68A)
+                            : const Color(0xFFB7D8C0),
+                        disabledForegroundColor: isContestPending
+                            ? const Color(0xFF92400E)
+                            : Colors.white,
                         elevation: 3,
                         minimumSize: const Size.fromHeight(54),
                         shape: RoundedRectangleBorder(
@@ -4912,8 +4933,9 @@ class _QuizScreenState extends State<QuizScreen> {
           }
 
           // If still tied:
-          final isConfirmed =
-              nextReadyConfirmed && (confirmedQuestionIndex == currentQuestion);
+          final isConfirmed = !isContestPending &&
+              nextReadyConfirmed &&
+              (confirmedQuestionIndex == currentQuestion);
           return Container(
             width: double.infinity,
             margin: const EdgeInsets.only(top: 15),
@@ -4922,12 +4944,15 @@ class _QuizScreenState extends State<QuizScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.amber.shade400,
+                color: isContestPending
+                    ? Colors.orange.shade300
+                    : Colors.amber.shade400,
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.amber.withValues(alpha: 0.08),
+                  color: (isContestPending ? Colors.orange : Colors.amber)
+                      .withValues(alpha: 0.08),
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -4939,34 +4964,52 @@ class _QuizScreenState extends State<QuizScreen> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: isContestPending
+                        ? Colors.orange.shade50
+                        : Colors.amber.shade50,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.balance_rounded,
-                    color: Colors.amber.shade800,
+                    isContestPending
+                        ? Icons.hourglass_top_rounded
+                        : Icons.balance_rounded,
+                    color: isContestPending
+                        ? Colors.orange.shade800
+                        : Colors.amber.shade800,
                     size: 28,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  isConfirmed ? "ANDAM NA PARA SA SUNOD!" : "TIE BREAKER CONTINUES",
+                  isContestPending
+                      ? "CONTEST UNDER REVIEW"
+                      : (isConfirmed
+                          ? "ANDAM NA PARA SA SUNOD!"
+                          : "TIE BREAKER CONTINUES"),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isConfirmed ? darkGreen : Colors.amber.shade900,
+                    color: isContestPending
+                        ? Colors.orange.shade800
+                        : (isConfirmed ? darkGreen : Colors.amber.shade900),
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  isConfirmed
-                      ? "Waiting for the Quiz Master to start the next tie breaker question..."
-                      : "Both contestants are still tied! Click CONFIRM when you are ready for the next tie breaker question.",
+                  isContestPending
+                      ? "Please wait for the Quiz Master to review your contest (approve or reject) before confirming."
+                      : (isConfirmed
+                          ? "Waiting for the Quiz Master to start the next tie breaker question..."
+                          : "Both contestants are still tied! Click CONFIRM when you are ready for the next tie breaker question."),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.black54,
+                  style: TextStyle(
+                    color: isContestPending
+                        ? Colors.orange.shade900
+                        : Colors.black54,
                     fontSize: 13.5,
+                    fontWeight:
+                        isContestPending ? FontWeight.w600 : FontWeight.normal,
                     height: 1.4,
                   ),
                 ),
@@ -4974,7 +5017,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: isConfirmed
+                    onPressed: (isConfirmed || isContestPending)
                         ? null
                         : () {
                             setNextQuestionReady(true);
@@ -4988,11 +5031,17 @@ class _QuizScreenState extends State<QuizScreen> {
                             }
                           },
                     icon: Icon(
-                      isConfirmed ? Icons.check_circle_rounded : Icons.check,
+                      isContestPending
+                          ? Icons.hourglass_top_rounded
+                          : (isConfirmed
+                              ? Icons.check_circle_rounded
+                              : Icons.check),
                       size: 20,
                     ),
                     label: Text(
-                      isConfirmed ? "READY" : "CONFIRM",
+                      isContestPending
+                          ? "WAITING FOR REVIEW..."
+                          : (isConfirmed ? "READY" : "CONFIRM"),
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -5001,8 +5050,12 @@ class _QuizScreenState extends State<QuizScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: const Color(0xFFB7D8C0),
-                      disabledForegroundColor: Colors.white,
+                      disabledBackgroundColor: isContestPending
+                          ? const Color(0xFFFDE68A)
+                          : const Color(0xFFB7D8C0),
+                      disabledForegroundColor: isContestPending
+                          ? const Color(0xFF92400E)
+                          : Colors.white,
                       minimumSize: const Size.fromHeight(54),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
