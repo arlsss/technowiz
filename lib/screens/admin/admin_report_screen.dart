@@ -299,7 +299,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     }
   }
 
-  void _openManageReportSignaturesDialog({
+  Future<void> _openManageReportSignaturesDialog({
     String? quizTitle,
     String? quizCode,
     String? quizStatus,
@@ -307,7 +307,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     String? location,
     List<ReportContestant>? rankings,
     List<ReportContestant>? participants,
-  }) {
+    ReportPrintSection initialSection = ReportPrintSection.allSeparatePages,
+  }) async {
     final effectiveCode = quizCode ?? selectedQuizCode ?? '';
     final effectiveTitle = quizTitle ?? _currentQuizTitle ?? 'TechNoWiz Quiz';
     final effectiveStatus = quizStatus ?? _currentQuizStatus ?? 'FINISHED';
@@ -316,7 +317,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final effectiveRankings = rankings ?? _currentRankings;
     final effectiveParticipants = participants ?? _currentParticipants;
 
-    showDialog<void>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -329,6 +330,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           quizStatus: effectiveStatus,
           rankings: effectiveRankings,
           participants: effectiveParticipants,
+          initialSection: initialSection,
           onSave: (newConfig) async {
             await _saveReportConfig(newConfig);
             if (mounted) {
@@ -341,7 +343,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               );
             }
           },
-          onPreview: (previewConfig) async {
+          onPreview: (previewConfig, targetSection) async {
             await _generateOfficialReportPdf(
               quizTitle: effectiveTitle,
               quizCode: effectiveCode.isNotEmpty ? effectiveCode : 'SAMPLE',
@@ -350,7 +352,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               location: effectiveLocation,
               rankings: effectiveRankings,
               participants: effectiveParticipants,
-              section: ReportPrintSection.scoreSummaryOnly,
+              section: targetSection,
               customConfig: previewConfig,
             );
           },
@@ -367,6 +369,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     required String location,
     required List<ReportContestant> rankings,
     required List<ReportContestant> participants,
+    ReportPrintSection initialSection = ReportPrintSection.allSeparatePages,
   }) {
     showDialog<void>(
       context: context,
@@ -375,9 +378,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           quizTitle: quizTitle,
           quizCode: quizCode,
           reportConfig: _reportConfig,
-          onEditSignatures: () {
+          initialSection: initialSection,
+          onEditSignatures: (selectedSection) async {
             Navigator.of(dialogContext).pop();
-            _openManageReportSignaturesDialog(
+            await _openManageReportSignaturesDialog(
               quizTitle: quizTitle,
               quizCode: quizCode,
               quizStatus: quizStatus,
@@ -385,7 +389,20 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               location: location,
               rankings: rankings,
               participants: participants,
+              initialSection: selectedSection,
             );
+            if (mounted) {
+              _openExportReportOptionsDialog(
+                quizTitle: quizTitle,
+                quizCode: quizCode,
+                quizStatus: quizStatus,
+                quizDate: quizDate,
+                location: location,
+                rankings: rankings,
+                participants: participants,
+                initialSection: selectedSection,
+              );
+            }
           },
           onExport: (section) async {
             Navigator.of(dialogContext).pop();
@@ -5542,8 +5559,9 @@ class _ManageReportSignaturesDialog extends StatefulWidget {
   final String quizStatus;
   final List<ReportContestant> rankings;
   final List<ReportContestant> participants;
+  final ReportPrintSection initialSection;
   final Future<void> Function(ReportConfig) onSave;
-  final Future<void> Function(ReportConfig) onPreview;
+  final Future<void> Function(ReportConfig, ReportPrintSection) onPreview;
 
   const _ManageReportSignaturesDialog({
     required this.initialConfig,
@@ -5554,6 +5572,7 @@ class _ManageReportSignaturesDialog extends StatefulWidget {
     this.quizStatus = 'FINISHED',
     this.rankings = const [],
     this.participants = const [],
+    this.initialSection = ReportPrintSection.allSeparatePages,
     required this.onSave,
     required this.onPreview,
   });
@@ -5565,6 +5584,7 @@ class _ManageReportSignaturesDialog extends StatefulWidget {
 
 class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDialog> {
   int _signatoryCount = 2;
+  late ReportPrintSection _activeSection;
   late final List<TextEditingController> _labelControllers;
   late final List<TextEditingController> _nameControllers;
   late final List<TextEditingController> _titleControllers;
@@ -5575,6 +5595,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
   @override
   void initState() {
     super.initState();
+    _activeSection = widget.initialSection;
     _signatoryCount = widget.initialConfig.signatories.length.clamp(1, 3);
 
     _labelControllers = List.generate(3, (i) {
@@ -5761,6 +5782,99 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Active Target Report Section Banner / Selector
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4F46E5).withValues(alpha: isDark ? 0.2 : 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF4F46E5).withValues(alpha: isDark ? 0.4 : 0.25),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.print_rounded, size: 16, color: Colors.white),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'TARGET REPORT FOR PREVIEW & EDIT:',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF4F46E5),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _sectionTitle(_activeSection),
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : AdminThemeColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuButton<ReportPrintSection>(
+                            tooltip: 'Change Report Section',
+                            initialValue: _activeSection,
+                            onSelected: (sec) => setState(() => _activeSection = sec),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4F46E5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    'Change',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Icon(Icons.arrow_drop_down_rounded, size: 16, color: Colors.white),
+                                ],
+                              ),
+                            ),
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: ReportPrintSection.allSeparatePages,
+                                child: Text('Complete Report (All Tables)'),
+                              ),
+                              const PopupMenuItem(
+                                value: ReportPrintSection.scoreSummaryOnly,
+                                child: Text('Table 1: Score Summary & Statistics'),
+                              ),
+                              const PopupMenuItem(
+                                value: ReportPrintSection.finalRankingsOnly,
+                                child: Text('Table 2: Final Standings & Rankings'),
+                              ),
+                              const PopupMenuItem(
+                                value: ReportPrintSection.participantRecordsOnly,
+                                child: Text('Contestant Records Directory'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     // Signatory Count Selector
                     Row(
                       children: [
@@ -5982,129 +6096,20 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                           ),
                           const SizedBox(height: 12),
 
-                          // 3. Score Summary Mini Table
-                          const Text(
-                            '1. SCORE SUMMARY & STATISTICS',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF581C87),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFCBD5E1)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                                  color: const Color(0xFF4C1D95),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                    children: const [
-                                      Text('Total Contestants', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
-                                      Text('Active / Completed', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
-                                      Text('Eliminated', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
-                                      Text('Top Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
-                                      Text('Average Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                                  color: Colors.white,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                    children: [
-                                      Text('$totalParticipants', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('$activeCount', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('$eliminatedCount', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('$topScore pts', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text('$avgScore pts', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // 4. Final Standings Mini Table
-                          const Text(
-                            '2. FINAL STANDINGS & RANKINGS',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF581C87),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFCBD5E1)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                  color: const Color(0xFF4C1D95),
-                                  child: Row(
-                                    children: const [
-                                      SizedBox(width: 32, child: Text('Rank', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
-                                      Expanded(child: Text('Contestant Name', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
-                                      SizedBox(width: 50, child: Text('Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
-                                      SizedBox(width: 70, child: Text('Award / Status', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
-                                    ],
-                                  ),
-                                ),
-                                if (widget.rankings.isEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                                    color: Colors.white,
-                                    alignment: Alignment.center,
-                                    child: const Text(
-                                      'No contestants or scores recorded yet for this quiz.',
-                                      style: TextStyle(fontSize: 7.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
-                                    ),
-                                  )
-                                else ...[
-                                  ...widget.rankings.take(3).toList().asMap().entries.map((entry) {
-                                    final idx = entry.key;
-                                    final c = entry.value;
-                                    final rank = '${idx + 1}';
-                                    final name = c.teamName.isNotEmpty ? c.teamName : c.name;
-                                    final score = '${c.totalScore} pts';
-                                    final award = c.isEliminated
-                                        ? 'Eliminated'
-                                        : (idx == 0
-                                            ? 'Champion'
-                                            : (idx == 1
-                                                ? '1st Runner-Up'
-                                                : (idx == 2
-                                                    ? '2nd Runner-Up'
-                                                    : 'Finalist')));
-                                    return _buildPreviewStandingRow(rank, name, score, award, idx % 2 == 0);
-                                  }),
-                                  if (widget.rankings.length > 3)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 8),
-                                      color: const Color(0xFFF8FAFC),
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        '+ ${widget.rankings.length - 3} more contestant(s) included in official PDF export',
-                                        style: const TextStyle(fontSize: 6.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
-                                      ),
-                                    ),
-                                ],
-                              ],
-                            ),
-                          ),
+                          // Dynamically display the selected table/report in the live replica
+                          if (_activeSection == ReportPrintSection.scoreSummaryOnly) ...[
+                            _buildPreviewScoreSummary(totalParticipants, activeCount, eliminatedCount, topScore, avgScore),
+                          ] else if (_activeSection == ReportPrintSection.finalRankingsOnly) ...[
+                            _buildPreviewFinalStandings(),
+                          ] else if (_activeSection == ReportPrintSection.participantRecordsOnly) ...[
+                            _buildPreviewTable3(),
+                          ] else ...[
+                            _buildPreviewScoreSummary(totalParticipants, activeCount, eliminatedCount, topScore, avgScore),
+                            const SizedBox(height: 12),
+                            _buildPreviewFinalStandings(),
+                            const SizedBox(height: 12),
+                            _buildPreviewTable3(),
+                          ],
                           const SizedBox(height: 22),
 
                           // 5. Official Signatures Section (Live updating with form fields)
@@ -6175,14 +6180,14 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: const [
-                                Text(
+                              children: [
+                                const Text(
                                   'TechNoWiz - System Generated Official Document',
                                   style: TextStyle(fontSize: 7, color: Color(0xFF94A3B8)),
                                 ),
                                 Text(
-                                  'Page 1 of 1',
-                                  style: TextStyle(fontSize: 7, color: Color(0xFF94A3B8)),
+                                  _pageFooterText(_activeSection),
+                                  style: const TextStyle(fontSize: 7, color: Color(0xFF94A3B8)),
                                 ),
                               ],
                             ),
@@ -6222,7 +6227,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                         : () async {
                             setState(() => _isPreviewing = true);
                             try {
-                              await widget.onPreview(_buildConfig());
+                              await widget.onPreview(_buildConfig(), _activeSection);
                             } finally {
                               if (mounted) setState(() => _isPreviewing = false);
                             }
@@ -6234,7 +6239,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.visibility_rounded, size: 16),
-                    label: const Text('Preview PDF', style: TextStyle(fontSize: 12)),
+                    label: Text('Preview ${_sectionShortName(_activeSection)} PDF', style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -6413,6 +6418,274 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
     return '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
   }
 
+  String _sectionTitle(ReportPrintSection section) {
+    switch (section) {
+      case ReportPrintSection.allSeparatePages:
+        return 'Complete Official Report (All Tables)';
+      case ReportPrintSection.scoreSummaryOnly:
+        return 'Table 1: Score Summary & Statistics (Page 1)';
+      case ReportPrintSection.finalRankingsOnly:
+        return 'Table 2: Final Standings & Rankings (Page 2)';
+      case ReportPrintSection.participantRecordsOnly:
+        return 'Contestant Records Directory (Page 3)';
+    }
+  }
+
+  String _sectionShortName(ReportPrintSection section) {
+    switch (section) {
+      case ReportPrintSection.allSeparatePages:
+        return 'All Tables';
+      case ReportPrintSection.scoreSummaryOnly:
+        return 'Table 1';
+      case ReportPrintSection.finalRankingsOnly:
+        return 'Table 2';
+      case ReportPrintSection.participantRecordsOnly:
+        return 'Table 3';
+    }
+  }
+
+  String _pageFooterText(ReportPrintSection section) {
+    switch (section) {
+      case ReportPrintSection.allSeparatePages:
+        return 'Pages 1-3 of 3 (Complete Report)';
+      case ReportPrintSection.scoreSummaryOnly:
+        return 'Page 1 of 1 (Score Summary)';
+      case ReportPrintSection.finalRankingsOnly:
+        return 'Page 2 of 2 (Final Standings)';
+      case ReportPrintSection.participantRecordsOnly:
+        return 'Page 3 of 3 (Contestant Directory)';
+    }
+  }
+
+  Widget _buildPreviewScoreSummary(
+    int totalParticipants,
+    int activeCount,
+    int eliminatedCount,
+    int topScore,
+    String avgScore,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '1. SCORE SUMMARY & STATISTICS',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF581C87),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                color: const Color(0xFF4C1D95),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: const [
+                    Text('Total Contestants', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('Active / Completed', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('Eliminated', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('Top Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('Average Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                color: Colors.white,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Text('$totalParticipants', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text('$activeCount', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text('$eliminatedCount', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text('$topScore pts', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text('$avgScore pts', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewFinalStandings() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '2. FINAL STANDINGS & RANKINGS',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF581C87),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                color: const Color(0xFF4C1D95),
+                child: Row(
+                  children: const [
+                    SizedBox(width: 32, child: Text('Rank', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    Expanded(child: Text('Contestant Name', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    SizedBox(width: 50, child: Text('Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    SizedBox(width: 70, child: Text('Award / Status', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              ),
+              if (widget.rankings.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  color: Colors.white,
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'No contestants or scores recorded yet for this quiz.',
+                    style: TextStyle(fontSize: 7.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                  ),
+                )
+              else ...[
+                ...widget.rankings.take(3).toList().asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final c = entry.value;
+                  final rank = '${idx + 1}';
+                  final name = c.teamName.isNotEmpty ? c.teamName : c.name;
+                  final score = '${c.totalScore} pts';
+                  final award = c.isEliminated
+                      ? 'Eliminated'
+                      : (idx == 0
+                          ? 'Champion'
+                          : (idx == 1
+                              ? '1st Runner-Up'
+                              : (idx == 2
+                                  ? '2nd Runner-Up'
+                                  : 'Finalist')));
+                  return _buildPreviewStandingRow(rank, name, score, award, idx % 2 == 0);
+                }),
+                if (widget.rankings.length > 3)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 8),
+                    color: const Color(0xFFF8FAFC),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '+ ${widget.rankings.length - 3} more contestant(s) included in official PDF export',
+                      style: const TextStyle(fontSize: 6.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewTable3() {
+    final list = widget.participants.isNotEmpty
+        ? widget.participants
+        : widget.rankings;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '3. CONTESTANT RECORDS DIRECTORY',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF581C87),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                color: const Color(0xFF4C1D95),
+                child: Row(
+                  children: const [
+                    SizedBox(width: 24, child: Text('#', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    Expanded(flex: 3, child: Text('Contestant / Team', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    Expanded(flex: 3, child: Text('Members', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    Expanded(flex: 3, child: Text('School Name', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              ),
+              if (list.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  color: Colors.white,
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'No contestant records found for this quiz.',
+                    style: TextStyle(fontSize: 7.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                  ),
+                )
+              else ...[
+                ...list.take(3).toList().asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final p = entry.value;
+                  final isTeam = p.teamName.isNotEmpty;
+                  final displayName = isTeam ? p.teamName : p.name;
+                  final memberList = p.members.isNotEmpty
+                      ? p.members
+                      : (isTeam && p.name.isNotEmpty && p.name != p.teamName ? [p.name] : <String>[]);
+                  final membersText = memberList.isNotEmpty ? memberList.join(', ') : '-';
+                  final schoolText = p.school.isNotEmpty ? p.school : '-';
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 3.5, horizontal: 8),
+                    color: idx % 2 == 0 ? const Color(0xFFF8FAFC) : Colors.white,
+                    child: Row(
+                      children: [
+                        SizedBox(width: 24, child: Text('${idx + 1}', style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+                        Expanded(flex: 3, child: Text(displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)))),
+                        Expanded(flex: 3, child: Text(membersText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 7.5, color: Color(0xFF475569)))),
+                        Expanded(flex: 3, child: Text(schoolText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 7.5, color: Color(0xFF475569)))),
+                      ],
+                    ),
+                  );
+                }),
+                if (list.length > 3)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 8),
+                    color: const Color(0xFFF8FAFC),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '+ ${list.length - 3} more participant(s) included in official directory PDF',
+                      style: const TextStyle(fontSize: 6.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPreviewStandingRow(String rank, String name, String score, String award, bool isStripe) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 3.5, horizontal: 8),
@@ -6470,13 +6743,15 @@ class _ExportReportOptionsDialog extends StatefulWidget {
   final String quizTitle;
   final String quizCode;
   final ReportConfig reportConfig;
-  final VoidCallback onEditSignatures;
+  final ReportPrintSection initialSection;
+  final void Function(ReportPrintSection selectedSection) onEditSignatures;
   final Future<void> Function(ReportPrintSection) onExport;
 
   const _ExportReportOptionsDialog({
     required this.quizTitle,
     required this.quizCode,
     required this.reportConfig,
+    this.initialSection = ReportPrintSection.allSeparatePages,
     required this.onEditSignatures,
     required this.onExport,
   });
@@ -6487,8 +6762,14 @@ class _ExportReportOptionsDialog extends StatefulWidget {
 }
 
 class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> {
-  ReportPrintSection _selectedSection = ReportPrintSection.allSeparatePages;
+  late ReportPrintSection _selectedSection;
   bool _isExporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSection = widget.initialSection;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -6773,7 +7054,7 @@ class _ExportReportOptionsDialogState extends State<_ExportReportOptionsDialog> 
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: widget.onEditSignatures,
+                            onPressed: () => widget.onEditSignatures(_selectedSection),
                             icon: const Icon(Icons.edit_rounded, size: 14),
                             label: const Text('Edit', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                             style: TextButton.styleFrom(
