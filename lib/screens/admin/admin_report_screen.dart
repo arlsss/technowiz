@@ -2042,21 +2042,26 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       extractedLevels[2] = l2;
       extractedLevels[3] = l3;
 
+      final existing = map[uid];
       final sumLevels = extractedLevels.values.fold<int>(0, (acc, pts) => acc + pts);
-      final tieBreakerExtra = _toInt(d['tieBreakerScore']);
+      final tieBreakerExtra = _toInt(d['tieBreakerScore'] ?? d['tie_breaker_score'] ?? d['tbScore'] ?? d['tieScore']);
+      int effectiveTb = tieBreakerExtra > 0 ? tieBreakerExtra : (existing?.tieBreakerScore ?? 0);
       int finalTotal = 0;
       if (sumLevels > 0) {
-        finalTotal = sumLevels + tieBreakerExtra;
+        finalTotal = sumLevels + (effectiveTb > 0 ? effectiveTb : tieBreakerExtra);
       } else {
-        finalTotal = total > 0 ? (total + tieBreakerExtra) : 0;
+        finalTotal = total > 0 ? (total + (effectiveTb > 0 ? effectiveTb : tieBreakerExtra)) : 0;
         if (finalTotal > 0) extractedLevels[1] = finalTotal;
+      }
+
+      if (effectiveTb <= 0 && finalTotal > sumLevels && sumLevels > 0) {
+        effectiveTb = finalTotal - sumLevels;
       }
 
       int timeMs = 0;
       final rawTime = d['lastSubmissionTime'] ?? d['updatedAt'] ?? d['answeredAt'];
       if (rawTime is Timestamp) timeMs = rawTime.millisecondsSinceEpoch;
 
-      final existing = map[uid];
       final mergedMembers = {...existing?.members ?? <String>[], ...members}.toList();
       final effectiveSchool = school.isNotEmpty
           ? school
@@ -2078,6 +2083,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         level2Score: l2,
         level3Score: l3,
         levelScores: extractedLevels,
+        tieBreakerScore: effectiveTb,
         isEliminated: isElim || (existing?.isEliminated ?? false),
         eliminatedLevel: d['eliminatedLevel'] != null ? _toInt(d['eliminatedLevel']) : null,
         status: (d['status'] ?? existing?.status ?? 'active').toString(),
@@ -3235,35 +3241,71 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                     final sortedKeys = levelsMap.keys.toList()..sort();
                     final allKeys = {...sortedKeys, 1, 2, 3}.toList()..sort();
 
+                    final sumL = allKeys.fold<int>(0, (acc, lvl) => acc + (levelsMap[lvl] ?? 0));
+                    final diff = c.totalScore - sumL;
+                    final effectiveTb = c.tieBreakerScore > 0 ? c.tieBreakerScore : (diff > 0 ? diff : 0);
+
                     return Wrap(
                       spacing: 5,
                       runSpacing: 4,
-                      children: allKeys.map((lvl) {
-                        final pts = levelsMap[lvl] ??
-                            (lvl == 1
-                                ? c.level1Score
-                                : (lvl == 2
-                                    ? c.level2Score
-                                    : (lvl == 3 ? c.level3Score : 0)));
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: const Color(0xFFE2E8F0), width: 0.8),
-                          ),
-                          child: Text(
-                            'L$lvl: $pts pts',
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
+                      children: [
+                        ...allKeys.map((lvl) {
+                          final pts = levelsMap[lvl] ??
+                              (lvl == 1
+                                  ? c.level1Score
+                                  : (lvl == 2
+                                      ? c.level2Score
+                                      : (lvl == 3 ? c.level3Score : 0)));
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: const Color(0xFFE2E8F0), width: 0.8),
+                            ),
+                            child: Text(
+                              'L$lvl: $pts pts',
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          );
+                        }),
+                        if (effectiveTb > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: const Color(0xFFFDE68A), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.bolt_rounded,
+                                  size: 11,
+                                  color: Color(0xFFD97706),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'TB: +$effectiveTb ${effectiveTb == 1 ? 'pt' : 'pts'}',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        );
-                      }).toList(),
+                      ],
                     );
                   },
                 ),
@@ -4103,6 +4145,7 @@ class ReportContestant {
   final bool isEliminated;
   final int? eliminatedLevel;
   final String status;
+  final int tieBreakerScore;
   final int submissionTimeMs;
   final DateTime? registeredAt;
 
@@ -4117,6 +4160,7 @@ class ReportContestant {
     this.level2Score = 0,
     this.level3Score = 0,
     this.levelScores = const {},
+    this.tieBreakerScore = 0,
     this.isEliminated = false,
     this.eliminatedLevel,
     this.status = 'active',
