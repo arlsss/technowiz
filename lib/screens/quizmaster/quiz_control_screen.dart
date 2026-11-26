@@ -4682,7 +4682,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             children: [
                               Text(
                                 isBroken
-                                    ? 'TIE BROKEN — WINNER FOUND!'
+                                    ? 'TIE BREAKER — WINNER FOUND!'
                                     : 'TIE BREAKER SHOWDOWN IN PROGRESS',
                                 style: TextStyle(
                                   color: isBroken
@@ -7036,7 +7036,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                       Text(
                                         _tieBreakerBroken &&
                                                 _tieBreakerLeadingName != null
-                                            ? 'Leader: $_tieBreakerLeadingName ($_tieBreakerLeadingScore PTS) • Tie broken!'
+                                            ? 'Leader: $_tieBreakerLeadingName ($_tieBreakerLeadingScore PTS) • Tie breaker winner!'
                                             : 'Sudden-Death Round: ${(_quizData?['tieBreakerContestantNames'] as List?)?.join(' vs ') ?? 'Tied Contestants'}',
                                         style: TextStyle(
                                           color: Colors.white.withValues(

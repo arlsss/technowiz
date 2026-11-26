@@ -3677,7 +3677,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   Expanded(
                                                     child: Text(
                                                       isBroken
-                                                          ? 'TIE BROKEN — WINNER FOUND!'
+                                                          ? 'TIE BREAKER — WINNER FOUND!'
                                                           : 'TIE BREAKER SHOWDOWN IN PROGRESS',
                                                       maxLines: 1,
                                                       overflow:
