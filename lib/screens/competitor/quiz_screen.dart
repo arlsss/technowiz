@@ -12572,4 +12572,3 @@ class _FinishedTallyRowData {
     this.isMe = false,
   });
 }
-
