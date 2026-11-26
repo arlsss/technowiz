@@ -51,6 +51,8 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _quizFinishedForContestant = false;
   int _finishedCongratulationsTabIndex = 0; // 0: My Result, 1: Overall Tally
   int _tieBreakerSpectatorTabIndex = 0; // 0: Live Showdown, 1: Standings
+  bool _showTieBreakerOverallTally = false;
+  bool _tieBreakerNextQuestionConfirmed = false;
 
   void _handleQuizFinishedAndExit() {
     if (_hasExitedToDashboard) return;
@@ -4246,12 +4248,16 @@ class _QuizScreenState extends State<QuizScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final bool isTiedContestant = tieBreakerContestantUids.contains(currentUid);
 
-    if (_quizFinishedForContestant &&
-        (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant)) {
+    if (_showTieBreakerOverallTally ||
+        (_quizFinishedForContestant &&
+            (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant))) {
       return _buildFinishedCongratulationsScreen(context, currentUid);
     }
 
-    if (isTieBreakerActive && isThisQuestionConfirmed && !isTieBreakerEnded) {
+    if (isTieBreakerActive &&
+        !isTieBreakerEnded &&
+        !_showTieBreakerOverallTally &&
+        (_tieBreakerNextQuestionConfirmed || isThisQuestionConfirmed)) {
       return _buildTieBreakerPreparationScreen(
         context,
         _latestQuizData,
@@ -4892,8 +4898,9 @@ class _QuizScreenState extends State<QuizScreen> {
                           ? null
                           : () {
                               setState(() {
+                                _showTieBreakerOverallTally = true;
                                 _quizFinishedForContestant = true;
-                                _finishedCongratulationsTabIndex = 0;
+                                _finishedCongratulationsTabIndex = 1;
                               });
                             },
                       icon: Icon(
@@ -5020,6 +5027,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     onPressed: (isConfirmed || isContestPending)
                         ? null
                         : () {
+                            setState(() {
+                              _tieBreakerNextQuestionConfirmed = true;
+                            });
                             setNextQuestionReady(true);
                             if (myUid.isNotEmpty) {
                               _sessionRef
@@ -8512,11 +8522,12 @@ class _QuizScreenState extends State<QuizScreen> {
               tieBreakerContestantUids.contains(currentUid);
 
           // Reset finished state if Quiz Master started or resumed a Tie Breaker for this tied contestant!
-          if (isTieBreakerActive && !isTieBreakerEnded && isTiedContestant) {
+          if (isTieBreakerActive && !isTieBreakerEnded && isTiedContestant && !_showTieBreakerOverallTally) {
             _quizFinishedForContestant = false;
           }
 
-          if (_quizFinishedForContestant ||
+          if (_showTieBreakerOverallTally ||
+              _quizFinishedForContestant ||
               (((isQuizFinished && (!isTieBreakerEnded || publishedWinners)) ||
                       _quizFinishedForContestant) &&
                   (!isTieBreakerActive || !isTiedContestant))) {
@@ -8565,6 +8576,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 _confirmedTieBreakerSessionId != currentSessionId) {
               _tieBreakerInviteConfirmed = false;
               _confirmedTieBreakerSessionId = null;
+              _tieBreakerNextQuestionConfirmed = false;
+              _showTieBreakerOverallTally = false;
               answered = false;
               resultRevealed = false;
               submitting = false;
@@ -8620,6 +8633,7 @@ class _QuizScreenState extends State<QuizScreen> {
           // can briefly render the waiting room before the question appears.
           if (countdownActive) {
             _countdownWasActive = true;
+            _tieBreakerNextQuestionConfirmed = false;
             if (currentQuestion == 0) {
               _firstQuestionCountdownHandoff = true;
             }
@@ -8834,6 +8848,7 @@ class _QuizScreenState extends State<QuizScreen> {
               previousQuestion != currentQuestion &&
               (countdownActive || status == "countdown" || status == "active" || status == "finished")) {
             previousQuestion = currentQuestion;
+            _tieBreakerNextQuestionConfirmed = false;
             nextQuestionConfirmed = false;
             nextQuestionReadySavedForId = null;
             nextReadyConfirmed = false;
@@ -8926,8 +8941,9 @@ class _QuizScreenState extends State<QuizScreen> {
           // Once the contestant submits (or time runs out), show the
           // result immediately. Do not let Ready Check or Countdown
           // hide it.
-          if (_quizFinishedForContestant &&
-              (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant)) {
+          if (_showTieBreakerOverallTally ||
+              (_quizFinishedForContestant &&
+                  (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant))) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
@@ -8935,6 +8951,24 @@ class _QuizScreenState extends State<QuizScreen> {
           if (answered && resultRevealed) {
             final isTieBreakerActive =
                 _latestQuizData['tieBreakerActive'] == true;
+            final isTieBreakerEnded = _latestQuizData['tieBreakerEnded'] == true ||
+                (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
+                    'tie_breaker_ended' ||
+                _latestQuizData['tieBreakerResolved'] == true;
+
+            if (isTieBreakerActive &&
+                !isTieBreakerEnded &&
+                !_showTieBreakerOverallTally &&
+                _tieBreakerNextQuestionConfirmed) {
+              return _buildTieBreakerPreparationScreen(
+                context,
+                _latestQuizData,
+                _getTieBreakerOpponentName(
+                  _latestQuizData,
+                  FirebaseAuth.instance.currentUser?.uid ?? '',
+                ),
+              );
+            }
             final resultLevel = activeLevelMetrics.level > 0
                 ? activeLevelMetrics.level
                 : (currentQuestionData != null &&
