@@ -7091,7 +7091,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                         // ==================================================
                         // LEVEL PAUSE MESSAGE
                         // ==================================================
-                        if (isLevelPause)
+                        if (isLevelPause && !_isTieBreakerActive)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(18),
@@ -7123,55 +7123,56 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                             ),
                           ),
 
-                        if (isLevelPause) const SizedBox(height: 20),
+                        if (isLevelPause && !_isTieBreakerActive) const SizedBox(height: 20),
 
                         // ==================================================
                         // LEVEL INFO  (blue icon square removed)
                         // ==================================================
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.blue.shade100),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                'LEVEL $_currentLevel',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: darkBlue,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                        if (!_isTieBreakerActive)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.blue.shade100),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'LEVEL $_currentLevel',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: darkBlue,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Question $_currentLevelQuestionCount of $_currentLevelQuestionCount',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 10,
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Question $_currentLevelQuestionCount of $_currentLevelQuestionCount',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 10,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Type: $_questionType',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 10,
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Type: $_questionType',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 10,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
 
                         // Admin-configured timer for the currently selected level.
                         // Displayed as a circle between the level summary and question.
