@@ -1885,13 +1885,15 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               : null);
 
       if (contestantUid != null && qIndex != null && qIndex >= 0) {
+        final respDocId = reqData?['responseDocId']?.toString() ??
+            (_isTieBreakerActive ? 'tb_question_$qIndex' : 'question_$qIndex');
         final respRef = FirebaseFirestore.instance
             .collection('quiz_sessions')
             .doc(widget.quizCode)
             .collection('answers')
             .doc(contestantUid)
             .collection('responses')
-            .doc('question_$qIndex');
+            .doc(respDocId);
 
         final respUpdate = <String, dynamic>{
           'contestStatus': status,
@@ -5840,7 +5842,9 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
             for (final doc in responseDocs) {
               final data = doc.data();
-              final rawIdx = doc.id.replaceAll('question_', '');
+              final rawIdx = doc.id
+                  .replaceAll('tb_question_', '')
+                  .replaceAll('question_', '');
               final int qIdx = int.tryParse(rawIdx) ??
                   ((data['questionNumber'] as num?)?.toInt() ?? 1) - 1;
               final qNum = qIdx + 1;

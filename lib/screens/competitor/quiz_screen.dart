@@ -1443,11 +1443,11 @@ class _QuizScreenState extends State<QuizScreen> {
   // ==========================================================
 
   bool isAnswerCorrect(Map<String, dynamic> question, String submittedAnswer) {
-    final questionType = getQuestionType(question);
-
     if (submittedAnswer.trim().isEmpty) {
       return false;
     }
+
+    final questionType = getQuestionType(question);
 
     if (questionType == "Enumeration") {
       final submittedAnswers = parseEnumerationAnswers(submittedAnswer);
@@ -1492,19 +1492,15 @@ class _QuizScreenState extends State<QuizScreen> {
       return matchedIndices.length == correctItems.length;
     }
 
-    if (questionType == "Identification") {
-      final acceptedList = getAcceptedAnswers(question);
-      for (final accepted in acceptedList) {
-        if (_isAnswerMatch(submittedAnswer, accepted)) {
-          return true;
-        }
-      }
-      return false;
+    // Direct check against resolved correct answer first (handles exact text, options text, normalization)
+    final correctAnswer = getCorrectAnswer(question);
+    if (_isAnswerMatch(submittedAnswer, correctAnswer)) {
+      return true;
     }
 
     if (questionType == "True or False") {
       final sub = submittedAnswer.trim().toLowerCase();
-      final cor = getCorrectAnswer(question).trim().toLowerCase();
+      final cor = correctAnswer.trim().toLowerCase();
       if (sub == cor) return true;
       if ((sub == "true" || sub == "t") && (cor == "true" || cor == "t")) {
         return true;
@@ -1513,11 +1509,6 @@ class _QuizScreenState extends State<QuizScreen> {
         return true;
       }
       return _isAnswerMatch(submittedAnswer, cor);
-    }
-
-    final correctAnswer = getCorrectAnswer(question);
-    if (_isAnswerMatch(submittedAnswer, correctAnswer)) {
-      return true;
     }
 
     final acceptedList = getAcceptedAnswers(question);
@@ -2226,6 +2217,18 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   // ==========================================================
+  // RESPONSE DOCUMENT ID HELPER
+  // ==========================================================
+
+  String _getResponseDocId(int questionIndex, {bool isTieBreaker = false}) {
+    final bool isTB =
+        isTieBreaker || _latestQuizData['tieBreakerActive'] == true;
+    return isTB
+        ? 'tb_question_$questionIndex'
+        : 'question_$questionIndex';
+  }
+
+  // ==========================================================
   // LOAD EXISTING RESPONSE
   // ==========================================================
 
@@ -2237,13 +2240,16 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     try {
+      final isTB = _latestQuizData['tieBreakerActive'] == true;
+      final responseDocId =
+          _getResponseDocId(questionIndex, isTieBreaker: isTB);
       final responseRef = FirebaseFirestore.instance
           .collection('quiz_sessions')
           .doc(widget.quizCode)
           .collection('answers')
           .doc(currentUser.uid)
           .collection('responses')
-          .doc('question_$questionIndex');
+          .doc(responseDocId);
 
       final responseSnapshot = await responseRef.get();
 
@@ -2421,6 +2427,13 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final questionNumber = questionIndex + 1;
 
+      final bool isTieBreakerActive =
+          _latestQuizData['tieBreakerActive'] == true;
+      final responseDocId = _getResponseDocId(
+        questionIndex,
+        isTieBreaker: isTieBreakerActive,
+      );
+
       final answerDoc = FirebaseFirestore.instance
           .collection('quiz_sessions')
           .doc(widget.quizCode)
@@ -2429,7 +2442,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final responseRef = answerDoc
           .collection('responses')
-          .doc('question_$questionIndex');
+          .doc(responseDocId);
 
       final existingResponse = await responseRef.get();
 
@@ -2604,6 +2617,7 @@ class _QuizScreenState extends State<QuizScreen> {
         'correctAnswer': correctAnswer,
         'correctAnswers': question['correctAnswers'],
         'isCorrect': correct,
+        'isTieBreaker': isTieBreakerActive,
         'answerStatus': !hasAnswer
             ? 'unanswered'
             : (correct ? 'correct' : 'wrong'),
@@ -4539,15 +4553,66 @@ class _QuizScreenState extends State<QuizScreen> {
         effectiveAnswer.toLowerCase() == 'no answer' ||
         effectiveAnswer.toLowerCase() == 'unanswered';
     final displayAnswer = noAnswer ? "No answer" : effectiveAnswer;
+
+    final Map<String, dynamic>? questionForEval = currentQuestionData ??
+        (previousQuestion >= 0 &&
+                previousQuestion < _sortedSessionQuestions.length
+            ? _sortedSessionQuestions[previousQuestion].data()
+                as Map<String, dynamic>?
+            : null);
+
+    final bool isEffectiveCorrect = lastAnswerCorrect ||
+        (!noAnswer &&
+            questionForEval != null &&
+            isAnswerCorrect(questionForEval, effectiveAnswer));
+
+    if (isEffectiveCorrect && !lastAnswerCorrect) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          lastAnswerCorrect = true;
+        });
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null && uid.isNotEmpty) {
+          final isTB = _latestQuizData['tieBreakerActive'] == true;
+          final targetQIdx =
+              previousQuestion >= 0 ? previousQuestion : currentQuestion;
+          final docId = _getResponseDocId(targetQIdx, isTieBreaker: isTB);
+          FirebaseFirestore.instance
+              .collection('quiz_sessions')
+              .doc(widget.quizCode)
+              .collection('answers')
+              .doc(uid)
+              .collection('responses')
+              .doc(docId)
+              .update({
+                'isCorrect': true,
+                'answerStatus': 'correct',
+                'points': points,
+                'autoCorrected': true,
+                'updatedAt': FieldValue.serverTimestamp(),
+              })
+              .catchError((_) {});
+
+          updateScore(
+            uid,
+            points,
+            targetQIdx + 1,
+            level: _currentQuestionLevel,
+          ).catchError((_) {});
+        }
+      });
+    }
+
     final Color resultAccent = noAnswer
         ? Colors.orange.shade700
-        : (lastAnswerCorrect ? primaryGreen : Colors.red.shade600);
+        : (isEffectiveCorrect ? primaryGreen : Colors.red.shade600);
     final Color resultBackground = noAnswer
         ? Colors.orange.shade50
-        : (lastAnswerCorrect ? softGreen : Colors.red.shade50);
+        : (isEffectiveCorrect ? softGreen : Colors.red.shade50);
     final Color resultBorder = noAnswer
         ? Colors.orange.shade200
-        : (lastAnswerCorrect ? const Color(0xFF86C995) : Colors.red.shade200);
+        : (isEffectiveCorrect ? const Color(0xFF86C995) : Colors.red.shade200);
 
     return Container(
       width: double.infinity,
@@ -4569,7 +4634,7 @@ class _QuizScreenState extends State<QuizScreen> {
             child: Icon(
               noAnswer
                   ? Icons.hourglass_empty_rounded
-                  : (lastAnswerCorrect
+                  : (isEffectiveCorrect
                         ? Icons.check_rounded
                         : Icons.close_rounded),
               color: Colors.white,
@@ -4578,7 +4643,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            noAnswer ? "NO ANSWER" : (lastAnswerCorrect ? "CORRECT!" : "WRONG"),
+            noAnswer ? "NO ANSWER" : (isEffectiveCorrect ? "CORRECT!" : "WRONG"),
             style: TextStyle(
               color: resultAccent,
               fontSize: 26,
@@ -4587,7 +4652,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
           const SizedBox(height: 7),
           Text(
-            lastAnswerCorrect
+            isEffectiveCorrect
                 ? "+$points POINT${points == 1 ? '' : 'S'}"
                 : "0 POINTS",
             style: TextStyle(
@@ -5665,7 +5730,13 @@ class _QuizScreenState extends State<QuizScreen> {
           ? (teamName.isNotEmpty ? teamName : personalName)
           : personalName;
 
-      final requestId = '${uid}_question_$questionIndex';
+      final bool isTieBreakerActive =
+          _latestQuizData['tieBreakerActive'] == true;
+      final responseDocId = _getResponseDocId(
+        questionIndex,
+        isTieBreaker: isTieBreakerActive,
+      );
+      final requestId = '${uid}_$responseDocId';
 
       final requestRef = FirebaseFirestore.instance
           .collection('quiz_sessions')
@@ -5679,7 +5750,7 @@ class _QuizScreenState extends State<QuizScreen> {
           .collection('answers')
           .doc(uid)
           .collection('responses')
-          .doc('question_$questionIndex');
+          .doc(responseDocId);
 
       final existingRequest = await requestRef.get();
 
@@ -5736,6 +5807,8 @@ class _QuizScreenState extends State<QuizScreen> {
         'teamMembers': teamMembers,
         'questionId': questionId,
         'questionNumber': questionNumber,
+        'responseDocId': responseDocId,
+        'isTieBreaker': isTieBreakerActive,
         'questionText': question['question']?.toString() ?? '',
         'questionType': getQuestionType(question),
         'expectedAnswer': getCorrectAnswer(question),
@@ -5835,7 +5908,13 @@ class _QuizScreenState extends State<QuizScreen> {
       question: currentQuestionData,
     );
 
-    final requestId = contestRequestId ?? '${uid}_question_$questionIndex';
+    final bool isTieBreakerActive =
+        _latestQuizData['tieBreakerActive'] == true;
+    final responseDocId = _getResponseDocId(
+      questionIndex,
+      isTieBreaker: isTieBreakerActive,
+    );
+    final requestId = contestRequestId ?? '${uid}_$responseDocId';
 
     final requestRef = FirebaseFirestore.instance
         .collection('quiz_sessions')
@@ -5849,7 +5928,7 @@ class _QuizScreenState extends State<QuizScreen> {
         .collection('answers')
         .doc(uid)
         .collection('responses')
-        .doc('question_$questionIndex');
+        .doc(responseDocId);
 
     setState(() {
       contestProcessingApproval = true;
@@ -9088,6 +9167,7 @@ class _QuizScreenState extends State<QuizScreen> {
               resultRevealed = false;
               submitting = false;
               _showLocalLevelResults = false;
+              previousQuestion = -1;
             }
 
             final isInviteConfirmed =
