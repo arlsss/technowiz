@@ -4016,6 +4016,11 @@ class _QuizScreenState extends State<QuizScreen> {
     String currentUid,
     bool isTiedContestant,
   ) {
+    final bool isTieBreaker = quizData['tieBreakerEnded'] == true ||
+        quizData['tieBreakerActive'] == true ||
+        (quizData['status'] ?? '').toString().toLowerCase() ==
+            'tie_breaker_ended';
+
     return TechCircuitBackground(
       baseColor: lightGreen,
       child: Scaffold(
@@ -4048,8 +4053,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const TechArenaBadge(
-                          label: 'TIE BREAKER CONCLUDED',
+                        TechArenaBadge(
+                          label: isTieBreaker
+                              ? 'TIE BREAKER CONCLUDED'
+                              : 'QUIZ COMPLETED • STANDBY',
                           icon: Icons.military_tech_rounded,
                         ),
                         const SizedBox(height: 24),
@@ -4082,10 +4089,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                         ),
                         const SizedBox(height: 22),
-                        const Text(
-                          "Tie Breaker Round Ended",
+                        Text(
+                          isTieBreaker
+                              ? "Tie Breaker Round Ended"
+                              : "Quiz Completed",
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: darkGreen,
                             fontSize: 25,
                             fontWeight: FontWeight.w900,
@@ -4094,9 +4103,11 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          isTiedContestant
-                              ? "Outstanding work! Your tie breaker points have been recorded."
-                              : "The tie breaker round between the tied contestants has concluded.",
+                          isTieBreaker
+                              ? (isTiedContestant
+                                  ? "Outstanding work! Your tie breaker points have been recorded."
+                                  : "The tie breaker round between the tied contestants has concluded.")
+                              : "Outstanding work! All your answers and points have been recorded.",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.grey.shade600,
@@ -4104,7 +4115,7 @@ class _QuizScreenState extends State<QuizScreen> {
                             height: 1.4,
                           ),
                         ),
-                        if (isTiedContestant) ...[
+                        if (isTiedContestant && tbScore > 0) ...[
                           const SizedBox(height: 24),
                           Container(
                             width: double.infinity,
@@ -4167,6 +4178,41 @@ class _QuizScreenState extends State<QuizScreen> {
                                     ),
                                   ),
                                 ],
+                              ],
+                            ),
+                          ),
+                        ] else if (totalScore > 0) ...[
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: borderGreen,
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.stars_rounded,
+                                  color: primaryGreen,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Total Score: $totalScore ${totalScore == 1 ? 'pt' : 'pts'}",
+                                  style: const TextStyle(
+                                    color: darkGreen,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -4248,10 +4294,23 @@ class _QuizScreenState extends State<QuizScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final bool isTiedContestant = tieBreakerContestantUids.contains(currentUid);
 
-    if (_showTieBreakerOverallTally ||
-        (_quizFinishedForContestant &&
-            (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant))) {
-      return _buildFinishedCongratulationsScreen(context, currentUid);
+    final bool publishedWinners = _latestQuizData['publishedWinners'] == true;
+
+    if (publishedWinners) {
+      if (_showTieBreakerOverallTally ||
+          (_quizFinishedForContestant &&
+              (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant))) {
+        return _buildFinishedCongratulationsScreen(context, currentUid);
+      }
+    } else if (isTieBreakerEnded) {
+      if (_showTieBreakerOverallTally || isThisQuestionConfirmed) {
+        return _buildTieBreakerEndedWaitingScreen(
+          context,
+          _latestQuizData,
+          currentUid,
+          isTiedContestant,
+        );
+      }
     }
 
     if (isTieBreakerActive &&
@@ -7285,7 +7344,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 18),
-                                    if (isQuizFinished)
+                                    if (isQuizFinished && sessionData['publishedWinners'] == true)
                                       Column(
                                         children: [
                                           Container(
@@ -7419,6 +7478,49 @@ class _QuizScreenState extends State<QuizScreen> {
                                             ),
                                           ),
                                         ],
+                                      )
+                                    else if (isQuizFinished)
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 18,
+                                          vertical: 14,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.90),
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: borderGreen,
+                                            width: 1.3,
+                                          ),
+                                        ),
+                                        child: const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color: primaryGreen,
+                                              ),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Flexible(
+                                              child: Text(
+                                                "Quiz finished! Waiting for Quiz Master to publish winners...",
+                                                style: TextStyle(
+                                                  color: darkGreen,
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       )
                                     else
                                       Column(
@@ -8526,13 +8628,26 @@ class _QuizScreenState extends State<QuizScreen> {
             _quizFinishedForContestant = false;
           }
 
-          if (_showTieBreakerOverallTally ||
-              _quizFinishedForContestant ||
-              (((isQuizFinished && (!isTieBreakerEnded || publishedWinners)) ||
-                      _quizFinishedForContestant) &&
-                  (!isTieBreakerActive || !isTiedContestant))) {
+          // Only show final ranking / congratulations screen if Quiz Master has published winners!
+          if (publishedWinners &&
+              (_showTieBreakerOverallTally ||
+                  _quizFinishedForContestant ||
+                  (isQuizFinished && (!isTieBreakerActive || !isTiedContestant)))) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
+          }
+
+          if (isTieBreakerEnded &&
+              !publishedWinners &&
+              (_showTieBreakerOverallTally ||
+                  _quizFinishedForContestant ||
+                  !(answered && resultRevealed))) {
+            return _buildTieBreakerEndedWaitingScreen(
+              context,
+              quizData,
+              currentUid,
+              isTiedContestant,
+            );
           }
 
           final status = quizData['status']?.toString() ?? 'waiting';
@@ -8941,11 +9056,24 @@ class _QuizScreenState extends State<QuizScreen> {
           // Once the contestant submits (or time runs out), show the
           // result immediately. Do not let Ready Check or Countdown
           // hide it.
-          if (_showTieBreakerOverallTally ||
-              (_quizFinishedForContestant &&
-                  (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant))) {
+          if (publishedWinners &&
+              (_showTieBreakerOverallTally ||
+                  (_quizFinishedForContestant &&
+                      (!isTieBreakerActive || isTieBreakerEnded || !isTiedContestant)))) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
+          }
+
+          if (isTieBreakerEnded &&
+              !publishedWinners &&
+              (_showTieBreakerOverallTally || _quizFinishedForContestant)) {
+            timer?.cancel();
+            return _buildTieBreakerEndedWaitingScreen(
+              context,
+              quizData,
+              currentUid,
+              isTiedContestant,
+            );
           }
 
           if (answered && resultRevealed) {
@@ -9791,11 +9919,31 @@ class _QuizScreenState extends State<QuizScreen> {
   // CONGRATULATIONS RANKING SCREEN (When Quizmaster finishes quiz)
   // ==========================================================
   Widget _buildFinishedCongratulationsScreen(BuildContext context, String uid) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: _joinRequestRef(uid).snapshots(),
-        builder: (context, joinSnap) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _sessionRef.snapshots(),
+      builder: (context, sessionSnap) {
+        final sessionData = sessionSnap.data?.data() ?? _latestQuizData;
+        final bool publishedWinners = sessionData['publishedWinners'] == true;
+
+        if (!publishedWinners) {
+          final rawTieUids = sessionData['tieBreakerContestantUids'];
+          final List<String> tieBreakerContestantUids = rawTieUids is List
+              ? rawTieUids.map((e) => e.toString()).toList()
+              : <String>[];
+          final bool isTiedContestant = tieBreakerContestantUids.contains(uid);
+          return _buildTieBreakerEndedWaitingScreen(
+            context,
+            sessionData,
+            uid,
+            isTiedContestant,
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: const Color(0xFF0F172A),
+          body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _joinRequestRef(uid).snapshots(),
+            builder: (context, joinSnap) {
           final jData = joinSnap.data?.data() ?? const <String, dynamic>{};
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -10879,6 +11027,8 @@ class _QuizScreenState extends State<QuizScreen> {
           );
         },
       ),
+    );
+      },
     );
   }
 
