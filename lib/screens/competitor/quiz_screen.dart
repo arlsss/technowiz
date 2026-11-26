@@ -2880,7 +2880,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           const SizedBox(height: 12),
                           const Text(
                             '• 1 Point per question.\n\n'
-                            '• Sudden-Death Rule: If a contestant scores a point '
+                            '• Tie Breaker Rule: If a contestant scores a point '
                             '(answers correctly while the opponent answers incorrectly or runs out of time), '
                             'the tie breaker concludes immediately and that contestant wins the contested rank!\n\n'
                             '• If both contestants answer correctly (or both answer incorrectly / run out of time), '
@@ -3703,7 +3703,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                               Text(
                                                 isBroken && leadingName != null
                                                     ? '$leadingName is leading with $maxTbScore pts!'
-                                                    : 'Sudden-Death Rule: Higher point wins immediately.',
+                                                    : 'Tie Breaker Rule: Higher point wins immediately.',
                                                 style: const TextStyle(
                                                   color: Colors.black54,
                                                   fontSize: 11.5,
@@ -5127,7 +5127,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   Text(
                     leadName != null && leadName.isNotEmpty
                         ? "$leadName scored the winning tie breaker point!"
-                        : "The sudden-death tie breaker has ended!",
+                        : "The tie breaker round has ended!",
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Color(0xFF0F172A),

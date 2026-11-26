@@ -4227,7 +4227,7 @@ class ParticipantReadinessPage extends StatelessWidget {
         'title': 'TIE BREAKER',
         'bullets': <String>[
           'Triggered automatically when contestants tie for top ranks.',
-          'Only tied contestants participate in sudden-death questions.',
+          'Only tied contestants participate in tie breaker questions.',
           'Tie-breaker points directly determine final podium rankings.',
         ],
       },

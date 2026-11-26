@@ -4696,7 +4696,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                               Text(
                                 isBroken
                                     ? 'A contestant has broken the tie! Tap END TIE BREAKER to finalize results.'
-                                    : 'Sudden-Death Rule: Higher point wins immediately.',
+                                    : 'Tie Breaker Rule: Higher point wins immediately.',
                                 style: const TextStyle(
                                   color: Colors.black54,
                                   fontSize: 11.5,
@@ -7037,7 +7037,7 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                                         _tieBreakerBroken &&
                                                 _tieBreakerLeadingName != null
                                             ? 'Leader: $_tieBreakerLeadingName ($_tieBreakerLeadingScore PTS) • Tie breaker winner!'
-                                            : 'Sudden-Death Round: ${(_quizData?['tieBreakerContestantNames'] as List?)?.join(' vs ') ?? 'Tied Contestants'}',
+                                            : 'Tie Breaker Round: ${(_quizData?['tieBreakerContestantNames'] as List?)?.join(' vs ') ?? 'Tied Contestants'}',
                                         style: TextStyle(
                                           color: Colors.white.withValues(
                                             alpha: 0.9,
