@@ -11635,7 +11635,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       const Row(
                         children: [
                           Icon(
-                            Icons.emoji_events_rounded,
+                            Icons.stars_rounded,
                             size: 14,
                             color: Color(0xFFD97706),
                           ),
@@ -11702,7 +11702,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 return _buildFinishedTallyRow(
                   item,
                   sortedLevels,
-                  showTrophies: true,
+                  showTrophies: false,
                 );
               },
             ),
@@ -11930,9 +11930,9 @@ class _QuizScreenState extends State<QuizScreen> {
         ),
         alignment: Alignment.center,
         child: Text(
-          "#${item.rank}",
+          '${item.rank}',
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: 15,
             fontWeight: FontWeight.w900,
             color: textColor,
           ),
