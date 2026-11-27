@@ -10412,7 +10412,7 @@ class _QuizScreenState extends State<QuizScreen> {
               // MAIN QUIZ SCREEN
               // ==================================================
 
-              final bool inTieBreaker = isTieBreakerActive || isTieBreakerRound;
+              final bool inTieBreaker = isTieBreakerActive || _isCurrentlyInTieBreaker();
 
               return Scaffold(
                 backgroundColor: lightGreen,
