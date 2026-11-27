@@ -8466,522 +8466,672 @@ class _QuizScreenState extends State<QuizScreen> {
 
             // Body: Live Ranking Stream (directly visible)
             Expanded(
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _sessionRef.collection('scores').snapshots(),
-                builder: (context, scoreSnap) {
+              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: _sessionRef.snapshots(),
+                builder: (context, sessionSnap) {
+                  final sessionData =
+                      sessionSnap.data?.data() ?? _latestQuizData;
+                  final bool isTieBreaker =
+                      (sessionData['tieBreakerActive'] == true) ||
+                      (_latestQuizData['tieBreakerActive'] == true) ||
+                      (sessionData['status']
+                              ?.toString()
+                              .toLowerCase()
+                              .contains('tie_breaker') ??
+                          false) ||
+                      (_latestQuizData['status']
+                              ?.toString()
+                              .toLowerCase()
+                              .contains('tie_breaker') ??
+                          false);
+
+                  final rawTieUids = sessionData['tieBreakerContestantUids'] ??
+                      _latestQuizData['tieBreakerContestantUids'];
+                  final Set<String> tiedUids = rawTieUids is List
+                      ? rawTieUids
+                          .map((e) => e.toString().trim())
+                          .where((e) => e.isNotEmpty)
+                          .toSet()
+                      : <String>{};
+
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _sessionRef.collection('join_requests').snapshots(),
-                    builder: (context, contestantSnap) {
-                      if (scoreSnap.connectionState ==
-                              ConnectionState.waiting &&
-                          !scoreSnap.hasData) {
-                        return const Center(
-                          child: CircularProgressIndicator(color: primaryGreen),
-                        );
-                      }
+                    stream: _sessionRef.collection('scores').snapshots(),
+                    builder: (context, scoreSnap) {
+                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream:
+                            _sessionRef.collection('join_requests').snapshots(),
+                        builder: (context, contestantSnap) {
+                          if (scoreSnap.connectionState ==
+                                  ConnectionState.waiting &&
+                              !scoreSnap.hasData) {
+                            return const Center(
+                              child:
+                                  CircularProgressIndicator(color: primaryGreen),
+                            );
+                          }
 
-                      final scoreDocs = scoreSnap.data?.docs ?? [];
-                      final contestants = contestantSnap.data?.docs ?? [];
+                          final scoreDocs = scoreSnap.data?.docs ?? [];
+                          final contestants = contestantSnap.data?.docs ?? [];
 
-                      final Map<String, Map<String, dynamic>> scoreById = {
-                        for (final s in scoreDocs) s.id: s.data(),
-                      };
-                      final Map<String, Map<String, dynamic>> contestantById = {
-                        for (final c in contestants) c.id: c.data(),
-                      };
+                          final Map<String, Map<String, dynamic>> scoreById = {
+                            for (final s in scoreDocs) s.id: s.data(),
+                          };
+                          final Map<String, Map<String, dynamic>> contestantById = {
+                            for (final c in contestants) c.id: c.data(),
+                          };
 
-                      final Set<String> allUids = {
-                        ...contestantById.keys,
-                        ...scoreById.keys,
-                      };
+                          final Set<String> allUids = {
+                            ...contestantById.keys,
+                            ...scoreById.keys,
+                          };
 
-                      final rows = <Map<String, dynamic>>[];
-
-                      for (final uid in allUids) {
-                        final cData =
-                            contestantById[uid] ?? const <String, dynamic>{};
-                        final sData =
-                            scoreById[uid] ?? const <String, dynamic>{};
-                        final uData =
-                            _userProfileCache[uid] ?? const <String, dynamic>{};
-
-                        final status =
-                            (cData['status'] ?? sData['status'] ?? '')
-                                .toString()
-                                .trim()
-                                .toLowerCase();
-                        final decision =
-                            (cData['contestantDecision'] ??
-                                    sData['contestantDecision'] ??
-                                    '')
-                                .toString()
-                                .trim()
-                                .toLowerCase();
-
-                        // Skip users who left, were rejected, or are still pending
-                        if (status == 'left' ||
-                            status == 'rejected' ||
-                            status == 'declined' ||
-                            cData['leftQuiz'] == true ||
-                            sData['leftQuiz'] == true ||
-                            status == 'pending') {
-                          continue;
-                        }
-
-                        final isElim =
-                            cData['eliminated'] == true ||
-                            cData['isEliminated'] == true ||
-                            sData['eliminated'] == true ||
-                            status == 'eliminated' ||
-                            decision == 'eliminated';
-                        if (isElim) continue;
-
-                        final rawTeam =
-                            (cData['teamName'] ??
-                                    sData['teamName'] ??
-                                    uData['teamName'] ??
-                                    '')
-                                .toString()
-                                .trim();
-                        final contestantType =
-                            (cData['contestantType'] ??
-                                    sData['contestantType'] ??
-                                    uData['contestantType'] ??
-                                    '')
-                                .toString()
-                                .trim()
-                                .toLowerCase();
-
-                        final rawMembers =
-                            cData['teamMembers'] ??
-                            cData['members'] ??
-                            sData['teamMembers'] ??
-                            sData['members'] ??
-                            uData['teamMembers'] ??
-                            uData['members'];
-
-                        final List<String> teamMembers = [];
-                        if (rawMembers is List) {
-                          for (final m in rawMembers) {
-                            final s = m is Map
-                                ? (m['name'] ??
-                                          m['displayName'] ??
-                                          m['fullName'] ??
-                                          '')
-                                      .toString()
-                                      .trim()
-                                : m.toString().trim();
-                            if (s.isNotEmpty && !teamMembers.contains(s)) {
-                              teamMembers.add(s);
+                          // Fallback: if tieBreakerContestantUids wasn't populated, detect tied contestants
+                          final Set<String> fallbackTiedUids = <String>{};
+                          if (isTieBreaker && tiedUids.isEmpty) {
+                            for (final uid in allUids) {
+                              final cData = contestantById[uid] ??
+                                  const <String, dynamic>{};
+                              final sData = scoreById[uid] ??
+                                  const <String, dynamic>{};
+                              if (cData['tieBreakerReady'] != null ||
+                                  sData['tieBreakerScore'] != null ||
+                                  sData['tieBreakerWon'] != null) {
+                                fallbackTiedUids.add(uid);
+                              }
                             }
                           }
-                        }
+                          final effectiveTiedUids = tiedUids.isNotEmpty
+                              ? tiedUids
+                              : fallbackTiedUids;
 
-                        final bool isTeam =
-                            contestantType == 'team' ||
-                            cData['isTeam'] == true ||
-                            sData['isTeam'] == true ||
-                            uData['isTeam'] == true ||
-                            rawTeam.isNotEmpty ||
-                            teamMembers.isNotEmpty;
+                          final rows = <Map<String, dynamic>>[];
 
-                        // If it's a team and we don't have members or team info yet, prefetch user profile
-                        if (isTeam &&
-                            teamMembers.isEmpty &&
-                            !uData.containsKey('teamMembers')) {
-                          _prefetchUserProfile(uid);
-                        }
+                          for (final uid in allUids) {
+                            // If tie breaker is active, only show the tied contestants participating in the tie breaker!
+                            if (isTieBreaker &&
+                                effectiveTiedUids.isNotEmpty &&
+                                !effectiveTiedUids.contains(uid)) {
+                              continue;
+                            }
 
-                        final personalName =
-                            (cData['realName'] ??
-                                    cData['fullName'] ??
-                                    uData['fullName'] ??
-                                    uData['name'] ??
-                                    sData['fullName'] ??
-                                    cData['displayName'] ??
-                                    cData['name'] ??
-                                    sData['name'] ??
-                                    cData['email'] ??
-                                    uid)
-                                .toString()
-                                .trim();
+                            final cData =
+                                contestantById[uid] ?? const <String, dynamic>{};
+                            final sData =
+                                scoreById[uid] ?? const <String, dynamic>{};
+                            final uData =
+                                _userProfileCache[uid] ?? const <String, dynamic>{};
 
-                        final teamName = rawTeam.isNotEmpty
-                            ? rawTeam
-                            : (isTeam && teamMembers.isNotEmpty
-                                  ? (rawTeam.isNotEmpty
-                                        ? rawTeam
-                                        : personalName)
-                                  : '');
+                            final status =
+                                (cData['status'] ?? sData['status'] ?? '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase();
+                            final decision =
+                                (cData['contestantDecision'] ??
+                                        sData['contestantDecision'] ??
+                                        '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase();
 
-                        final displayName = isTeam
-                            ? (teamName.isNotEmpty ? teamName : personalName)
-                            : personalName;
+                            // Skip users who left, were rejected, or are still pending
+                            if (status == 'left' ||
+                                status == 'rejected' ||
+                                status == 'declined' ||
+                                cData['leftQuiz'] == true ||
+                                sData['leftQuiz'] == true ||
+                                status == 'pending') {
+                              continue;
+                            }
 
-                        final int storedScore =
-                            int.tryParse(
-                              (sData['totalScore'] ?? sData['score'])
+                            final isElim =
+                                cData['eliminated'] == true ||
+                                cData['isEliminated'] == true ||
+                                sData['eliminated'] == true ||
+                                status == 'eliminated' ||
+                                decision == 'eliminated';
+                            if (isElim) continue;
+
+                            final rawTeam =
+                                (cData['teamName'] ??
+                                        sData['teamName'] ??
+                                        uData['teamName'] ??
+                                        '')
+                                    .toString()
+                                    .trim();
+                            final contestantType =
+                                (cData['contestantType'] ??
+                                        sData['contestantType'] ??
+                                        uData['contestantType'] ??
+                                        '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase();
+
+                            final rawMembers =
+                                cData['teamMembers'] ??
+                                cData['members'] ??
+                                sData['teamMembers'] ??
+                                sData['members'] ??
+                                uData['teamMembers'] ??
+                                uData['members'];
+
+                            final List<String> teamMembers = [];
+                            if (rawMembers is List) {
+                              for (final m in rawMembers) {
+                                final s = m is Map
+                                    ? (m['name'] ??
+                                              m['displayName'] ??
+                                              m['fullName'] ??
+                                              '')
+                                          .toString()
+                                          .trim()
+                                    : m.toString().trim();
+                                if (s.isNotEmpty && !teamMembers.contains(s)) {
+                                  teamMembers.add(s);
+                                }
+                              }
+                            }
+
+                            final bool isTeam =
+                                contestantType == 'team' ||
+                                cData['isTeam'] == true ||
+                                sData['isTeam'] == true ||
+                                uData['isTeam'] == true ||
+                                rawTeam.isNotEmpty ||
+                                teamMembers.isNotEmpty;
+
+                            // If it's a team and we don't have members or team info yet, prefetch user profile
+                            if (isTeam &&
+                                teamMembers.isEmpty &&
+                                !uData.containsKey('teamMembers')) {
+                              _prefetchUserProfile(uid);
+                            }
+
+                            final personalName =
+                                (cData['realName'] ??
+                                        cData['fullName'] ??
+                                        uData['fullName'] ??
+                                        uData['name'] ??
+                                        sData['fullName'] ??
+                                        cData['displayName'] ??
+                                        cData['name'] ??
+                                        sData['name'] ??
+                                        cData['email'] ??
+                                        uid)
+                                    .toString()
+                                    .trim();
+
+                            final teamName = rawTeam.isNotEmpty
+                                ? rawTeam
+                                : (isTeam && teamMembers.isNotEmpty
+                                      ? (rawTeam.isNotEmpty
+                                            ? rawTeam
+                                            : personalName)
+                                      : '');
+
+                            final displayName = isTeam
+                                ? (teamName.isNotEmpty ? teamName : personalName)
+                                : personalName;
+
+                            final int storedScore =
+                                int.tryParse(
+                                  (sData['totalScore'] ?? sData['score'])
+                                          ?.toString() ??
+                                      '',
+                                ) ??
+                                0;
+                            int lvlSum = 0;
+                            for (int l = 1; l <= 20; l++) {
+                              final v =
+                                  sData['level${l}Score'] ??
+                                  sData['level_$l'] ??
+                                  (sData['levelScores'] is Map
+                                      ? (sData['levelScores']['Level $l'] ??
+                                            sData['levelScores']['$l'])
+                                      : null);
+                              if (v != null) {
+                                lvlSum += int.tryParse(v.toString()) ?? 0;
+                              }
+                            }
+                            if (sData['levelScores'] is Map) {
+                              int mSum = 0;
+                              for (final v
+                                  in (sData['levelScores'] as Map).values) {
+                                if (v != null) {
+                                  mSum += int.tryParse(v.toString()) ?? 0;
+                                }
+                              }
+                              if (mSum > lvlSum) {
+                                lvlSum = mSum;
+                              }
+                            }
+
+                            final tiePts =
+                                int.tryParse(
+                                  (sData['tieBreakerScore'] ??
+                                          cData['tieBreakerScore'])
                                       ?.toString() ??
-                                  '',
-                            ) ??
-                            0;
-                        int lvlSum = 0;
-                        for (int l = 1; l <= 20; l++) {
-                          final v =
-                              sData['level${l}Score'] ??
-                              sData['level_$l'] ??
-                              (sData['levelScores'] is Map
-                                  ? (sData['levelScores']['Level $l'] ??
-                                        sData['levelScores']['$l'])
-                                  : null);
-                          if (v != null) {
-                            lvlSum += int.tryParse(v.toString()) ?? 0;
+                                      '',
+                                ) ??
+                                0;
+
+                            // Base level score is the overall points from the regular level quiz
+                            int baseLevelScore = lvlSum;
+                            if (baseLevelScore == 0 && storedScore > 0) {
+                              baseLevelScore =
+                                  (storedScore >= tiePts && tiePts > 0)
+                                      ? (storedScore - tiePts)
+                                      : storedScore;
+                            }
+
+                            // Total score displayed: regular level quiz points + tie breaker points (+1 if scored)
+                            int scoreVal = baseLevelScore + tiePts;
+                            if (storedScore > scoreVal) {
+                              scoreVal = storedScore;
+                            }
+
+                            if (uid == myUid && currentScore > scoreVal) {
+                              scoreVal = currentScore;
+                            }
+
+                            rows.add({
+                              'uid': uid,
+                              'name': displayName,
+                              'team': isTeam ? teamName : '',
+                              'isTeam': isTeam,
+                              'teamMembers': teamMembers,
+                              'score': scoreVal,
+                              'tiePts': tiePts,
+                            });
                           }
-                        }
-                        if (sData['levelScores'] is Map) {
-                          int mSum = 0;
-                          for (final v
-                              in (sData['levelScores'] as Map).values) {
-                            if (v != null) {
-                              mSum += int.tryParse(v.toString()) ?? 0;
+
+                          rows.sort((a, b) {
+                            final byScore = (b['score'] as int).compareTo(
+                              a['score'] as int,
+                            );
+                            if (byScore != 0) return byScore;
+                            return (a['name'] as String).compareTo(
+                              b['name'] as String,
+                            );
+                          });
+
+                          // Competition ranking: equal scores share the same rank
+                          final ranks = <int>[];
+                          for (int i = 0; i < rows.length; i++) {
+                            if (i > 0 &&
+                                rows[i]['score'] == rows[i - 1]['score']) {
+                              ranks.add(ranks[i - 1]);
+                            } else {
+                              ranks.add(i + 1);
                             }
                           }
-                          if (mSum > lvlSum) {
-                            lvlSum = mSum;
+
+                          // Check if Question 2 has submissions/answers or has concluded:
+                          // Rank numbers only appear after answering/submitting for Question 2
+                          bool hasQuestion2Submission = false;
+                          for (final s in scoreDocs) {
+                            final data = s.data();
+                            final lq =
+                                int.tryParse(
+                                  data['lastQuestion']?.toString() ?? '',
+                                ) ??
+                                0;
+                            if (lq >= 2) {
+                              hasQuestion2Submission = true;
+                              break;
+                            }
                           }
-                        }
 
-                        final tiePts =
-                            int.tryParse(
-                              sData['tieBreakerScore']?.toString() ?? '',
-                            ) ??
-                            0;
-
-                        int scoreVal = (lvlSum + tiePts) > 0
-                            ? (lvlSum + tiePts)
-                            : storedScore;
-                        if (storedScore > scoreVal) {
-                          scoreVal = storedScore;
-                        }
-
-                        if (uid == myUid && currentScore > scoreVal) {
-                          scoreVal = currentScore;
-                        }
-
-                        rows.add({
-                          'uid': uid,
-                          'name': displayName,
-                          'team': isTeam ? teamName : '',
-                          'isTeam': isTeam,
-                          'teamMembers': teamMembers,
-                          'score': scoreVal,
-                        });
-                      }
-
-                      rows.sort((a, b) {
-                        final byScore = (b['score'] as int).compareTo(
-                          a['score'] as int,
-                        );
-                        if (byScore != 0) return byScore;
-                        return (a['name'] as String).compareTo(
-                          b['name'] as String,
-                        );
-                      });
-
-                      // Competition ranking: equal scores share the same rank
-                      final ranks = <int>[];
-                      for (int i = 0; i < rows.length; i++) {
-                        if (i > 0 && rows[i]['score'] == rows[i - 1]['score']) {
-                          ranks.add(ranks[i - 1]);
-                        } else {
-                          ranks.add(i + 1);
-                        }
-                      }
-
-                      // Check if Question 2 has submissions/answers or has concluded:
-                      // Rank numbers only appear after answering/submitting for Question 2
-                      bool hasQuestion2Submission = false;
-                      for (final s in scoreDocs) {
-                        final data = s.data();
-                        final lq =
-                            int.tryParse(
-                              data['lastQuestion']?.toString() ?? '',
-                            ) ??
-                            0;
-                        if (lq >= 2) {
-                          hasQuestion2Submission = true;
-                          break;
-                        }
-                      }
-
-                      final currentQ =
-                          int.tryParse(
-                            _latestQuizData['currentQuestion']?.toString() ??
-                                '',
-                          ) ??
-                          currentQuestion;
-                      final currentLvl =
-                          int.tryParse(
-                            _latestQuizData['currentLevel']?.toString() ?? '',
-                          ) ??
-                          1;
-                      final qStatus = (_latestQuizData['status'] ?? '')
-                          .toString()
-                          .toLowerCase()
-                          .trim();
-                      final qEventStatus =
-                          (_latestQuizData['eventStatus'] ?? '')
+                          final currentQ =
+                              int.tryParse(
+                                sessionData['currentQuestion']?.toString() ??
+                                    _latestQuizData['currentQuestion']
+                                        ?.toString() ??
+                                    '',
+                              ) ??
+                              currentQuestion;
+                          final currentLvl =
+                              int.tryParse(
+                                sessionData['currentLevel']?.toString() ??
+                                    _latestQuizData['currentLevel']?.toString() ??
+                                    '',
+                              ) ??
+                              1;
+                          final qStatus = (sessionData['status'] ??
+                                  _latestQuizData['status'] ??
+                                  '')
+                              .toString()
+                              .toLowerCase()
+                              .trim();
+                          final qEventStatus = (sessionData['eventStatus'] ??
+                                  _latestQuizData['eventStatus'] ??
+                                  '')
                               .toString()
                               .toLowerCase()
                               .trim();
 
-                      final hasAnyScore = rows.any(
-                        (r) => (r['score'] as int) > 0,
-                      );
-                      bool showRankNumbers = false;
+                          final hasAnyScore = rows.any(
+                            (r) => (r['score'] as int) > 0,
+                          );
+                          bool showRankNumbers = false;
 
-                      if (hasAnyScore) {
-                        if (currentLvl > 1 || currentQ >= 2) {
-                          showRankNumbers = true;
-                        } else if (hasQuestion2Submission) {
-                          showRankNumbers = true;
-                        } else if (currentQ == 1 &&
-                            (qStatus == 'contest_review' ||
-                                qStatus == 'level_pause' ||
-                                qStatus == 'review' ||
-                                qEventStatus == 'contest_review')) {
-                          showRankNumbers = true;
-                        } else if (qStatus == 'finished' ||
-                            qStatus == 'completed') {
-                          showRankNumbers = true;
-                        }
-                      }
+                          if (isTieBreaker) {
+                            // In tie breaker, always show ranking numbers for the competing tied contestants
+                            showRankNumbers = true;
+                          } else if (hasAnyScore) {
+                            if (currentLvl > 1 || currentQ >= 2) {
+                              showRankNumbers = true;
+                            } else if (hasQuestion2Submission) {
+                              showRankNumbers = true;
+                            } else if (currentQ == 1 &&
+                                (qStatus == 'contest_review' ||
+                                    qStatus == 'level_pause' ||
+                                    qStatus == 'review' ||
+                                    qEventStatus == 'contest_review')) {
+                              showRankNumbers = true;
+                            } else if (qStatus == 'finished' ||
+                                qStatus == 'completed') {
+                              showRankNumbers = true;
+                            }
+                          }
 
-                      if (rows.isEmpty) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              'No active contestants yet.',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      return Column(
-                        children: [
-                          if (!showRankNumbers)
-                            Container(
-                              margin: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: const Color(0xFFFDE68A),
+                          if (rows.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  isTieBreaker
+                                      ? 'Loading tied contestants...'
+                                      : 'No active contestants yet.',
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
-                              child: const Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline_rounded,
-                                    size: 15,
-                                    color: Color(0xFFD97706),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Rank numbers will appear after Question 2.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF92400E),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          Expanded(
-                            child: ListView.separated(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              itemCount: rows.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (context, i) {
-                                final item = rows[i];
-                                final rank = ranks[i];
-                                final isMe = item['uid'] == myUid;
-                                final isTeam = item['isTeam'] == true;
-                                final List<String> members =
-                                    (item['teamMembers'] as List<String>?) ??
-                                    [];
+                            );
+                          }
 
-                                Color rankBadgeColor;
-                                Color rankTextColor;
-                                if (rank == 1) {
-                                  rankBadgeColor = const Color(0xFFFEF3C7);
-                                  rankTextColor = const Color(0xFFB45309);
-                                } else if (rank == 2) {
-                                  rankBadgeColor = const Color(0xFFF3F4F6);
-                                  rankTextColor = const Color(0xFF4B5563);
-                                } else if (rank == 3) {
-                                  rankBadgeColor = const Color(0xFFFFEDD5);
-                                  rankTextColor = const Color(0xFFC2410C);
-                                } else {
-                                  rankBadgeColor = const Color(0xFFE5F4FF);
-                                  rankTextColor = const Color(0xFF1565D8);
-                                }
-
-                                return Container(
+                          return Column(
+                            children: [
+                              if (!showRankNumbers)
+                                Container(
+                                  margin:
+                                      const EdgeInsets.fromLTRB(14, 10, 14, 4),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
+                                    horizontal: 10,
+                                    vertical: 7,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isMe
-                                        ? const Color(0xFFF0FDF4)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: isMe
-                                          ? primaryGreen
-                                          : const Color(0xFFE5E7EB),
-                                      width: isMe ? 1.5 : 1.0,
+                                      color: const Color(0xFFFDE68A),
                                     ),
                                   ),
-                                  child: Row(
+                                  child: const Row(
                                     children: [
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: showRankNumbers
-                                              ? rankBadgeColor
-                                              : const Color(0xFFF3F4F6),
-                                          shape: BoxShape.circle,
-                                        ),
+                                      Icon(
+                                        Icons.info_outline_rounded,
+                                        size: 15,
+                                        color: Color(0xFFD97706),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
                                         child: Text(
-                                          showRankNumbers ? '$rank' : '-',
+                                          'Rank numbers will appear after Question 2.',
                                           style: TextStyle(
-                                            color: showRankNumbers
-                                                ? rankTextColor
-                                                : const Color(0xFF9CA3AF),
-                                            fontSize: showRankNumbers ? 12 : 14,
-                                            fontWeight: FontWeight.w800,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF92400E),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Row(
+                                    ],
+                                  ),
+                                ),
+                              Expanded(
+                                child: ListView.separated(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                  itemCount: rows.length,
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(height: 8),
+                                  itemBuilder: (context, i) {
+                                    final item = rows[i];
+                                    final rank = ranks[i];
+                                    final isMe = item['uid'] == myUid;
+                                    final isTeam = item['isTeam'] == true;
+                                    final List<String> members =
+                                        (item['teamMembers']
+                                                as List<String>?) ??
+                                            [];
+
+                                    Color rankBadgeColor;
+                                    Color rankTextColor;
+                                    if (rank == 1) {
+                                      rankBadgeColor = const Color(0xFFFEF3C7);
+                                      rankTextColor = const Color(0xFFB45309);
+                                    } else if (rank == 2) {
+                                      rankBadgeColor = const Color(0xFFF3F4F6);
+                                      rankTextColor = const Color(0xFF4B5563);
+                                    } else if (rank == 3) {
+                                      rankBadgeColor = const Color(0xFFFFEDD5);
+                                      rankTextColor = const Color(0xFFC2410C);
+                                    } else {
+                                      rankBadgeColor = const Color(0xFFE5F4FF);
+                                      rankTextColor = const Color(0xFF1565D8);
+                                    }
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isMe
+                                            ? const Color(0xFFF0FDF4)
+                                            : Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isMe
+                                              ? primaryGreen
+                                              : const Color(0xFFE5E7EB),
+                                          width: isMe ? 1.5 : 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 28,
+                                            height: 28,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: showRankNumbers
+                                                  ? rankBadgeColor
+                                                  : const Color(0xFFF3F4F6),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Text(
+                                              showRankNumbers ? '$rank' : '-',
+                                              style: TextStyle(
+                                                color: showRankNumbers
+                                                    ? rankTextColor
+                                                    : const Color(0xFF9CA3AF),
+                                                fontSize: showRankNumbers
+                                                    ? 12
+                                                    : 14,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    item['name'],
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      color: textDark,
-                                                      fontWeight: isMe
-                                                          ? FontWeight.w800
-                                                          : FontWeight.w600,
-                                                      fontSize: 13,
+                                                Row(
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        item['name'],
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          color: textDark,
+                                                          fontWeight: isMe
+                                                              ? FontWeight.w800
+                                                              : FontWeight.w600,
+                                                          fontSize: 13,
+                                                        ),
+                                                      ),
                                                     ),
-                                                  ),
-                                                ),
-                                                if (isMe) ...[
-                                                  const SizedBox(width: 6),
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
+                                                    if (isMe) ...[
+                                                      const SizedBox(width: 6),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
                                                           horizontal: 6,
                                                           vertical: 2,
                                                         ),
-                                                    decoration: BoxDecoration(
-                                                      color: primaryGreen,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: primaryGreen,
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(
                                                             10,
                                                           ),
+                                                        ),
+                                                        child: const Text(
+                                                          'YOU',
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 9,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                                if (isTeam &&
+                                                    members.isNotEmpty)
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                      top: 2,
                                                     ),
-                                                    child: const Text(
-                                                      'YOU',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 9,
+                                                    child: Text(
+                                                      'Members: ${members.join(', ')}',
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        color:
+                                                            Color(0xFF5B7A9C),
+                                                        fontSize: 10,
                                                         fontWeight:
-                                                            FontWeight.bold,
+                                                            FontWeight.w500,
+                                                        height: 1.25,
                                                       ),
                                                     ),
                                                   ),
-                                                ],
                                               ],
                                             ),
-                                            if (isTeam && members.isNotEmpty)
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  top: 2,
-                                                ),
-                                                child: Text(
-                                                  'Members: ${members.join(', ')}',
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF5B7A9C),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w500,
-                                                    height: 1.25,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Builder(
+                                            builder: (_) {
+                                              final int scoreVal =
+                                                  (item['score'] as num?)
+                                                      ?.toInt() ??
+                                                  0;
+                                              final int tiePts =
+                                                  (item['tiePts'] as num?)
+                                                      ?.toInt() ??
+                                                  0;
+                                              return Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                children: [
+                                                  Text(
+                                                    scoreVal == 0
+                                                        ? '0'
+                                                        : '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
+                                                    style: const TextStyle(
+                                                      color: primaryGreen,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      fontSize: 13,
+                                                    ),
                                                   ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
+                                                  if (isTieBreaker &&
+                                                      tiePts > 0)
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                        top: 1.5,
+                                                      ),
+                                                      child: Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 5,
+                                                          vertical: 1.5,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: const Color(
+                                                            0xFFFEF3C7,
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(4),
+                                                          border: Border.all(
+                                                            color: const Color(
+                                                              0xFFFDE68A,
+                                                            ),
+                                                            width: 0.8,
+                                                          ),
+                                                        ),
+                                                        child: Text(
+                                                          '+$tiePts TB',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 9.5,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color: Color(
+                                                              0xFFB45309,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 8),
-                                      Builder(
-                                        builder: (_) {
-                                          final int scoreVal =
-                                              (item['score'] as num?)
-                                                  ?.toInt() ??
-                                              0;
-                                          return Text(
-                                            scoreVal == 0
-                                                ? '0'
-                                                : '$scoreVal ${scoreVal == 1 ? 'pt' : 'pts'}',
-                                            style: const TextStyle(
-                                              color: primaryGreen,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 13,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   );
