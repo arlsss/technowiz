@@ -2135,28 +2135,86 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ],
               ),
               child: ClipOval(
-                child: Image.asset(
-                  rank == 1
-                      ? 'assets/trophies/gold_trophy_3d.jpg'
-                      : rank == 2
-                      ? 'assets/trophies/silver_trophy_3d.jpg'
-                      : 'assets/trophies/bronze_trophy_3d.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Icon(
-                    Icons.emoji_events_rounded,
-                    size: isFirst ? 32 : 26,
-                    color: rank == 1
-                        ? const Color(0xFFD97706)
-                        : rank == 2
-                        ? const Color(0xFF64748B)
-                        : const Color(0xFFB45309),
-                  ),
+                child: _buildPodiumAvatar(
+                  tier: nonNullTier,
+                  rank: rank,
+                  isFirst: isFirst,
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPodiumAvatar({
+    required _LeaderboardRankTier? tier,
+    required int rank,
+    required bool isFirst,
+  }) {
+    final entries = tier?.entries ?? [];
+    final hasEntries = entries.isNotEmpty;
+
+    String photoUrl = '';
+    bool isTeam = false;
+    if (hasEntries) {
+      for (final e in entries) {
+        if (e.photoUrl.isNotEmpty &&
+            (e.photoUrl.startsWith('http://') ||
+                e.photoUrl.startsWith('https://'))) {
+          photoUrl = e.photoUrl;
+          break;
+        }
+      }
+      isTeam = entries.first.teamName.isNotEmpty ||
+          entries.first.members.isNotEmpty;
+    }
+
+    final Color rankColor = rank == 1
+        ? const Color(0xFFD97706)
+        : rank == 2
+        ? const Color(0xFF64748B)
+        : const Color(0xFFB45309);
+
+    if (hasEntries && photoUrl.isNotEmpty) {
+      return Image.network(
+        photoUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _podiumAvatarFallback(
+          isTeam: isTeam,
+          isFirst: isFirst,
+          rankColor: rankColor,
+          hasEntries: hasEntries,
+        ),
+      );
+    }
+
+    return _podiumAvatarFallback(
+      isTeam: isTeam,
+      isFirst: isFirst,
+      rankColor: rankColor,
+      hasEntries: hasEntries,
+    );
+  }
+
+  Widget _podiumAvatarFallback({
+    required bool isTeam,
+    required bool isFirst,
+    required Color rankColor,
+    required bool hasEntries,
+  }) {
+    return Container(
+      color: const Color(0xFFF1F5F9),
+      child: Center(
+        child: Icon(
+          hasEntries
+              ? (isTeam ? Icons.groups_rounded : Icons.person_rounded)
+              : Icons.person_outline_rounded,
+          size: isFirst ? 28 : 22,
+          color: hasEntries ? rankColor : textMuted,
+        ),
+      ),
     );
   }
 
@@ -2278,14 +2336,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         ),
       );
     } else if (isTop3) {
-      final trophyAsset = isFirst
-          ? 'assets/trophies/gold_trophy_3d.jpg'
-          : (isSecond
-                ? 'assets/trophies/silver_trophy_3d.jpg'
-                : 'assets/trophies/bronze_trophy_3d.jpg');
       final rankColor = isFirst
           ? const Color(0xFFF59E0B)
           : (isSecond ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
+      final photoUrl = entry.photoUrl;
+      final bool isTeam =
+          entry.teamName.isNotEmpty || entry.members.isNotEmpty;
 
       leadingWidget = Stack(
         clipBehavior: Clip.none,
@@ -2306,15 +2362,37 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ],
             ),
             child: ClipOval(
-              child: Image.asset(
-                trophyAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Icon(
-                  Icons.emoji_events_rounded,
-                  size: 20,
-                  color: rankColor,
-                ),
-              ),
+              child: photoUrl.isNotEmpty &&
+                      (photoUrl.startsWith('http://') ||
+                          photoUrl.startsWith('https://'))
+                  ? Image.network(
+                      photoUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        color: const Color(0xFFF1F5F9),
+                        child: Center(
+                          child: Icon(
+                            isTeam
+                                ? Icons.groups_rounded
+                                : Icons.person_rounded,
+                            size: 20,
+                            color: rankColor,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: const Color(0xFFF1F5F9),
+                      child: Center(
+                        child: Icon(
+                          isTeam
+                              ? Icons.groups_rounded
+                              : Icons.person_rounded,
+                          size: 20,
+                          color: rankColor,
+                        ),
+                      ),
+                    ),
             ),
           ),
           Positioned(
@@ -2963,6 +3041,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           data['eliminated'] == true ||
           data['isEliminated'] == true;
 
+      final reqPhoto = (data['photoUrl'] ??
+              data['photoURL'] ??
+              data['profileImageUrl'] ??
+              data['avatarUrl'] ??
+              '')
+          .toString()
+          .trim();
+
       final current = grouped[key];
       if (current == null) {
         grouped[key] = _LeaderboardEntry(
@@ -2974,8 +3060,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           score: 0,
           eliminated: reqIsEliminated,
           status: status,
+          photoUrl: reqPhoto,
         );
       } else {
+        final existingPhoto = current.photoUrl;
         grouped[key] = _LeaderboardEntry(
           id: current.id,
           name: current.name,
@@ -2985,6 +3073,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           score: current.score,
           eliminated: current.eliminated || reqIsEliminated,
           status: current.status.isNotEmpty ? current.status : status,
+          photoUrl: existingPhoto.isNotEmpty ? existingPhoto : reqPhoto,
         );
       }
     }
@@ -3074,6 +3163,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final key = teamName.isNotEmpty ? 'team:$teamName' : 'user:$uid';
       final display = teamName.isNotEmpty ? teamName : name;
 
+      final scorePhoto = (data['photoUrl'] ??
+              data['photoURL'] ??
+              data['profileImageUrl'] ??
+              data['avatarUrl'] ??
+              '')
+          .toString()
+          .trim();
+
       final current = grouped[key];
       if (current == null) {
         grouped[key] = _LeaderboardEntry(
@@ -3086,8 +3183,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           eliminated: isEliminated,
           status: status,
           lastSubmissionTime: lastSubTime,
+          photoUrl: scorePhoto,
         );
       } else {
+        final existingPhoto = current.photoUrl;
         grouped[key] = _LeaderboardEntry(
           id: current.id,
           name: current.name,
@@ -3102,6 +3201,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           eliminated: current.eliminated || isEliminated,
           status: status.isNotEmpty ? status : current.status,
           lastSubmissionTime: lastSubTime ?? current.lastSubmissionTime,
+          photoUrl: existingPhoto.isNotEmpty ? existingPhoto : scorePhoto,
         );
       }
     }
@@ -3173,6 +3273,7 @@ class _LeaderboardEntry {
   final bool eliminated;
   final String status;
   final Timestamp? lastSubmissionTime;
+  final String photoUrl;
 
   const _LeaderboardEntry({
     this.id = '',
@@ -3184,6 +3285,7 @@ class _LeaderboardEntry {
     this.eliminated = false,
     this.status = '',
     this.lastSubmissionTime,
+    this.photoUrl = '',
   });
 }
 
