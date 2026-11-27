@@ -1486,7 +1486,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               'Level 2',
               'Level 3',
               'Total Score',
-              'Award / Status',
+              'Winners',
             ],
             data: rankings.asMap().entries.map((entry) {
               final rank = entry.key + 1;
@@ -1497,12 +1497,8 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               final award = c.isEliminated
                   ? 'Eliminated'
                   : (rank == 1
-                      ? 'Champion'
-                      : (rank == 2
-                          ? '2nd Place'
-                          : (rank == 3
-                              ? '3rd Place'
-                              : 'Finalist')));
+                      ? 'Champion / Rank 1'
+                      : 'Rank $rank');
 
               final displayName = c.teamName.isNotEmpty ? c.teamName : c.name;
 
@@ -6548,7 +6544,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                     SizedBox(width: 32, child: Text('Rank', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
                     Expanded(child: Text('Contestant Name', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
                     SizedBox(width: 50, child: Text('Score', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
-                    SizedBox(width: 70, child: Text('Award / Status', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
+                    SizedBox(width: 80, child: Text('Winners', style: TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold))),
                   ],
                 ),
               ),
@@ -6572,12 +6568,8 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                   final award = c.isEliminated
                       ? 'Eliminated'
                       : (idx == 0
-                          ? 'Champion'
-                          : (idx == 1
-                              ? '1st Runner-Up'
-                              : (idx == 2
-                                  ? '2nd Runner-Up'
-                                  : 'Finalist')));
+                          ? 'Champion / Rank 1'
+                          : 'Rank ${idx + 1}');
                   return _buildPreviewStandingRow(rank, name, score, award, idx % 2 == 0);
                 }),
                 if (widget.rankings.length > 3)
@@ -6715,7 +6707,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
             ),
           ),
           SizedBox(
-            width: 70,
+            width: 80,
             child: Text(
               award,
               maxLines: 1,
