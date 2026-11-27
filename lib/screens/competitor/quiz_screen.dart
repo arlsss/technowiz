@@ -4470,22 +4470,14 @@ class _QuizScreenState extends State<QuizScreen> {
     final bool publishedWinners = _latestQuizData['publishedWinners'] == true;
 
     if (publishedWinners) {
-      if (_showTieBreakerOverallTally ||
-          (_quizFinishedForContestant &&
-              (!isTieBreakerActive ||
-                  isTieBreakerEnded ||
-                  !isTiedContestant))) {
-        return _buildFinishedCongratulationsScreen(context, currentUid);
-      }
+      return _buildFinishedCongratulationsScreen(context, currentUid);
     } else if (isTieBreakerEnded) {
-      if (_showTieBreakerOverallTally || isThisQuestionConfirmed) {
-        return _buildTieBreakerEndedWaitingScreen(
-          context,
-          _latestQuizData,
-          currentUid,
-          isTiedContestant,
-        );
-      }
+      return _buildTieBreakerEndedWaitingScreen(
+        context,
+        _latestQuizData,
+        currentUid,
+        isTiedContestant,
+      );
     }
 
     if (isTieBreakerActive &&
@@ -5042,35 +5034,38 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   bool _isCurrentlyInTieBreaker() {
-    // 1. If the current question data is explicitly for a regular level, it is NOT tie breaker!
-    final rawLvl = (currentQuestionData?['level'] ?? '').toString().toLowerCase().trim();
-    if (rawLvl.startsWith('level') || currentQuestionData?['isTieBreaker'] == false) {
-      return false;
+    if (_latestQuizData['tieBreakerActive'] == true ||
+        _latestQuizData['tieBreakerEnded'] == true ||
+        _latestQuizData['tieBreakerResolved'] == true) {
+      return true;
     }
-    if (currentQuestionData?['isTieBreaker'] == true || rawLvl == 'tie breaker') {
+    final status =
+        (_latestQuizData['status'] ?? '').toString().toLowerCase().trim();
+    if (status.startsWith('tie_breaker') || status.contains('tie_breaker')) {
+      return true;
+    }
+    final rawLvl = (currentQuestionData?['sessionLevel'] ??
+            currentQuestionData?['level'] ??
+            '')
+        .toString()
+        .toLowerCase()
+        .trim();
+    if (currentQuestionData?['isTieBreaker'] == true ||
+        rawLvl == 'tie breaker') {
       return true;
     }
 
-    // 2. If the current question level is a normal level (> 0), it is NOT tie breaker!
     if (_currentQuestionLevel > 0) {
-      final rawStatus = (_latestQuizData['status'] ?? '').toString().toLowerCase().trim();
-      if (!rawStatus.startsWith('tie_breaker')) {
-        return false;
-      }
+      return false;
     }
 
-    // 3. Check session currentLevel
-    final currentLvl = int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '');
+    final currentLvl =
+        int.tryParse(_latestQuizData['currentLevel']?.toString() ?? '');
     if (currentLvl != null && currentLvl > 0) {
       return false;
     }
 
-    // 4. Check session status and tieBreakerActive flag
-    final status = (_latestQuizData['status'] ?? '').toString().toLowerCase().trim();
-    if (status.startsWith('tie_breaker')) {
-      return true;
-    }
-    return _latestQuizData['tieBreakerActive'] == true;
+    return false;
   }
 
   Widget waitingForNextQuestion({
@@ -5084,327 +5079,17 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     final bool isTieBreakerRound = _isCurrentlyInTieBreaker();
-    final bool isTieBreakerActive = isTieBreakerRound && _latestQuizData['tieBreakerActive'] == true;
+    final bool isTieBreakerActive =
+        isTieBreakerRound || _latestQuizData['tieBreakerActive'] == true;
     final bool isTieBreakerEnded = isTieBreakerRound &&
         (_latestQuizData['tieBreakerEnded'] == true ||
             (_latestQuizData['status'] ?? '').toString().toLowerCase() ==
                 'tie_breaker_ended' ||
             _latestQuizData['tieBreakerResolved'] == true);
 
-    if (isTieBreakerActive || isTieBreakerEnded) {
-      final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
-      final List<String> tiedUids = rawTieUids is List
-          ? rawTieUids
-                .map((e) => e.toString().trim())
-                .where((e) => e.isNotEmpty)
-                .toList()
-          : <String>[];
-      final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-      final bool isContestPending = contestStatus == "pending";
-
-      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _sessionRef.collection('scores').snapshots(),
-        builder: (context, scoreSnap) {
-          final scoreDocs = scoreSnap.data?.docs ?? [];
-          final Map<String, int> tieScores = {};
-          final Map<String, String> namesMap = {};
-
-          for (final doc in scoreDocs) {
-            if (tiedUids.isEmpty || tiedUids.contains(doc.id)) {
-              final sData = doc.data();
-              final int tb =
-                  int.tryParse(sData['tieBreakerScore']?.toString() ?? '') ?? 0;
-              tieScores[doc.id] = tb;
-              final String name = (sData['teamName'] ?? sData['name'] ?? doc.id)
-                  .toString()
-                  .trim();
-              namesMap[doc.id] = name.isNotEmpty ? name : 'Contestant';
-            }
-          }
-
-          int maxTb = -1;
-          int minTb = 999999;
-          String? leadName;
-          for (final uid in tiedUids) {
-            final tb = tieScores[uid] ?? 0;
-            if (tb > maxTb) {
-              maxTb = tb;
-              leadName = namesMap[uid];
-            }
-            if (tb < minTb) {
-              minTb = tb;
-            }
-          }
-
-          // Notice if one contestant got the check/point and the other got wrong,
-          // or tie breaker ended:
-          final bool isNoticeCheckOneWrongOther =
-              (tiedUids.length >= 2 && maxTb > minTb && maxTb > 0) ||
-              isTieBreakerEnded ||
-              _latestQuizData['tieBreakerResolved'] == true;
-
-          if (isNoticeCheckOneWrongOther) {
-            return Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(top: 15),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: primaryGreen, width: 1.8),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryGreen.withValues(alpha: 0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: const BoxDecoration(
-                      color: softGreen,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.emoji_events_rounded,
-                      color: primaryGreen,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "THE TIE BREAKER ENDS",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: darkGreen,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    leadName != null && leadName.isNotEmpty
-                        ? "$leadName scored the winning tie breaker point!"
-                        : "The tie breaker round has ended!",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    isContestPending
-                        ? "Please wait for the Quiz Master to review your contest (approve or reject) before proceeding."
-                        : "Click CONFIRM to view your overall points from each level plus your tie breaker points.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isContestPending
-                          ? Colors.orange.shade900
-                          : const Color(0xFF64748B),
-                      fontSize: 13,
-                      fontWeight: isContestPending
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: isContestPending
-                          ? null
-                          : () {
-                              setState(() {
-                                _showTieBreakerOverallTally = true;
-                                _quizFinishedForContestant = true;
-                                _finishedCongratulationsTabIndex = 1;
-                              });
-                            },
-                      icon: Icon(
-                        isContestPending
-                            ? Icons.hourglass_top_rounded
-                            : Icons.check_circle_rounded,
-                        size: 22,
-                      ),
-                      label: Text(
-                        isContestPending ? "WAITING FOR REVIEW..." : "CONFIRM",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryGreen,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: isContestPending
-                            ? const Color(0xFFFDE68A)
-                            : const Color(0xFFB7D8C0),
-                        disabledForegroundColor: isContestPending
-                            ? const Color(0xFF92400E)
-                            : Colors.white,
-                        elevation: 3,
-                        minimumSize: const Size.fromHeight(54),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // If still tied:
-          final isConfirmed =
-              !isContestPending &&
-              nextReadyConfirmed &&
-              (confirmedQuestionIndex == currentQuestion);
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(top: 15),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isContestPending
-                    ? Colors.orange.shade300
-                    : Colors.amber.shade400,
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (isContestPending ? Colors.orange : Colors.amber)
-                      .withValues(alpha: 0.08),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: isContestPending
-                        ? Colors.orange.shade50
-                        : Colors.amber.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isContestPending
-                        ? Icons.hourglass_top_rounded
-                        : Icons.balance_rounded,
-                    color: isContestPending
-                        ? Colors.orange.shade800
-                        : Colors.amber.shade800,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  isContestPending
-                      ? "CONTEST UNDER REVIEW"
-                      : (isConfirmed
-                            ? "ANDAM NA PARA SA SUNOD!"
-                            : "TIE BREAKER CONTINUES"),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isContestPending
-                        ? Colors.orange.shade800
-                        : (isConfirmed ? darkGreen : Colors.amber.shade900),
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isContestPending
-                      ? "Please wait for the Quiz Master to review your contest (approve or reject) before confirming."
-                      : (isConfirmed
-                            ? "Waiting for the Quiz Master to start the next tie breaker question..."
-                            : "Both contestants are still tied! Click CONFIRM when you are ready for the next tie breaker question."),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isContestPending
-                        ? Colors.orange.shade900
-                        : Colors.black54,
-                    fontSize: 13.5,
-                    fontWeight: isContestPending
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: (isConfirmed || isContestPending)
-                        ? null
-                        : () {
-                            setState(() {
-                              _tieBreakerNextQuestionConfirmed = true;
-                            });
-                            setNextQuestionReady(true);
-                            if (myUid.isNotEmpty) {
-                              _sessionRef
-                                  .collection('join_requests')
-                                  .doc(myUid)
-                                  .set({
-                                    'tieBreakerReady': true,
-                                  }, SetOptions(merge: true));
-                            }
-                          },
-                    icon: Icon(
-                      isContestPending
-                          ? Icons.hourglass_top_rounded
-                          : (isConfirmed
-                                ? Icons.check_circle_rounded
-                                : Icons.check),
-                      size: 20,
-                    ),
-                    label: Text(
-                      isContestPending
-                          ? "WAITING FOR REVIEW..."
-                          : (isConfirmed ? "READY" : "CONFIRM"),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: isContestPending
-                          ? const Color(0xFFFDE68A)
-                          : const Color(0xFFB7D8C0),
-                      disabledForegroundColor: isContestPending
-                          ? const Color(0xFF92400E)
-                          : Colors.white,
-                      minimumSize: const Size.fromHeight(54),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
+    // In tie breaker, remove the confirm card completely.
+    if (isTieBreakerRound || isTieBreakerActive || isTieBreakerEnded) {
+      return const SizedBox.shrink();
     }
 
     final nextQuestionNumber = _getNextQuestionNumberInLevel();
@@ -5547,7 +5232,8 @@ class _QuizScreenState extends State<QuizScreen> {
         !resultRevealed ||
         lastAnswerCorrect ||
         contestStatus != "none" ||
-        previousQuestion < 0) {
+        previousQuestion < 0 ||
+        _isCurrentlyInTieBreaker()) {
       return;
     }
 
@@ -6310,7 +5996,8 @@ class _QuizScreenState extends State<QuizScreen> {
     if (!answered ||
         !resultRevealed ||
         lastAnswerCorrect ||
-        contestStatus != "none") {
+        contestStatus != "none" ||
+        _isCurrentlyInTieBreaker()) {
       return const SizedBox.shrink();
     }
 
@@ -9296,11 +8983,7 @@ class _QuizScreenState extends State<QuizScreen> {
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
 
-          if (isTieBreakerEnded &&
-              !publishedWinners &&
-              (_showTieBreakerOverallTally ||
-                  _quizFinishedForContestant ||
-                  !(answered && resultRevealed))) {
+          if (isTieBreakerEnded && !publishedWinners) {
             return _buildTieBreakerEndedWaitingScreen(
               context,
               quizData,
@@ -9387,16 +9070,6 @@ class _QuizScreenState extends State<QuizScreen> {
             _refreshedQuestionsForTieBreaker = false;
           }
 
-          if (isTieBreakerEnded &&
-              !publishedWinners &&
-              !(answered && resultRevealed)) {
-            return _buildTieBreakerEndedWaitingScreen(
-              context,
-              quizData,
-              currentUid,
-              isTiedContestant,
-            );
-          }
 
           final countdown =
               int.tryParse(quizData['countdown']?.toString() ?? '0') ?? 0;
@@ -9738,19 +9411,12 @@ class _QuizScreenState extends State<QuizScreen> {
           // Once the contestant submits (or time runs out), show the
           // result immediately. Do not let Ready Check or Countdown
           // hide it.
-          if (publishedWinners &&
-              (_showTieBreakerOverallTally ||
-                  (_quizFinishedForContestant &&
-                      (!isTieBreakerActive ||
-                          isTieBreakerEnded ||
-                          !isTiedContestant)))) {
+          if (publishedWinners) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
 
-          if (isTieBreakerEnded &&
-              !publishedWinners &&
-              (_showTieBreakerOverallTally || _quizFinishedForContestant)) {
+          if (isTieBreakerEnded && !publishedWinners) {
             timer?.cancel();
             return _buildTieBreakerEndedWaitingScreen(
               context,
