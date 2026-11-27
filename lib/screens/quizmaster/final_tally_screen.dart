@@ -1122,9 +1122,6 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
 
                           // 1. Map scores by uid
                           final scoreDocs = scoresSnap.data?.docs ?? [];
-                          final Map<String, DocumentSnapshot<Map<String, dynamic>>> scoreDocByUid = {
-                            for (final d in scoreDocs) d.id: d,
-                          };
                           final Map<String, Map<String, dynamic>> scoreByUid = {};
                           for (final d in scoreDocs) {
                             scoreByUid[d.id] = d.data();
