@@ -3493,6 +3493,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       required String fallbackTeamName,
       required int score,
       List<String> fallbackTeamMembers = const [],
+      String fallbackPhotoUrl = '',
     }) {
       final user = users[uid] ?? {};
       final teamName =
@@ -3521,6 +3522,17 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       final isTeam = teamName.isNotEmpty;
       final key = isTeam ? 'team:${teamName.toLowerCase()}' : 'solo:$uid';
 
+      String photoUrl = (user['photoUrl'] ??
+              user['photoURL'] ??
+              user['profileImageUrl'] ??
+              user['avatarUrl'] ??
+              fallbackPhotoUrl)
+          .toString()
+          .trim();
+      if (photoUrl.isEmpty && uid == FirebaseAuth.instance.currentUser?.uid) {
+        photoUrl = profileImageUrl;
+      }
+
       final existing = grouped[key];
       if (existing == null) {
         grouped[key] = {
@@ -3530,6 +3542,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           'teamMembers': isTeam ? members : <String>[],
           'uid': uid,
           'uids': [uid],
+          'photoUrl': photoUrl,
         };
       } else {
         existing['score'] = _scoreToInt(existing['score']) + score;
@@ -3550,6 +3563,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
         if (!currentUids.contains(uid)) {
           currentUids.add(uid);
           existing['uids'] = currentUids;
+        }
+
+        if ((existing['photoUrl'] == null ||
+                existing['photoUrl'].toString().trim().isEmpty) &&
+            photoUrl.isNotEmpty) {
+          existing['photoUrl'] = photoUrl;
         }
       }
     }
@@ -3573,6 +3592,12 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ? _parseTeamMemberList(rawMembers)
           : <String>[];
 
+      final docPhoto = (data['photoUrl'] ??
+              data['photoURL'] ??
+              data['profileImageUrl'] ??
+              '')
+          .toString();
+
       addParticipant(
         uid: uid,
         fallbackName:
@@ -3580,6 +3605,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
         fallbackTeamName: data['teamName']?.toString() ?? '',
         score: 0,
         fallbackTeamMembers: requestMembers,
+        fallbackPhotoUrl: docPhoto,
       );
     }
 
@@ -3603,11 +3629,31 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
       final score = _scoreToInt(data['score']);
       if (grouped.containsKey(key)) {
         grouped[key]!['score'] = score;
+        if (grouped[key]!['photoUrl'] == null ||
+            grouped[key]!['photoUrl'].toString().trim().isEmpty) {
+          final p = (user['photoUrl'] ??
+                  user['photoURL'] ??
+                  user['profileImageUrl'] ??
+                  user['avatarUrl'] ??
+                  data['photoUrl'] ??
+                  data['photoURL'] ??
+                  data['profileImageUrl'] ??
+                  '')
+              .toString()
+              .trim();
+          if (p.isNotEmpty) grouped[key]!['photoUrl'] = p;
+        }
       } else {
         final rawMembers = data['teamMembers'] ?? data['members'];
         final scoreMembers = rawMembers is List
             ? _parseTeamMemberList(rawMembers)
             : <String>[];
+
+        final docPhoto = (data['photoUrl'] ??
+                data['photoURL'] ??
+                data['profileImageUrl'] ??
+                '')
+            .toString();
 
         addParticipant(
           uid: uid,
@@ -3615,6 +3661,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           fallbackTeamName: teamName,
           score: score,
           fallbackTeamMembers: scoreMembers,
+          fallbackPhotoUrl: docPhoto,
         );
       }
     }
@@ -3934,7 +3981,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.emoji_events_outlined,
+                Icons.leaderboard_outlined,
                 size: 28,
                 color: Color(0xFF94A3B8),
               ),
@@ -4947,11 +4994,6 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
   }) {
     final nonNullTier = tier;
     final bool isFirst = rank == 1;
-    final trophyAsset = rank == 1
-        ? 'assets/trophies/gold_trophy_3d.jpg'
-        : (rank == 2
-              ? 'assets/trophies/silver_trophy_3d.jpg'
-              : 'assets/trophies/bronze_trophy_3d.jpg');
 
     final rankColor = rank == 1
         ? const Color(0xFFF59E0B)
@@ -4983,7 +5025,7 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 3D Trophy Circle Avatar
+        // Contestant Profile Circle Avatar (Replaces Trophy)
         Container(
           width: isFirst ? 58 : 50,
           height: isFirst ? 58 : 50,
@@ -5000,14 +5042,11 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
           child: ClipOval(
             child: hasEntries
-                ? Image.asset(
-                    trophyAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Icon(
-                      Icons.emoji_events_rounded,
-                      size: isFirst ? 30 : 24,
-                      color: rankColor,
-                    ),
+                ? _buildPodiumContestantAvatar(
+                    tier: nonNullTier,
+                    rank: rank,
+                    rankColor: rankColor,
+                    isFirst: isFirst,
                   )
                 : Container(
                     color: const Color(0xFFF1F5F9),
@@ -5172,6 +5211,71 @@ class _CompetitorDashboardState extends State<CompetitorDashboard> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPodiumContestantAvatar({
+    required _PodiumTierData tier,
+    required int rank,
+    required Color rankColor,
+    required bool isFirst,
+  }) {
+    final entries = tier.entries;
+    final isTied = tier.isTied;
+
+    String photoUrl = '';
+    for (final e in entries) {
+      final p = (e['photoUrl'] ?? e['profileImageUrl'] ?? '').toString().trim();
+      if (p.isNotEmpty && (p.startsWith('http://') || p.startsWith('https://'))) {
+        photoUrl = p;
+        break;
+      }
+    }
+
+    final primaryEntry =
+        entries.isNotEmpty ? entries.first : <String, dynamic>{};
+    final bool isTeam = primaryEntry['isTeam'] == true;
+
+    if (photoUrl.isNotEmpty) {
+      return Image.network(
+        photoUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildPodiumAvatarFallback(
+          isTeam: isTeam,
+          isTied: isTied,
+          isFirst: isFirst,
+          rankColor: rankColor,
+        ),
+      );
+    }
+
+    return _buildPodiumAvatarFallback(
+      isTeam: isTeam,
+      isTied: isTied,
+      isFirst: isFirst,
+      rankColor: rankColor,
+    );
+  }
+
+  Widget _buildPodiumAvatarFallback({
+    required bool isTeam,
+    required bool isTied,
+    required bool isFirst,
+    required Color rankColor,
+  }) {
+    final IconData icon = (isTeam || isTied)
+        ? Icons.groups_rounded
+        : Icons.person_rounded;
+
+    return Container(
+      color: const Color(0xFFF1F5F9),
+      child: Center(
+        child: Icon(
+          icon,
+          size: isFirst ? 28 : 24,
+          color: rankColor,
+        ),
+      ),
     );
   }
 
