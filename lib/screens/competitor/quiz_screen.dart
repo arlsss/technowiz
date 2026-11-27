@@ -7488,7 +7488,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 size: 24,
                                               ),
                                               label: const Text(
-                                                "OVERALL TALLY",
+                                                "FINAL TALLY",
                                                 style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w900,
@@ -7687,7 +7687,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   size: 22,
                                                 ),
                                                 label: const Text(
-                                                  "OVERALL TALLY",
+                                                  "FINAL TALLY",
                                                   style: TextStyle(
                                                     fontSize: 15.5,
                                                     fontWeight: FontWeight.w800,
@@ -11018,7 +11018,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                           width: 8,
                                                         ),
                                                         Text(
-                                                          "OVERALL TALLY",
+                                                          "FINAL TALLY",
                                                           style: TextStyle(
                                                             fontSize: 13,
                                                             fontWeight:
@@ -11638,7 +11638,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "OVERALL TALLY",
+                      "FINAL TALLY",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,

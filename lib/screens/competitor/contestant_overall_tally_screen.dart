@@ -65,7 +65,7 @@ class _ContestantOverallTallyScreenState
               Icon(Icons.analytics_rounded, color: primaryGreen, size: 22),
               SizedBox(width: 8),
               Text(
-                'OVERALL TALLY',
+                'FINAL TALLY',
                 style: TextStyle(
                   color: textDark,
                   fontSize: 18,
