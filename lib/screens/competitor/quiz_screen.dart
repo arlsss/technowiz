@@ -11629,83 +11629,45 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFF59E0B),
-                            width: 2,
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.emoji_events_rounded,
+                            size: 14,
+                            color: Color(0xFFD97706),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xFFF59E0B,
-                              ).withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/trophies/gold_trophy_3d.jpg',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const Icon(
-                              Icons.emoji_events_rounded,
-                              color: Color(0xFFF59E0B),
-                              size: 24,
+                          SizedBox(width: 5),
+                          Text(
+                            "TOURNAMENT CHAMPION",
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                              color: Color(0xFFB45309),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.emoji_events_rounded,
-                                  size: 13,
-                                  color: Color(0xFFD97706),
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  "TOURNAMENT CHAMPION",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                    color: Color(0xFFB45309),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              winner.name,
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              "${winner.totalScore} ${winner.totalScore == 1 ? 'PT' : 'PTS'} • 1ST PLACE",
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFD97706),
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 2),
+                      Text(
+                        winner.name,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        "${winner.totalScore} ${winner.totalScore == 1 ? 'PT' : 'PTS'} • 1ST PLACE",
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFD97706),
                         ),
                       ),
                     ],
