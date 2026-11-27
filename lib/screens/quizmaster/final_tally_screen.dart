@@ -2172,79 +2172,98 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
       ),
       child: Row(
         children: [
-          // TIE BREAKER BUTTON: Only shown if a tie is detected
-          if (hasAnyTie) ...[
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () => _handleTieBreaker(contestants),
-                  icon: Icon(
-                    Icons.balance_rounded,
-                    color: Colors.amber.shade900,
-                    size: 20,
+          // TIE BREAKER BUTTON: Clickable only when there is a tie
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed:
+                    hasAnyTie ? () => _handleTieBreaker(contestants) : null,
+                icon: Icon(
+                  Icons.balance_rounded,
+                  color: hasAnyTie
+                      ? Colors.amber.shade900
+                      : const Color(0xFF94A3B8),
+                  size: 20,
+                ),
+                label: Text(
+                  'TIE BREAKER',
+                  style: TextStyle(
+                    color: hasAnyTie
+                        ? Colors.amber.shade900
+                        : const Color(0xFF94A3B8),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
-                  label: Text(
-                    'TIE BREAKER',
-                    style: TextStyle(
-                      color: Colors.amber.shade900,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: hasAnyTie
+                      ? const Color(0xFFFFFBEB)
+                      : const Color(0xFFF1F5F9),
+                  side: BorderSide(
+                    color: hasAnyTie
+                        ? Colors.amber.shade400
+                        : const Color(0xFFCBD5E1),
+                    width: 1.5,
                   ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFFBEB),
-                    side: BorderSide(color: Colors.amber.shade400, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-          ],
+          ),
+          const SizedBox(width: 12),
 
-          // PUBLISH WINNERS BUTTON (or LEVEL RESULTS if intermediate)
+          // PUBLISH WINNERS BUTTON: Clickable only when there is NO tie
           Expanded(
             child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: widget.isFinal
-                    ? _confirmFinishQuiz
-                    : () async {
-                        if (widget.onProceedToNextLevel != null) {
-                          await widget.onProceedToNextLevel!();
-                        }
-                        if (!mounted) return;
-                        Navigator.of(context).pushReplacement(
-                          PageRouteBuilder<void>(
-                            pageBuilder: (_, _, _) => FinalRankingScreen(
-                              quizCode: widget.quizCode,
-                              level: widget.level,
-                              isFinal: false,
-                            ),
-                            transitionDuration: Duration.zero,
-                            reverseTransitionDuration: Duration.zero,
-                          ),
-                        );
-                      },
+                onPressed: !hasAnyTie
+                    ? (widget.isFinal
+                        ? _confirmFinishQuiz
+                        : () async {
+                            if (widget.onProceedToNextLevel != null) {
+                              await widget.onProceedToNextLevel!();
+                            }
+                            if (!mounted) return;
+                            Navigator.of(context).pushReplacement(
+                              PageRouteBuilder<void>(
+                                pageBuilder: (_, _, _) => FinalRankingScreen(
+                                  quizCode: widget.quizCode,
+                                  level: widget.level,
+                                  isFinal: false,
+                                ),
+                                transitionDuration: Duration.zero,
+                                reverseTransitionDuration: Duration.zero,
+                              ),
+                            );
+                          })
+                    : null,
                 icon: Icon(
                   widget.isFinal
                       ? Icons.emoji_events_rounded
                       : Icons.skip_next_rounded,
                   size: 20,
+                  color: !hasAnyTie ? Colors.white : const Color(0xFF94A3B8),
                 ),
                 label: Text(
                   widget.isFinal ? 'PUBLISH WINNERS' : 'LEVEL RESULTS',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
+                    color: !hasAnyTie ? Colors.white : const Color(0xFF94A3B8),
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: QuizMasterColors.primaryBlue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: !hasAnyTie
+                      ? QuizMasterColors.primaryBlue
+                      : const Color(0xFFE2E8F0),
+                  foregroundColor:
+                      !hasAnyTie ? Colors.white : const Color(0xFF94A3B8),
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  disabledForegroundColor: const Color(0xFF94A3B8),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
