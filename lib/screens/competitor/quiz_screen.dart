@@ -4617,7 +4617,8 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
 
-    if (isTieBreakerActive &&
+    final bool inTieBreakerScreen = isTieBreakerActive || _isCurrentlyInTieBreaker();
+    if (inTieBreakerScreen &&
         !isTieBreakerEnded &&
         !_showTieBreakerOverallTally &&
         _tieBreakerNextQuestionConfirmed) {
@@ -5437,13 +5438,13 @@ class _QuizScreenState extends State<QuizScreen> {
                 Icon(
                   isConfirmed
                       ? Icons.check_circle_rounded
-                      : Icons.play_circle_outline_rounded,
+                      : Icons.arrow_circle_right_outlined,
                   color: primaryGreen,
                   size: 44,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  isConfirmed ? "YOU ARE READY!" : "YOU ARE READY?",
+                  "NEXT QUESTION",
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: darkGreen,
@@ -5455,7 +5456,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 Text(
                   isConfirmed
                       ? "Waiting for the Quiz Master to start the next tie breaker question."
-                      : "Review your result above, then tap CONFIRM when you are ready for the next question.",
+                      : "No winner yet. Review your result above, then tap NEXT when you are ready for another tie breaker question.",
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.grey,
@@ -5471,6 +5472,9 @@ class _QuizScreenState extends State<QuizScreen> {
                         ? null
                         : () {
                             setNextQuestionReady(true);
+                            setState(() {
+                              _tieBreakerNextQuestionConfirmed = true;
+                            });
                             if (myUid.isNotEmpty) {
                               _sessionRef
                                   .collection('join_requests')
@@ -5481,17 +5485,29 @@ class _QuizScreenState extends State<QuizScreen> {
                                     'resultConfirmedQuestion': currentQuestion,
                                     'nextQuestionReady': true,
                                   }, SetOptions(merge: true));
+                              _sessionRef
+                                  .collection('scores')
+                                  .doc(myUid)
+                                  .set({
+                                    'tieBreakerReady': true,
+                                    'resultConfirmed': true,
+                                    'resultConfirmedQuestion': currentQuestion,
+                                    'nextQuestionReady': true,
+                                  }, SetOptions(merge: true));
                             }
                           },
                     icon: Icon(
-                      isConfirmed ? Icons.check_circle_rounded : Icons.check,
+                      isConfirmed
+                          ? Icons.check_circle_rounded
+                          : Icons.arrow_forward_rounded,
                       size: 20,
                     ),
                     label: Text(
-                      isConfirmed ? "READY" : "CONFIRM",
+                      isConfirmed ? "READY" : "NEXT",
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -9965,7 +9981,8 @@ class _QuizScreenState extends State<QuizScreen> {
                         'tie_breaker_ended' ||
                     _latestQuizData['tieBreakerResolved'] == true);
 
-            if (isTieBreakerActive &&
+            final bool inTieBreakerScreen = isTieBreakerActive || _isCurrentlyInTieBreaker();
+            if (inTieBreakerScreen &&
                 !isTieBreakerEnded &&
                 !_showTieBreakerOverallTally &&
                 _tieBreakerNextQuestionConfirmed) {
