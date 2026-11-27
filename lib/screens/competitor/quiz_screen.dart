@@ -6536,7 +6536,8 @@ class _QuizScreenState extends State<QuizScreen> {
         .collection('scores')
         .doc(uid);
 
-    final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
+    final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true ||
+        _isCurrentlyInTieBreaker();
     final int targetLevel =
         (level != null && level > 0) ? level : getLevelFromQuestionNumber(questionNumber);
     final String levelKey = 'level${targetLevel}Score';
@@ -6645,6 +6646,7 @@ class _QuizScreenState extends State<QuizScreen> {
         'score': effectiveScore,
         'totalScore': effectiveScore,
         'tieBreakerScore': newTieBreaker,
+        'tie_breaker_score': newTieBreaker,
         'currentLevel': targetLevel,
         'lastQuestion': questionNumber,
         'lastPoints': points,

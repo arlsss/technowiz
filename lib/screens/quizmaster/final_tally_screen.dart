@@ -1224,9 +1224,17 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                               lvlSum += pts;
                             }
 
-                            final tiePts = int.tryParse(
-                              sData['tieBreakerScore']?.toString() ?? '',
+                            int tiePts = int.tryParse(
+                              (sData['tieBreakerScore'] ??
+                               sData['tie_breaker_score'] ??
+                               sData['tbScore'] ??
+                               sData['tieScore'] ??
+                               data['tieBreakerScore'] ??
+                               data['tie_breaker_score'])?.toString() ?? '',
                             ) ?? 0;
+                            if (tiePts == 0 && stored > lvlSum) {
+                              tiePts = stored - lvlSum;
+                            }
 
                             final rawScore = sData['totalScore'] ?? sData['score'];
                             final stored = rawScore is num

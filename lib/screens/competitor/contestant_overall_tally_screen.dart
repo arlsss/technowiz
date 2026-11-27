@@ -261,9 +261,17 @@ class _ContestantOverallTallyScreenState
                           levelSum += pts;
                         }
 
-                        final tiePts = _extractNumber(sData['tieBreakerScore']);
-                        int totalScore = levelSum + tiePts;
+                        int tiePts = _extractNumber(sData['tieBreakerScore'] ??
+                            sData['tie_breaker_score'] ??
+                            sData['tbScore'] ??
+                            sData['tieScore'] ??
+                            jData['tieBreakerScore'] ??
+                            jData['tie_breaker_score']);
                         final storedScore = _extractNumber(sData['score'] ?? sData['totalScore']);
+                        if (tiePts == 0 && storedScore > levelSum) {
+                          tiePts = storedScore - levelSum;
+                        }
+                        int totalScore = levelSum + tiePts;
                         if (totalScore == 0 && storedScore > 0) {
                           totalScore = storedScore;
                         }
@@ -345,6 +353,7 @@ class _ContestantOverallTallyScreenState
                                       int tbCorrect = 0;
                                       int tbWrong = 0;
                                       int tbContest = 0;
+                                      int tbPointsFromResponses = 0;
 
                                       for (final doc in responseDocs) {
                                         final data = doc.data();
@@ -373,7 +382,11 @@ class _ContestantOverallTallyScreenState
                                                 data['contested'] == true;
 
                                         if (isTb) {
-                                          if (isCorrect) tbCorrect++;
+                                          if (isCorrect) {
+                                            tbCorrect++;
+                                            final int p = _extractNumber(data['points']);
+                                            tbPointsFromResponses += (p > 0 ? p : 1);
+                                          }
                                           if (isWrong) tbWrong++;
                                           if (isContest) tbContest++;
                                           continue;
@@ -407,8 +420,14 @@ class _ContestantOverallTallyScreenState
                                         }
                                       }
 
+                                      final int effectiveTbPoints = myParticipant!.tieBreakerPoints > 0
+                                          ? myParticipant.tieBreakerPoints
+                                          : (tbPointsFromResponses > 0
+                                              ? tbPointsFromResponses
+                                              : tbCorrect);
+
                                       return _buildMyTallyCard(
-                                        me: myParticipant!,
+                                        me: myParticipant,
                                         sortedLevels: sortedLevels,
                                         correctByLevel: correctByLevel,
                                         wrongByLevel: wrongByLevel,
@@ -416,6 +435,7 @@ class _ContestantOverallTallyScreenState
                                         tbCorrect: tbCorrect,
                                         tbWrong: tbWrong,
                                         tbContest: tbContest,
+                                        effectiveTbPoints: effectiveTbPoints,
                                       );
                                     },
                                   )
@@ -468,7 +488,15 @@ class _ContestantOverallTallyScreenState
     required int tbCorrect,
     required int tbWrong,
     required int tbContest,
+    int effectiveTbPoints = 0,
   }) {
+    int levelPointsSum = 0;
+    for (final pts in me.levelPoints.values) {
+      levelPointsSum += pts;
+    }
+    final int displayedTotal = (me.totalScore < levelPointsSum + effectiveTbPoints)
+        ? (levelPointsSum + effectiveTbPoints)
+        : me.totalScore;
     final displayName = me.isTeam
         ? (me.teamName.isNotEmpty ? me.teamName : me.name)
         : me.name;
@@ -642,7 +670,7 @@ class _ContestantOverallTallyScreenState
                   ],
                 ),
                 Text(
-                  "${me.totalScore} ${me.totalScore == 1 ? 'PT' : 'PTS'}",
+                  "$displayedTotal ${displayedTotal == 1 ? 'PT' : 'PTS'}",
                   style: const TextStyle(
                     color: primaryGreen,
                     fontSize: 22,
@@ -684,13 +712,13 @@ class _ContestantOverallTallyScreenState
             ),
             const SizedBox(height: 10),
           ],
-          if (me.tieBreakerPoints > 0 ||
+          if (effectiveTbPoints > 0 ||
               tbCorrect > 0 ||
               tbWrong > 0 ||
               tbContest > 0) ...[
             _buildLevelBreakdownCard(
               title: "Tie Breaker",
-              points: me.tieBreakerPoints,
+              points: effectiveTbPoints,
               correct: tbCorrect,
               wrong: tbWrong,
               contest: tbContest,
