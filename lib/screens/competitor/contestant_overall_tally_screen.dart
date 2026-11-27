@@ -7,11 +7,13 @@ import 'technowiz_theme.dart';
 class ContestantOverallTallyScreen extends StatefulWidget {
   final String quizCode;
   final int? currentLevel;
+  final bool fromTieBreakerEnd;
 
   const ContestantOverallTallyScreen({
     super.key,
     required this.quizCode,
     this.currentLevel,
+    this.fromTieBreakerEnd = false,
   });
 
   @override
@@ -121,7 +123,10 @@ class _ContestantOverallTallyScreenState
               final bool isTiedContestant =
                   tieBreakerContestantUids.contains(_currentUid);
 
-              if (isTieBreakerActive && !isTieBreakerEnded && isTiedContestant) {
+              if (!widget.fromTieBreakerEnd &&
+                  isTieBreakerActive &&
+                  !isTieBreakerEnded &&
+                  isTiedContestant) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (context.mounted) {
                     Navigator.of(context).pop();
