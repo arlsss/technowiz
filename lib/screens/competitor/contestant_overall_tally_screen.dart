@@ -8,12 +8,14 @@ class ContestantOverallTallyScreen extends StatefulWidget {
   final String quizCode;
   final int? currentLevel;
   final bool fromTieBreakerEnd;
+  final bool showBackButton;
 
   const ContestantOverallTallyScreen({
     super.key,
     required this.quizCode,
     this.currentLevel,
     this.fromTieBreakerEnd = false,
+    this.showBackButton = false,
   });
 
   @override
@@ -47,36 +49,41 @@ class _ContestantOverallTallyScreenState
 
     return TechCircuitBackground(
       baseColor: lightGreen,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
+      child: PopScope(
+        canPop: widget.showBackButton,
+        child: Scaffold(
           backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: primaryGreen),
-            tooltip: 'Back to Quiz',
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          title: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.analytics_rounded, color: primaryGreen, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'OVERALL TALLY',
-                style: TextStyle(
-                  color: textDark,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            centerTitle: true,
+            automaticallyImplyLeading: false,
+            leading: widget.showBackButton
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                        color: primaryGreen),
+                    tooltip: 'Back to Quiz',
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : null,
+            title: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.analytics_rounded, color: primaryGreen, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'FINAL TALLY',
+                  style: TextStyle(
+                    color: textDark,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           actions: [
             Container(
               margin: const EdgeInsets.only(right: 14),
@@ -442,6 +449,7 @@ class _ContestantOverallTallyScreenState
                 },
               );
             },
+          ),
           ),
         ),
       ),

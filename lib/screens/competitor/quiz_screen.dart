@@ -4121,7 +4121,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               ),
                             ] else ...[
                               // ==========================================
-                              // TAB 1: CURRENT STANDINGS (OVERALL TALLY)
+                              // TAB 1: CURRENT STANDINGS (FINAL TALLY)
                               // ==========================================
                               Container(
                                 width: double.infinity,
@@ -7901,7 +7901,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 size: 24,
                                               ),
                                               label: const Text(
-                                                "OVERALL TALLY",
+                                                "FINAL TALLY",
                                                 style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w900,
@@ -8100,7 +8100,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   size: 22,
                                                 ),
                                                 label: const Text(
-                                                  "OVERALL TALLY",
+                                                  "FINAL TALLY",
                                                   style: TextStyle(
                                                     fontSize: 15.5,
                                                     fontWeight: FontWeight.w800,
@@ -8130,6 +8130,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                                 widget.quizCode,
                                                             currentLevel:
                                                                 currentLevel,
+                                                            showBackButton: false,
                                                           ),
                                                     ),
                                                   );
@@ -11970,7 +11971,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                             ),
                                           )
                                         // ==========================================
-                                        // TAB 1: OVERALL TALLY CARD
+                                        // TAB 1: FINAL TALLY CARD
                                         // ==========================================
                                         else
                                           _buildFinishedOverallTallyCard(
@@ -11999,7 +12000,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   // ==========================================================
-  // FINISHED OVERALL TALLY CARD (All Contestants Standings & Levels)
+  // FINISHED FINAL TALLY CARD (All Contestants Standings & Levels)
   // ==========================================================
   Widget _buildFinishedOverallTallyCard({
     required BuildContext context,
