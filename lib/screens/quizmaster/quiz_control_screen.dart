@@ -3558,7 +3558,16 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   s.id,
             };
 
+            final isTB = _isTieBreakerActive;
+            final rawTiedUids = _quizData?['tieBreakerContestantUids'];
+            final tiedUids = rawTiedUids is List
+                ? rawTiedUids.map((e) => e.toString()).toSet()
+                : <String>{};
+
             final docs = rawRequests.where((doc) {
+              if (isTB && !tiedUids.contains(doc.id)) {
+                return false;
+              }
               final data = doc.data();
               final status = (data['status'] ?? '')
                   .toString()
@@ -4179,8 +4188,15 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       return data['ready'] == true;
     }
 
-    return data['resultConfirmed'] == true &&
-        _asInt(data['resultConfirmedQuestion']) == _currentQuestion;
+    final confirmedQ = _asInt(data['resultConfirmedQuestion']);
+    final isResultConfirmed = data['resultConfirmed'] == true;
+    if (isResultConfirmed && (confirmedQ == _currentQuestion || confirmedQ == (_currentQuestion - 1))) {
+      return true;
+    }
+    if (_isTieBreakerActive && (data['tieBreakerReady'] == true || isResultConfirmed)) {
+      return true;
+    }
+    return false;
   }
 
   bool _isDocEliminated(
@@ -4910,7 +4926,16 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                   s.id,
             };
 
+            final isTB = _isTieBreakerActive;
+            final rawTiedUids = _quizData?['tieBreakerContestantUids'];
+            final tiedUids = rawTiedUids is List
+                ? rawTiedUids.map((e) => e.toString()).toSet()
+                : <String>{};
+
             final docs = rawRequests.where((doc) {
+              if (isTB && !tiedUids.contains(doc.id)) {
+                return false;
+              }
               final data = doc.data();
               final status = (data['status'] ?? '')
                   .toString()

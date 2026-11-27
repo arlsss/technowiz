@@ -4483,7 +4483,7 @@ class _QuizScreenState extends State<QuizScreen> {
     if (isTieBreakerActive &&
         !isTieBreakerEnded &&
         !_showTieBreakerOverallTally &&
-        (_tieBreakerNextQuestionConfirmed || isThisQuestionConfirmed)) {
+        _tieBreakerNextQuestionConfirmed) {
       return _buildTieBreakerPreparationScreen(
         context,
         _latestQuizData,
@@ -4494,8 +4494,8 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
 
-    if (isTieBreakerEnded) {
-      // Stay on the result screen so contestant sees their points earned!
+    if (isTieBreakerActive || isTieBreakerEnded) {
+      // In tie breaker, stay on the result screen so contestants can review answers and confirm!
     } else {
       if (isLastQuestionInLevel && isThisQuestionConfirmed) {
         return levelPauseScreen(currentLevel);
@@ -5087,12 +5087,14 @@ class _QuizScreenState extends State<QuizScreen> {
                 'tie_breaker_ended' ||
             _latestQuizData['tieBreakerResolved'] == true);
 
-    // In tie breaker, remove the confirm card completely.
-    if (isTieBreakerRound || isTieBreakerActive || isTieBreakerEnded) {
+    // If the tie breaker ended, there is no next question to confirm.
+    if (isTieBreakerEnded) {
       return const SizedBox.shrink();
     }
 
-    final nextQuestionNumber = _getNextQuestionNumberInLevel();
+    final nextQuestionNumber = isTieBreakerActive
+        ? (currentQuestion + 1)
+        : _getNextQuestionNumberInLevel();
     final bool isContestPending = contestStatus == "pending";
     final bool isConfirmed =
         !isContestPending &&
@@ -5123,7 +5125,7 @@ class _QuizScreenState extends State<QuizScreen> {
             size: 44,
           ),
           const SizedBox(height: 10),
-          if (!isLastQuestionInLevel) ...[
+          if (!isLastQuestionInLevel || isTieBreakerActive) ...[
             Text(
               isContestPending
                   ? "CONTEST UNDER REVIEW"
@@ -5140,18 +5142,22 @@ class _QuizScreenState extends State<QuizScreen> {
           Text(
             isContestPending
                 ? "Please wait for the Quiz Master to review your contest (approve or reject) before confirming."
-                : (isLastQuestionInLevel
+                : (isTieBreakerActive
                       ? (isConfirmed
-                            ? "Waiting for the Quiz Master to show the Level $currentLevel results."
-                            : "Please see the Level $currentLevel results.")
-                      : (isConfirmed
-                            ? "Waiting for the Quiz Master to start Question $nextQuestionNumber."
-                            : "Review the result above, then press CONFIRM when you are ready for the next question.")),
+                            ? "Waiting for the Quiz Master to start the next tie breaker question."
+                            : "Review your result above, then tap CONFIRM when you are ready for the next question.")
+                      : (isLastQuestionInLevel
+                            ? (isConfirmed
+                                  ? "Waiting for the Quiz Master to show the Level $currentLevel results."
+                                  : "Please see the Level $currentLevel results.")
+                            : (isConfirmed
+                                  ? "Waiting for the Quiz Master to start Question $nextQuestionNumber."
+                                  : "Review the result above, then press CONFIRM when you are ready for the next question."))),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isContestPending ? Colors.orange.shade900 : Colors.grey,
-              fontSize: isLastQuestionInLevel ? 22 : 15,
-              fontWeight: (isLastQuestionInLevel || isContestPending)
+              fontSize: (isLastQuestionInLevel && !isTieBreakerActive) ? 22 : 15,
+              fontWeight: ((isLastQuestionInLevel && !isTieBreakerActive) || isContestPending)
                   ? FontWeight.w600
                   : FontWeight.normal,
               height: 1.4,
@@ -5164,7 +5170,7 @@ class _QuizScreenState extends State<QuizScreen> {
               onPressed: (isConfirmed || isContestPending)
                   ? null
                   : () {
-                      if (isLastQuestionInLevel) {
+                      if (isLastQuestionInLevel && !isTieBreakerActive) {
                         setState(() {
                           nextReadyConfirmed = true;
                           confirmedQuestionIndex = currentQuestion;
@@ -5174,13 +5180,15 @@ class _QuizScreenState extends State<QuizScreen> {
                         setNextQuestionReady(true);
                         final myUid =
                             FirebaseAuth.instance.currentUser?.uid ?? '';
-                        if (_latestQuizData['tieBreakerActive'] == true &&
-                            myUid.isNotEmpty) {
+                        if (isTieBreakerActive && myUid.isNotEmpty) {
                           _sessionRef
                               .collection('join_requests')
                               .doc(myUid)
                               .set({
                                 'tieBreakerReady': true,
+                                'resultConfirmed': true,
+                                'resultConfirmedQuestion': currentQuestion,
+                                'nextQuestionReady': true,
                               }, SetOptions(merge: true));
                         }
                       }
@@ -5195,8 +5203,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 isContestPending
                     ? "WAITING FOR REVIEW..."
                     : (isConfirmed
-                          ? (isLastQuestionInLevel ? "NEXT" : "READY")
-                          : (isLastQuestionInLevel ? "NEXT" : "CONFIRM")),
+                          ? (isLastQuestionInLevel && !isTieBreakerActive ? "NEXT" : "READY")
+                          : (isLastQuestionInLevel && !isTieBreakerActive ? "NEXT" : "CONFIRM")),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
