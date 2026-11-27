@@ -1936,157 +1936,47 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   }
 
   Widget _buildRankBadge(int rank, bool isTied) {
-    Widget badgeWidget;
+    Color rankBadgeColor;
+    Color rankTextColor;
+    Color rankBorderColor;
 
-    if (rank <= 3) {
-      final trophyAsset = rank == 1
-          ? 'assets/trophies/gold_trophy_3d.jpg'
-          : (rank == 2
-              ? 'assets/trophies/silver_trophy_3d.jpg'
-              : 'assets/trophies/bronze_trophy_3d.jpg');
-
-      final rankColor = rank == 1
-          ? const Color(0xFFF59E0B)
-          : (rank == 2 ? const Color(0xFF94A3B8) : const Color(0xFFD97706));
-
-      badgeWidget = Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: rankColor, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: rankColor.withValues(alpha: 0.35),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                trophyAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Icon(
-                  rank == 1
-                      ? Icons.emoji_events_rounded
-                      : (rank == 2
-                          ? Icons.military_tech_rounded
-                          : Icons.workspace_premium_rounded),
-                  size: 20,
-                  color: rankColor,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -2,
-            right: -3,
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: rankColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$rank',
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    } else if (rank >= 4 && rank <= 10) {
-      const badgeAsset = 'assets/trophies/top10_badge_3d.jpg';
-      const rankColor = Color(0xFF22C55E);
-
-      badgeWidget = Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: rankColor, width: 1.8),
-              boxShadow: [
-                BoxShadow(
-                  color: rankColor.withValues(alpha: 0.25),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1.5),
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                badgeAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Icon(
-                  Icons.workspace_premium_rounded,
-                  size: 18,
-                  color: rankColor,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -2,
-            right: -3,
-            child: Container(
-              width: 15,
-              height: 15,
-              decoration: BoxDecoration(
-                color: rankColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.2),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$rank',
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
+    if (rank == 1) {
+      rankBadgeColor = const Color(0xFFFEF3C7);
+      rankTextColor = const Color(0xFFB45309);
+      rankBorderColor = const Color(0xFFF59E0B);
+    } else if (rank == 2) {
+      rankBadgeColor = const Color(0xFFF1F5F9);
+      rankTextColor = const Color(0xFF475569);
+      rankBorderColor = const Color(0xFF94A3B8);
+    } else if (rank == 3) {
+      rankBadgeColor = const Color(0xFFFFEDD5);
+      rankTextColor = const Color(0xFFC2410C);
+      rankBorderColor = const Color(0xFFF97316);
     } else {
-      badgeWidget = Container(
-        width: 28,
-        height: 28,
-        decoration: const BoxDecoration(
-          color: Color(0xFFE2E8F0),
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Text(
-            '$rank',
-            style: const TextStyle(
-              color: QuizMasterColors.darkBlue,
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      );
+      rankBadgeColor = const Color(0xFFF8FAFC);
+      rankTextColor = QuizMasterColors.darkBlue;
+      rankBorderColor = const Color(0xFFCBD5E1);
     }
+
+    final Widget badgeWidget = Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: rankBadgeColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: rankBorderColor, width: 1.5),
+      ),
+      child: Text(
+        '$rank',
+        style: TextStyle(
+          color: rankTextColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+      ),
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
