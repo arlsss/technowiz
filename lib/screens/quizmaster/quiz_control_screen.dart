@@ -5080,9 +5080,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   Future<void> _confirmNextQuestion() async {
     if (_isAdvancingQuestion || _isFinished) return;
 
-    // Show the warning only when NO approved contestant has confirmed
-    // the current result/readiness. If at least one has confirmed, proceed
-    // directly without showing the dialog.
     try {
       final quizDoc = await _getQuizSession();
       if (quizDoc == null || !mounted) return;
@@ -5102,25 +5099,117 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             s.id,
       };
 
-      final activeDocs = requests.docs.where((doc) {
-        final data = doc.data();
-        final status = (data['status'] ?? '').toString().trim().toLowerCase();
-        if (status != 'approved' &&
-            status != 'proceeding' &&
-            status.isNotEmpty) {
-          return false;
-        }
-        return !_isDocEliminated(doc, eliminatedScoreIds);
-      }).toList();
+      final List<QueryDocumentSnapshot<Map<String, dynamic>>> activeDocs;
+      if (_isTieBreakerActive) {
+        final rawTiedUids = _quizData?['tieBreakerContestantUids'];
+        final tiedUids = rawTiedUids is List
+            ? rawTiedUids.map((e) => e.toString()).toSet()
+            : <String>{};
+        activeDocs = requests.docs.where((doc) {
+          if (!tiedUids.contains(doc.id)) return false;
+          return !_isDocEliminated(doc, eliminatedScoreIds);
+        }).toList();
+      } else {
+        activeDocs = requests.docs.where((doc) {
+          final data = doc.data();
+          final status = (data['status'] ?? '').toString().trim().toLowerCase();
+          if (status != 'approved' &&
+              status != 'proceeding' &&
+              status.isNotEmpty) {
+            return false;
+          }
+          return !_isDocEliminated(doc, eliminatedScoreIds);
+        }).toList();
+      }
 
       final confirmed = activeDocs
           .where((doc) => _isConfirmed(doc.data()))
           .length;
+      final unconfirmedCount = activeDocs.length - confirmed;
 
-      if (confirmed > 0 || activeDocs.isEmpty) {
+      if (unconfirmedCount <= 0 || activeDocs.isEmpty) {
         await _nextQuestion(skipReadyCheck: true);
         return;
       }
+
+      if (!mounted) return;
+
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 26,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Proceed to Next Question?',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: darkBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'Are you sure you want to proceed to the next question? '
+              '$unconfirmedCount ${unconfirmedCount == 1 ? "contestant is" : "contestants are"} not ready.',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                height: 1.4,
+              ),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text(
+                  'CANCEL',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _nextQuestion(skipReadyCheck: true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBlue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
+                ),
+                child: const Text(
+                  'CONFIRM',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          );
+        },
+      );
     } catch (e) {
       debugPrint('CHECK CONTESTANT CONFIRMATION ERROR: $e');
       if (mounted) {
@@ -5130,37 +5219,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       }
       return;
     }
-
-    if (!mounted) return;
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Proceed to Next Question'),
-          content: const Text(
-            'Some contestants are not ready. Continue anyway?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('CANCEL'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _nextQuestion(skipReadyCheck: true);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('CONTINUE'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   // ============================================================
