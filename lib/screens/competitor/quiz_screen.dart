@@ -846,19 +846,26 @@ class _QuizScreenState extends State<QuizScreen> {
   int getLevelFromSessionQuestion(
     Map<String, dynamic> question, {
     int fallbackQuestionNumber = 1,
+    String? docId,
   }) {
     // 1. Check if the question is assigned to a specific level in levelQuestions mapping
-    final qId = (question['questionId'] ?? question['id'] ?? '')
+    final qId = (docId ?? question['questionId'] ?? question['id'] ?? question['docId'] ?? '')
         .toString()
         .trim();
     final rawLevelQuestions = _latestQuizData['levelQuestions'];
     if (qId.isNotEmpty && rawLevelQuestions is Map) {
       for (final entry in rawLevelQuestions.entries) {
-        if (entry.value is List && (entry.value as List).contains(qId)) {
-          final m = RegExp(r'(\d+)').firstMatch(entry.key.toString());
-          if (m != null) {
-            final parsed = int.tryParse(m.group(1)!);
-            if (parsed != null && parsed > 0) return parsed;
+        if (entry.value is List) {
+          final list = entry.value as List;
+          final bool containsId = list.any(
+            (item) => item.toString().trim() == qId,
+          );
+          if (containsId) {
+            final m = RegExp(r'(\d+)').firstMatch(entry.key.toString());
+            if (m != null) {
+              final parsed = int.tryParse(m.group(1)!);
+              if (parsed != null && parsed > 0) return parsed;
+            }
           }
         }
       }
@@ -946,17 +953,20 @@ class _QuizScreenState extends State<QuizScreen> {
     Map<String, dynamic>? sessionData,
   }) {
     final quizData = sessionData ?? _latestQuizData;
+    final int effectiveLevel = level > 0
+        ? level
+        : (int.tryParse(quizData['currentLevel']?.toString() ?? '') ?? 1);
 
     // 1. Check quiz session levelSettings configured by Admin FIRST!
     final rawLevelSettings = quizData['levelSettings'] ?? quizData['levels'];
     if (rawLevelSettings is Map) {
-      final target = 'level$level';
+      final target = 'level$effectiveLevel';
       for (final entry in rawLevelSettings.entries) {
         final norm = entry.key.toString().toLowerCase().replaceAll(
           RegExp(r'[^a-z0-9]'),
           '',
         );
-        if ((norm == target || norm == '$level') && entry.value is Map) {
+        if ((norm == target || norm == '$effectiveLevel') && entry.value is Map) {
           final lp = _parsePoints(
             Map<String, dynamic>.from(entry.value as Map),
           );
@@ -967,11 +977,11 @@ class _QuizScreenState extends State<QuizScreen> {
 
     // 2. Check top-level session keys configured by Admin
     for (final key in [
-      'level${level}Points',
-      'level${level}PointsPerCorrectAnswer',
-      'level${level}PointsPerQuestion',
-      'level${level}PointValue',
-      'level_${level}_points',
+      'level${effectiveLevel}Points',
+      'level${effectiveLevel}PointsPerCorrectAnswer',
+      'level${effectiveLevel}PointsPerQuestion',
+      'level${effectiveLevel}PointValue',
+      'level_${effectiveLevel}_points',
     ]) {
       final v = quizData[key];
       final p = _parsePoints(v);
@@ -979,7 +989,7 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     // 3. Fallback default based on level (Level 1 = 1, Level 2 = 2, Level 3 = 3)
-    switch (level) {
+    switch (effectiveLevel) {
       case 1:
         return 1;
       case 2:
@@ -987,7 +997,7 @@ class _QuizScreenState extends State<QuizScreen> {
       case 3:
         return 3;
       default:
-        return level > 0 ? level : 1;
+        return effectiveLevel > 0 ? effectiveLevel : 1;
     }
   }
 
@@ -1235,6 +1245,25 @@ class _QuizScreenState extends State<QuizScreen> {
 
     int getLevel(QueryDocumentSnapshot doc) {
       final data = doc.data() as Map<String, dynamic>;
+
+      // 1. Check if the question is assigned to a specific level in levelQuestions mapping
+      final qId = doc.id;
+      final rawLevelQuestions = _latestQuizData['levelQuestions'];
+      if (rawLevelQuestions is Map) {
+        for (final entry in rawLevelQuestions.entries) {
+          if (entry.value is List) {
+            final list = entry.value as List;
+            if (list.any((item) => item.toString().trim() == qId)) {
+              final m = RegExp(r'(\d+)').firstMatch(entry.key.toString());
+              if (m != null) {
+                final parsed = int.tryParse(m.group(1)!);
+                if (parsed != null && parsed > 0) return parsed;
+              }
+            }
+          }
+        }
+      }
+
       final raw = data['sessionLevel'] ?? data['level'];
 
       if (raw is num && raw.toInt() > 0) return raw.toInt();
@@ -2276,12 +2305,19 @@ class _QuizScreenState extends State<QuizScreen> {
       bool isCurrentlyCorrect =
           data['isCorrect'] == true || savedAnswerStatus == "correct";
 
-      final Map<String, dynamic>? questionForEval =
-          currentQuestionData ??
-          (questionIndex < _sortedSessionQuestions.length
-              ? _sortedSessionQuestions[questionIndex].data()
-                    as Map<String, dynamic>?
+      final qDoc = (questionIndex >= 0 &&
+              questionIndex < _sortedSessionQuestions.length)
+          ? _sortedSessionQuestions[questionIndex]
+          : null;
+      final Map<String, dynamic>? questionForEval = qDoc != null
+          ? Map<String, dynamic>.from(qDoc.data() as Map)
+          : (currentQuestionData != null
+              ? Map<String, dynamic>.from(currentQuestionData!)
               : null);
+      if (questionForEval != null && qDoc != null) {
+        questionForEval.putIfAbsent('id', () => qDoc.id);
+        questionForEval.putIfAbsent('questionId', () => qDoc.id);
+      }
 
       if (questionForEval != null && savedAnswer.trim().isNotEmpty) {
         final bool shouldBeCorrect = isAnswerCorrect(
@@ -2292,6 +2328,7 @@ class _QuizScreenState extends State<QuizScreen> {
         final sessionLevel = getLevelFromSessionQuestion(
           questionForEval,
           fallbackQuestionNumber: questionIndex + 1,
+          docId: qDoc?.id,
         );
 
         if (isCurrentlyCorrect &&
@@ -2330,32 +2367,38 @@ class _QuizScreenState extends State<QuizScreen> {
           // If an answer is complete (e.g. "DNS(Domain Name System)"),
           // self-heal and award points.
           isCurrentlyCorrect = true;
-          try {
-            final earnedPoints = getPointsForLevel(
-              sessionLevel,
-              question: questionForEval,
-            );
-            responseRef
-                .update({
-                  'isCorrect': true,
-                  'answerStatus': 'correct',
-                  'points': earnedPoints,
-                  'autoCorrected': true,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                })
-                .catchError((e) {
-                  debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
-                });
-            updateScore(
-              currentUser.uid,
-              earnedPoints,
-              questionIndex + 1,
-              level: sessionLevel,
-            ).catchError((e) {
-              debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
-            });
-          } catch (e) {
-            debugPrint("AUTO-CORRECT EVAL ERROR: $e");
+          final scoreKey = '${isTB ? "tb_" : "lvl_"}${sessionLevel}_q${questionIndex + 1}';
+          final altKey = 'q_${questionIndex + 1}';
+          if (!_scoredQuestionKeys.contains(scoreKey) && !_scoredQuestionKeys.contains(altKey)) {
+            _scoredQuestionKeys.add(scoreKey);
+            _scoredQuestionKeys.add(altKey);
+            try {
+              final earnedPoints = getPointsForLevel(
+                sessionLevel,
+                question: questionForEval,
+              );
+              responseRef
+                  .update({
+                    'isCorrect': true,
+                    'answerStatus': 'correct',
+                    'points': earnedPoints,
+                    'autoCorrected': true,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  })
+                  .catchError((e) {
+                    debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
+                  });
+              updateScore(
+                currentUser.uid,
+                earnedPoints,
+                questionIndex + 1,
+                level: sessionLevel,
+              ).catchError((e) {
+                debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
+              });
+            } catch (e) {
+              debugPrint("AUTO-CORRECT EVAL ERROR: $e");
+            }
           }
         }
       }
@@ -2469,12 +2512,19 @@ class _QuizScreenState extends State<QuizScreen> {
                   existingData['isCorrect'] == true ||
                   existingData['answerStatus'] == "correct";
 
-              final Map<String, dynamic>? questionForEval =
-                  currentQuestionData ??
-                  (questionIndex < _sortedSessionQuestions.length
-                      ? _sortedSessionQuestions[questionIndex].data()
-                            as Map<String, dynamic>?
+              final qDoc = (questionIndex >= 0 &&
+                      questionIndex < _sortedSessionQuestions.length)
+                  ? _sortedSessionQuestions[questionIndex]
+                  : null;
+              final Map<String, dynamic>? questionForEval = qDoc != null
+                  ? Map<String, dynamic>.from(qDoc.data() as Map)
+                  : (currentQuestionData != null
+                      ? Map<String, dynamic>.from(currentQuestionData!)
                       : null);
+              if (questionForEval != null && qDoc != null) {
+                questionForEval.putIfAbsent('id', () => qDoc.id);
+                questionForEval.putIfAbsent('questionId', () => qDoc.id);
+              }
 
               if (questionForEval != null && savedAnswer.trim().isNotEmpty) {
                 final bool shouldBeCorrect = isAnswerCorrect(
@@ -2484,6 +2534,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 final sessionLevel = getLevelFromSessionQuestion(
                   questionForEval,
                   fallbackQuestionNumber: questionNumber,
+                  docId: qDoc?.id,
                 );
 
                 if (isCurrentlyCorrect &&
@@ -2517,29 +2568,37 @@ class _QuizScreenState extends State<QuizScreen> {
                 } else if (!isCurrentlyCorrect && shouldBeCorrect) {
                   // Complete answer (e.g. "DNS(Domain Name System)"): Mark CORRECT
                   isCurrentlyCorrect = true;
-                  final earnedPoints = getPointsForLevel(
-                    sessionLevel,
-                    question: questionForEval,
-                  );
-                  responseRef
-                      .update({
-                        'isCorrect': true,
-                        'answerStatus': 'correct',
-                        'points': earnedPoints,
-                        'autoCorrected': true,
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      })
-                      .catchError((e) {
-                        debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
-                      });
-                  updateScore(
-                    uid,
-                    earnedPoints,
-                    questionNumber,
-                    level: sessionLevel,
-                  ).catchError((e) {
-                    debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
-                  });
+                  final scoreKey =
+                      '${isTieBreakerActive ? "tb_" : "lvl_"}${sessionLevel}_q$questionNumber';
+                  final altKey = 'q_$questionNumber';
+                  if (!_scoredQuestionKeys.contains(scoreKey) &&
+                      !_scoredQuestionKeys.contains(altKey)) {
+                    _scoredQuestionKeys.add(scoreKey);
+                    _scoredQuestionKeys.add(altKey);
+                    final earnedPoints = getPointsForLevel(
+                      sessionLevel,
+                      question: questionForEval,
+                    );
+                    responseRef
+                        .update({
+                          'isCorrect': true,
+                          'answerStatus': 'correct',
+                          'points': earnedPoints,
+                          'autoCorrected': true,
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        })
+                        .catchError((e) {
+                          debugPrint("AUTO-CORRECT RESPONSE UPDATE ERROR: $e");
+                        });
+                    updateScore(
+                      uid,
+                      earnedPoints,
+                      questionNumber,
+                      level: sessionLevel,
+                    ).catchError((e) {
+                      debugPrint("AUTO-CORRECT UPDATE SCORE ERROR: $e");
+                    });
+                  }
                 }
               }
 
@@ -2561,12 +2620,19 @@ class _QuizScreenState extends State<QuizScreen> {
       // USE THE CURRENT ADMIN-ASSIGNED SESSION QUESTION
       // ======================================================
 
-      final question =
-          currentQuestionData ??
-          (questionIndex >= 0 && questionIndex < _sortedSessionQuestions.length
-              ? _sortedSessionQuestions[questionIndex].data()
-                    as Map<String, dynamic>?
+      final qDoc = (questionIndex >= 0 &&
+              questionIndex < _sortedSessionQuestions.length)
+          ? _sortedSessionQuestions[questionIndex]
+          : null;
+      final Map<String, dynamic>? question = qDoc != null
+          ? Map<String, dynamic>.from(qDoc.data() as Map)
+          : (currentQuestionData != null
+              ? Map<String, dynamic>.from(currentQuestionData!)
               : null);
+      if (question != null && qDoc != null) {
+        question.putIfAbsent('id', () => qDoc.id);
+        question.putIfAbsent('questionId', () => qDoc.id);
+      }
 
       if (question == null || questionIndex < 0) {
         if (mounted) {
@@ -2611,6 +2677,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final sessionLevel = getLevelFromSessionQuestion(
         question,
         fallbackQuestionNumber: questionNumber,
+        docId: qDoc?.id,
       );
       final earnedPoints = correct
           ? (isTieBreakerActive
@@ -2649,13 +2716,18 @@ class _QuizScreenState extends State<QuizScreen> {
       if (correct) {
         final scoreKey =
             '${isTieBreakerActive ? "tb_" : "lvl_"}${sessionLevel}_q$questionNumber';
-        _scoredQuestionKeys.add(scoreKey);
-        await updateScore(
-          uid,
-          earnedPoints,
-          questionNumber,
-          level: sessionLevel,
-        );
+        final altKey = 'q_$questionNumber';
+        if (!_scoredQuestionKeys.contains(scoreKey) &&
+            !_scoredQuestionKeys.contains(altKey)) {
+          _scoredQuestionKeys.add(scoreKey);
+          _scoredQuestionKeys.add(altKey);
+          await updateScore(
+            uid,
+            earnedPoints,
+            questionNumber,
+            level: sessionLevel,
+          );
+        }
       }
 
       if (!mounted) return;
@@ -4589,13 +4661,18 @@ class _QuizScreenState extends State<QuizScreen> {
           final isTB = _latestQuizData['tieBreakerActive'] == true;
           final targetQIdx =
               previousQuestion >= 0 ? previousQuestion : currentQuestion;
+          final targetLevel =
+              _currentQuestionLevel > 0 ? _currentQuestionLevel : 1;
           final scoreKey =
-              '${isTB ? "tb_" : "lvl_"}${_currentQuestionLevel}_q${targetQIdx + 1}';
-          if (_scoredQuestionKeys.contains(scoreKey)) {
+              '${isTB ? "tb_" : "lvl_"}${targetLevel}_q${targetQIdx + 1}';
+          final altKey = 'q_${targetQIdx + 1}';
+          if (_scoredQuestionKeys.contains(scoreKey) ||
+              _scoredQuestionKeys.contains(altKey)) {
             // Already scored by saveAnswer - avoid double counting
             return;
           }
           _scoredQuestionKeys.add(scoreKey);
+          _scoredQuestionKeys.add(altKey);
 
           final docId = _getResponseDocId(targetQIdx, isTieBreaker: isTB);
           FirebaseFirestore.instance
@@ -4618,7 +4695,7 @@ class _QuizScreenState extends State<QuizScreen> {
             uid,
             points,
             targetQIdx + 1,
-            level: _currentQuestionLevel,
+            level: targetLevel,
           ).catchError((_) {});
         }
       });
@@ -4781,22 +4858,29 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_sortedSessionQuestions.isNotEmpty &&
         globalQuestionIndex >= 0 &&
         globalQuestionIndex < _sortedSessionQuestions.length) {
-      final targetData =
-          _sortedSessionQuestions[globalQuestionIndex].data()
-              as Map<String, dynamic>;
+      final targetDoc = _sortedSessionQuestions[globalQuestionIndex];
+      final targetData = Map<String, dynamic>.from(targetDoc.data() as Map);
+      targetData.putIfAbsent('id', () => targetDoc.id);
+      targetData.putIfAbsent('questionId', () => targetDoc.id);
+
       final targetLevel = getLevelFromSessionQuestion(
         targetData,
         fallbackQuestionNumber: globalQuestionIndex + 1,
+        docId: targetDoc.id,
       );
 
       var numberInLevel = 0;
       var totalInLevel = 0;
       for (var i = 0; i < _sortedSessionQuestions.length; i++) {
-        final itemData =
-            _sortedSessionQuestions[i].data() as Map<String, dynamic>;
+        final itemDoc = _sortedSessionQuestions[i];
+        final itemData = Map<String, dynamic>.from(itemDoc.data() as Map);
+        itemData.putIfAbsent('id', () => itemDoc.id);
+        itemData.putIfAbsent('questionId', () => itemDoc.id);
+
         final itemLevel = getLevelFromSessionQuestion(
           itemData,
           fallbackQuestionNumber: i + 1,
+          docId: itemDoc.id,
         );
         if (itemLevel == targetLevel) {
           totalInLevel++;
@@ -6097,8 +6181,11 @@ class _QuizScreenState extends State<QuizScreen> {
         .doc(uid);
 
     final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
-    final int targetLevel = level ?? getLevelFromQuestionNumber(questionNumber);
+    final int targetLevel =
+        (level != null && level > 0) ? level : getLevelFromQuestionNumber(questionNumber);
     final String levelKey = 'level${targetLevel}Score';
+    final String questionScoreKey =
+        '${isTieBreakerActive ? "tb_" : "lvl_"}${targetLevel}_q$questionNumber';
     int calculatedEffectiveScore = 0;
 
     await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -6106,6 +6193,32 @@ class _QuizScreenState extends State<QuizScreen> {
 
       int oldLevelScore = 0;
       final scoreData = scoreDoc.data() ?? {};
+
+      // Check scored questions map to PREVENT DOUBLE SCORING!
+      final Map<String, dynamic> scoredQuestions = {};
+      if (scoreData['scoredQuestions'] is Map) {
+        (scoreData['scoredQuestions'] as Map).forEach((k, v) {
+          scoredQuestions[k.toString()] = v;
+        });
+      }
+
+      // If this exact question has already been scored with the same or greater points, prevent double counting!
+      if (points > 0 && scoredQuestions.containsKey(questionScoreKey)) {
+        final existingPts =
+            int.tryParse(scoredQuestions[questionScoreKey].toString()) ?? 0;
+        if (existingPts >= points) {
+          debugPrint("DUPLICATE SCORE PREVENTED for $questionScoreKey (already $existingPts pts)");
+          calculatedEffectiveScore =
+              int.tryParse(scoreData['score']?.toString() ?? '') ?? 0;
+          return;
+        }
+      }
+
+      if (points < 0) {
+        scoredQuestions.remove(questionScoreKey);
+      } else if (points > 0) {
+        scoredQuestions[questionScoreKey] = points;
+      }
 
       if (scoreDoc.exists) {
         final dynamic rawLvl =
@@ -6119,9 +6232,19 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
 
+      int calculatedLevelFromScored = 0;
+      for (final entry in scoredQuestions.entries) {
+        if (entry.key.startsWith('lvl_${targetLevel}_')) {
+          calculatedLevelFromScored +=
+              int.tryParse(entry.value.toString()) ?? 0;
+        }
+      }
+
       final int newLevelScore = isTieBreakerActive
           ? oldLevelScore
-          : ((oldLevelScore + points).clamp(0, 999999));
+          : (calculatedLevelFromScored > 0
+              ? calculatedLevelFromScored
+              : ((oldLevelScore + points).clamp(0, 999999)));
 
       final Map<String, dynamic> mergedLevelScores = {};
       if (scoreData['levelScores'] is Map) {
@@ -6169,6 +6292,7 @@ class _QuizScreenState extends State<QuizScreen> {
         'currentLevel': targetLevel,
         'lastQuestion': questionNumber,
         'lastPoints': points,
+        'scoredQuestions': scoredQuestions,
         'updatedAt': FieldValue.serverTimestamp(),
       };
       if (!isTieBreakerActive) {
@@ -8401,6 +8525,17 @@ class _QuizScreenState extends State<QuizScreen> {
                                 lvlSum = mSum;
                               }
                             }
+                            if (sData['scoredQuestions'] is Map) {
+                              int sqSum = 0;
+                              (sData['scoredQuestions'] as Map).forEach((k, v) {
+                                if (k.toString().startsWith('lvl_') && v is num) {
+                                  sqSum += v.toInt();
+                                }
+                              });
+                              if (sqSum > 0 && sqSum < lvlSum) {
+                                lvlSum = sqSum;
+                              }
+                            }
 
                             final tiePts =
                                 int.tryParse(
@@ -8422,7 +8557,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
                             // Total score displayed: regular level quiz points + tie breaker points (+1 if scored)
                             int scoreVal = baseLevelScore + tiePts;
-                            if (storedScore > scoreVal) {
+                            if (storedScore > scoreVal && sData['scoredQuestions'] is! Map) {
                               scoreVal = storedScore;
                             }
 
