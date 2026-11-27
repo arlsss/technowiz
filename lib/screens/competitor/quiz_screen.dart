@@ -7620,7 +7620,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                 size: 24,
                                               ),
                                               label: const Text(
-                                                "FINAL TALLY",
+                                                "OVERALL TALLY",
                                                 style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w900,
@@ -7819,7 +7819,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                                   size: 22,
                                                 ),
                                                 label: const Text(
-                                                  "FINAL TALLY",
+                                                  "OVERALL TALLY",
                                                   style: TextStyle(
                                                     fontSize: 15.5,
                                                     fontWeight: FontWeight.w800,
