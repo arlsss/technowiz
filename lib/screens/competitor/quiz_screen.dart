@@ -8654,6 +8654,51 @@ class _QuizScreenState extends State<QuizScreen> {
                           .toSet()
                       : <String>{};
 
+                  if (isTieBreaker) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFEF3C7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.hourglass_top_rounded,
+                                size: 36,
+                                color: Color(0xFFB45309),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Tie Breaker in Progress',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Live ranking is unavailable during the tie breaker round.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: _sessionRef.collection('scores').snapshots(),
                     builder: (context, scoreSnap) {
@@ -10367,9 +10412,11 @@ class _QuizScreenState extends State<QuizScreen> {
               // MAIN QUIZ SCREEN
               // ==================================================
 
+              final bool inTieBreaker = isTieBreakerActive || isTieBreakerRound;
+
               return Scaffold(
                 backgroundColor: lightGreen,
-                endDrawer: _buildQuizSideMenuDrawer(),
+                endDrawer: inTieBreaker ? null : _buildQuizSideMenuDrawer(),
                 appBar: AppBar(
                   backgroundColor: Colors.white,
                   elevation: 0,
@@ -10467,15 +10514,16 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   iconTheme: const IconThemeData(color: primaryGreen),
                   actions: [
-                    Builder(
-                      builder: (scaffoldContext) => IconButton(
-                        tooltip: 'Live Ranking & Menu',
-                        icon: const Icon(Icons.menu_rounded),
-                        onPressed: () {
-                          Scaffold.of(scaffoldContext).openEndDrawer();
-                        },
+                    if (!inTieBreaker)
+                      Builder(
+                        builder: (scaffoldContext) => IconButton(
+                          tooltip: 'Live Ranking & Menu',
+                          icon: const Icon(Icons.menu_rounded),
+                          onPressed: () {
+                            Scaffold.of(scaffoldContext).openEndDrawer();
+                          },
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 body: Stack(
