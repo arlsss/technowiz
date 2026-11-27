@@ -127,6 +127,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
   final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
       _responseSubs = {};
 
+  Map<String, dynamic> _sessionData = {};
   bool _isFinishing = false;
   final Set<String> _tieResolvedUids = {};
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
@@ -147,6 +148,9 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     _contestsStream = _sessionRef.collection('contest_requests').snapshots();
 
     _sessionDeletionSubscription = _sessionStream.listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        _sessionData = snapshot.data()!;
+      }
       final isDeleted = !snapshot.exists ||
           snapshot.data()?['deleted'] == true ||
           snapshot.data()?['isDeleted'] == true ||
@@ -155,6 +159,44 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         _handleQuizDeletedByAdmin();
       }
     });
+  }
+
+  int _getAdminPointsForLevel(int level) {
+    final rawSettings = _sessionData['levelSettings'] ?? _sessionData['levels'];
+    if (rawSettings is Map) {
+      final target = 'level$level';
+      for (final entry in rawSettings.entries) {
+        final norm = entry.key
+            .toString()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if ((norm == target || norm == '$level') && entry.value is Map) {
+          final val = entry.value['pointsPerCorrectAnswer'] ??
+              entry.value['points_per_correct_answer'] ??
+              entry.value['pointsPerQuestion'] ??
+              entry.value['points'];
+          if (val is num && val > 0) return val.toInt();
+          if (val != null) {
+            final p = int.tryParse(val.toString());
+            if (p != null && p > 0) return p;
+          }
+        }
+      }
+    }
+    for (final key in [
+      'level${level}Points',
+      'level${level}PointsPerCorrectAnswer',
+      'level${level}PointsPerQuestion',
+      'level_${level}_points',
+    ]) {
+      final val = _sessionData[key];
+      if (val is num && val > 0) return val.toInt();
+      if (val != null) {
+        final p = int.tryParse(val.toString());
+        if (p != null && p > 0) return p;
+      }
+    }
+    return level > 0 ? level : 1;
   }
 
   Future<void> _handleQuizDeletedByAdmin() async {
@@ -258,18 +300,24 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
           }
           lvl ??= 1;
 
-          final rawPts = data['points'] ?? data['score'];
-          int pts = 0;
-          if (rawPts is num) {
-            pts = rawPts.toInt();
-          } else if (rawPts != null) {
-            pts = int.tryParse(rawPts.toString()) ?? 0;
-          }
-          if (pts == 0 && (answerStatus == 'correct' || rawCorrect == true)) {
-            pts = 1;
-          }
+          final bool isCorrect = answerStatus == 'correct' ||
+              rawCorrect == true ||
+              contestStatus == 'approved';
 
-          if (pts > 0 && (rawCorrect == true || answerStatus == 'correct')) {
+          if (isCorrect) {
+            final adminPts = _getAdminPointsForLevel(lvl);
+            final rawPts = data['points'] ?? data['score'];
+            int pts = 0;
+            if (rawPts is num && rawPts > 0) {
+              pts = rawPts.toInt();
+            } else if (rawPts != null) {
+              final parsed = int.tryParse(rawPts.toString());
+              if (parsed != null && parsed > 0) pts = parsed;
+            }
+            if (pts == 0 || (pts < adminPts && adminPts > 1)) {
+              pts = adminPts;
+            }
+
             levelPoints[lvl] = (levelPoints[lvl] ?? 0) + pts;
           }
         }
@@ -1046,6 +1094,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
             stream: _sessionStream,
             builder: (context, sessionSnap) {
               final sessionData = sessionSnap.data?.data() ?? {};
+              if (sessionData.isNotEmpty) _sessionData = sessionData;
               final totalQuizQuestions =
                   (sessionData['questions'] as List?)?.length ?? 0;
 
@@ -1124,11 +1173,11 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
 
                             final sData = scoreByUid[uid] ?? {};
                             final Map<int, int> levelPoints = {};
+
+                            // 1. Read level scores from authoritative score doc (scores/{uid})
                             for (int l = 1; l <= 20; l++) {
                               final v = sData['level${l}Score'] ??
-                                  sData['level_$l'] ??
-                                  data['level${l}Score'] ??
-                                  data['level_$l'];
+                                  sData['level_$l'];
                               if (v is num && v > 0) {
                                 levelPoints[l] = v.toInt();
                               } else if (v != null) {
@@ -1154,22 +1203,8 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                 }
                               }
                             }
-                            if (data['levelScores'] is Map) {
-                              for (final entry in (data['levelScores'] as Map).entries) {
-                                final numStr = entry.key
-                                    .toString()
-                                    .replaceAll(RegExp(r'[^0-9]'), '');
-                                final lvl = int.tryParse(numStr);
-                                final val =
-                                    int.tryParse(entry.value?.toString() ?? '') ??
-                                        0;
-                                if (lvl != null && val > 0) {
-                                  if ((levelPoints[lvl] ?? 0) < val) {
-                                    levelPoints[lvl] = val;
-                                  }
-                                }
-                              }
-                            }
+
+                            // 2. Validate against cached responses from answers subcollection
                             final cachedResp = _contestantResponsesCache[uid];
                             if (cachedResp != null &&
                                 cachedResp['levelPoints'] is Map) {
@@ -1192,32 +1227,18 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                               lvlSum += pts;
                             }
 
-                            final tiePts = int.tryParse((sData['tieBreakerScore'] ??
-                                        data['tieBreakerScore'])
-                                    ?.toString() ??
-                                '') ??
-                                0;
+                            final tiePts = int.tryParse(
+                              sData['tieBreakerScore']?.toString() ?? '',
+                            ) ?? 0;
 
-                            final rawScore = sData['score'] ??
-                                sData['totalScore'] ??
-                                data['score'] ??
-                                data['finalScore'];
+                            final rawScore = sData['totalScore'] ?? sData['score'];
                             final stored = rawScore is num
                                 ? rawScore.toInt()
                                 : int.tryParse(rawScore?.toString() ?? '') ?? 0;
 
                             int calculated = lvlSum + tiePts;
-                            int score = calculated > stored ? calculated : stored;
-
-                            // Auto-heal corrupt score in Firestore
-                            if (scoreDocByUid[uid] != null &&
-                                stored != score &&
-                                score > 0) {
-                              scoreDocByUid[uid]!.reference.update({
-                                'score': score,
-                                'totalScore': score,
-                              }).catchError((_) {});
-                            }
+                            int score = calculated > 0 ? calculated : stored;
+                            if (stored > score) score = stored;
 
                             final isElim = sData['eliminated'] == true ||
                                 sData['isEliminated'] == true ||
@@ -1635,11 +1656,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         }
       }
     }
-    if (maxVal > 0) return maxVal;
-    if (lvl == 1 && (maxLevel == 1 || c.eliminatedLevel == 1)) {
-      return c.score;
-    }
-    return 0;
+    return maxVal;
   }
 
   Widget _buildLevelScoreCell(
