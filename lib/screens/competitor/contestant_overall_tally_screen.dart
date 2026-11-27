@@ -84,33 +84,6 @@ class _ContestantOverallTallyScreenState
                 ),
               ],
             ),
-          actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 14),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF86EFAC), width: 1.2),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.circle, size: 8, color: primaryGreen),
-                  SizedBox(width: 5),
-                  Text(
-                    'LIVE',
-                    style: TextStyle(
-                      color: darkGreen,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
         body: SafeArea(
           child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
