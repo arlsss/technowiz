@@ -1460,7 +1460,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     List<pw.Widget> buildTable2Widgets() {
       return [
         pw.Text(
-          '2. FINAL STANDINGS & RANKINGS',
+          'FINAL STANDINGS & RANKINGS',
           style: pw.TextStyle(
             fontSize: 11,
             fontWeight: pw.FontWeight.bold,
@@ -1488,6 +1488,26 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               'Total Score',
               'Winners',
             ],
+            columnWidths: const {
+              0: pw.FlexColumnWidth(0.9),
+              1: pw.FlexColumnWidth(2.2),
+              2: pw.FlexColumnWidth(2.4),
+              3: pw.FlexColumnWidth(0.9),
+              4: pw.FlexColumnWidth(0.9),
+              5: pw.FlexColumnWidth(0.9),
+              6: pw.FlexColumnWidth(1.2),
+              7: pw.FlexColumnWidth(2.2),
+            },
+            cellAlignments: const {
+              0: pw.Alignment.center,
+              1: pw.Alignment.centerLeft,
+              2: pw.Alignment.centerLeft,
+              3: pw.Alignment.center,
+              4: pw.Alignment.center,
+              5: pw.Alignment.center,
+              6: pw.Alignment.center,
+              7: pw.Alignment.centerLeft,
+            },
             data: rankings.asMap().entries.map((entry) {
               final rank = entry.key + 1;
               final c = entry.value;
@@ -6520,7 +6540,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '2. FINAL STANDINGS & RANKINGS',
+          'FINAL STANDINGS & RANKINGS',
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.w900,
