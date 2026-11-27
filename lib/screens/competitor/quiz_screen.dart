@@ -137,6 +137,9 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
+    _localLevelPoints.clear();
+    _scoredQuestionKeys.clear();
+    currentScore = 0;
     // Start loading questions immediately when this screen is opened,
     // including while the synchronized countdown is still running.
     _loadSessionQuestions();
@@ -2592,6 +2595,19 @@ class _QuizScreenState extends State<QuizScreen> {
       final bool correct =
           hasAnswer && isAnswerCorrect(question, effectiveAnswer);
 
+      // Ensure we have the latest quiz session document with admin levelSettings
+      Map<String, dynamic> currentSessionData = _latestQuizData;
+      if (currentSessionData.isEmpty ||
+          !currentSessionData.containsKey('levelSettings')) {
+        try {
+          final snap = await _sessionRef.get();
+          if (snap.exists && snap.data() != null) {
+            currentSessionData = snap.data()!;
+            _latestQuizData = currentSessionData;
+          }
+        } catch (_) {}
+      }
+
       final sessionLevel = getLevelFromSessionQuestion(
         question,
         fallbackQuestionNumber: questionNumber,
@@ -2599,7 +2615,11 @@ class _QuizScreenState extends State<QuizScreen> {
       final earnedPoints = correct
           ? (isTieBreakerActive
                 ? 1
-                : getPointsForLevel(sessionLevel, question: question))
+                : getPointsForLevel(
+                    sessionLevel,
+                    question: question,
+                    sessionData: currentSessionData,
+                  ))
           : 0;
 
       await answerDoc.set({
@@ -6383,10 +6403,6 @@ class _QuizScreenState extends State<QuizScreen> {
 
     final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true;
     final int targetLevel = level ?? getLevelFromQuestionNumber(questionNumber);
-    if (!isTieBreakerActive) {
-      _localLevelPoints[targetLevel] =
-          ((_localLevelPoints[targetLevel] ?? 0) + points).clamp(0, 999999);
-    }
     final String levelKey = 'level${targetLevel}Score';
     int calculatedEffectiveScore = 0;
 
@@ -6408,20 +6424,9 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
 
-      int calculatedLevelScore = ((oldLevelScore + points) < 0
-          ? 0
-          : (oldLevelScore + points));
-      final int localPts = _localLevelPoints[targetLevel] ?? 0;
-      if (localPts > calculatedLevelScore) {
-        calculatedLevelScore = localPts;
-      }
-      final newLevelScore = isTieBreakerActive
+      final int newLevelScore = isTieBreakerActive
           ? oldLevelScore
-          : calculatedLevelScore;
-
-      if (!isTieBreakerActive) {
-        _localLevelPoints[targetLevel] = newLevelScore;
-      }
+          : ((oldLevelScore + points).clamp(0, 999999));
 
       final Map<String, dynamic> mergedLevelScores = {};
       if (scoreData['levelScores'] is Map) {
@@ -6435,20 +6440,18 @@ class _QuizScreenState extends State<QuizScreen> {
 
       int sumOfLevels = 0;
       for (int l = 1; l <= 20; l++) {
-        int lVal = 0;
         if (!isTieBreakerActive && l == targetLevel) {
-          lVal = newLevelScore;
+          sumOfLevels += newLevelScore;
         } else {
           final dynamic r =
               scoreData['level${l}Score'] ??
               scoreData['level_$l'] ??
               mergedLevelScores['Level $l'] ??
               mergedLevelScores['$l'];
-          if (r != null) lVal = int.tryParse(r.toString()) ?? 0;
+          if (r != null) {
+            sumOfLevels += int.tryParse(r.toString()) ?? 0;
+          }
         }
-        final int localLvl = _localLevelPoints[l] ?? 0;
-        if (localLvl > lVal) lVal = localLvl;
-        sumOfLevels += lVal;
       }
 
       final int oldTieBreaker =
@@ -6571,7 +6574,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
       for (final doc in scoresSnapshot.docs) {
         final data = doc.data();
-        final rawScore = data['score'];
+        final rawScore = data['score'] ?? data['totalScore'];
         scoreByUid[doc.id] = rawScore is num
             ? rawScore.toInt()
             : int.tryParse(rawScore?.toString() ?? '') ?? 0;
@@ -6590,6 +6593,9 @@ class _QuizScreenState extends State<QuizScreen> {
       }
 
       scoreByUid.putIfAbsent(currentUser.uid, () => 0);
+      if (currentScore > (scoreByUid[currentUser.uid] ?? 0)) {
+        scoreByUid[currentUser.uid] = currentScore;
+      }
 
       final ranked = scoreByUid.entries.toList()
         ..sort((a, b) {
@@ -8612,13 +8618,9 @@ class _QuizScreenState extends State<QuizScreen> {
                             ? (teamName.isNotEmpty ? teamName : personalName)
                             : personalName;
 
-                        final int rawStored =
+                        final int storedScore =
                             int.tryParse(
-                              (sData['totalScore'] ??
-                                          sData['score'] ??
-                                          cData['finalScore'] ??
-                                          cData['totalScore'] ??
-                                          cData['score'])
+                              (sData['totalScore'] ?? sData['score'])
                                       ?.toString() ??
                                   '',
                             ) ??
@@ -8631,10 +8633,6 @@ class _QuizScreenState extends State<QuizScreen> {
                               (sData['levelScores'] is Map
                                   ? (sData['levelScores']['Level $l'] ??
                                         sData['levelScores']['$l'])
-                                  : null) ??
-                              (cData['levelScores'] is Map
-                                  ? (cData['levelScores']['Level $l'] ??
-                                        cData['levelScores']['$l'])
                                   : null);
                           if (v != null) {
                             lvlSum += int.tryParse(v.toString()) ?? 0;
@@ -8652,45 +8650,22 @@ class _QuizScreenState extends State<QuizScreen> {
                             lvlSum = mSum;
                           }
                         }
-                        if (cData['levelScores'] is Map) {
-                          int cSum = 0;
-                          for (final v
-                              in (cData['levelScores'] as Map).values) {
-                            if (v != null) {
-                              cSum += int.tryParse(v.toString()) ?? 0;
-                            }
-                          }
-                          if (cSum > lvlSum) {
-                            lvlSum = cSum;
-                          }
-                        }
+
                         final tiePts =
                             int.tryParse(
-                              (sData['tieBreakerScore'] ??
-                                          cData['tieBreakerScore'])
-                                      ?.toString() ??
-                                  '',
+                              sData['tieBreakerScore']?.toString() ?? '',
                             ) ??
                             0;
 
-                        int scoreVal = lvlSum + tiePts;
-                        if (rawStored > scoreVal) {
-                          scoreVal = rawStored;
+                        int scoreVal = (lvlSum + tiePts) > 0
+                            ? (lvlSum + tiePts)
+                            : storedScore;
+                        if (storedScore > scoreVal) {
+                          scoreVal = storedScore;
                         }
 
-                        if (uid == myUid) {
-                          if (currentScore > scoreVal) {
-                            scoreVal = currentScore;
-                          }
-                          if (_localLevelPoints.isNotEmpty) {
-                            final localSum = _localLevelPoints.values.fold<int>(
-                              0,
-                              (acc, p) => acc + p,
-                            );
-                            if (localSum + tiePts > scoreVal) {
-                              scoreVal = localSum + tiePts;
-                            }
-                          }
+                        if (uid == myUid && currentScore > scoreVal) {
+                          scoreVal = currentScore;
                         }
 
                         rows.add({

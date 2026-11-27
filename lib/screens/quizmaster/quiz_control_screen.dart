@@ -4349,7 +4349,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             .listen((responsesSnap) {
           if (!mounted) return;
           final Map<int, int> userLevelScores = {};
-          int totalRespPoints = 0;
           for (final r in responsesSnap.docs) {
             final rData = r.data();
             int lvl = 1;
@@ -4386,7 +4385,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 pts = adminPts > 0 ? adminPts : 1;
               }
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
-              totalRespPoints += pts;
             }
           }
 
@@ -4394,23 +4392,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
             setState(() {
               _levelScoresCache[uid] = userLevelScores;
             });
-
-            final updateData = <String, dynamic>{};
-            for (final entry in userLevelScores.entries) {
-              updateData['level${entry.key}Score'] = entry.value;
-              updateData['level_${entry.key}'] = entry.value;
-            }
-            updateData['levelScores'] = {
-              for (final entry in userLevelScores.entries)
-                'Level ${entry.key}': entry.value,
-            };
-            final int tiePts = _asInt(data['tieBreakerScore']) ?? 0;
-            final int realTotal = totalRespPoints + tiePts;
-            updateData['score'] = realTotal;
-            updateData['totalScore'] = realTotal;
-            doc.reference
-                .set(updateData, SetOptions(merge: true))
-                .catchError((_) {});
           }
         }, onError: (_) {});
         _responseSubs[uid] = sub;
@@ -4423,26 +4404,13 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
     Map<String, dynamic>? jData,
     String? uid,
   }) {
-    final tiePts = _asInt(sData['tieBreakerScore']) ??
-        _asInt(jData?['tieBreakerScore']) ??
+    final tiePts = _asInt(sData['tieBreakerScore']) ?? 0;
+
+    final stored = _asInt(sData['totalScore']) ??
+        _asInt(sData['score']) ??
         0;
 
-    final stored = _asInt(sData['score']) ??
-        _asInt(sData['totalScore']) ??
-        _asInt(jData?['score']) ??
-        0;
-
-    // 1. If we have live cached response scores from responses subcollection
-    if (uid != null && _levelScoresCache.containsKey(uid)) {
-      final cached = _levelScoresCache[uid];
-      if (cached != null) {
-        final cachedSum = cached.values.fold<int>(0, (acc, val) => acc + val);
-        final int calculated = cachedSum + tiePts;
-        return calculated;
-      }
-    }
-
-    // 2. Sum up configured level scores from levelScores map and level1Score..level20Score
+    // Sum up configured level scores from levelScores map and level1Score..level20Score
     final Map<int, int> levelPointsMap = {};
     if (sData['levelScores'] is Map) {
       (sData['levelScores'] as Map).forEach((k, v) {
@@ -6545,15 +6513,6 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                 jData: jData,
                 uid: id,
               );
-
-              // Auto-heal inflated or outdated score in Firestore score document
-              final storedScore = _asInt(sData['score']);
-              if (storedScore != null && storedScore != score) {
-                quizRef.collection('scores').doc(id).set({
-                  'score': score,
-                  'totalScore': score,
-                }, SetOptions(merge: true)).catchError((_) {});
-              }
 
               final bool isEliminated =
                   sData['eliminated'] == true ||
