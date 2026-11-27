@@ -1242,6 +1242,65 @@ class _QuizScreenState extends State<QuizScreen> {
         ? docs
         : filtered;
     final sorted = [...sourceDocs];
+    if (isTieBreakerActive) {
+      final rawTbIds = _latestQuizData['tieBreakerQuestionIds'] ??
+          _latestQuizData['levelQuestions']?['Tie Breaker'] ??
+          _latestQuizData['levelQuestions']?['tie breaker'];
+      final List<String> tbIdOrder = [];
+      if (rawTbIds is List) {
+        for (final item in rawTbIds) {
+          final s = item.toString().trim();
+          if (s.isNotEmpty && !tbIdOrder.contains(s)) {
+            tbIdOrder.add(s);
+          }
+        }
+      }
+
+      int? getOrder(QueryDocumentSnapshot doc) {
+        final raw = (doc.data() as Map<String, dynamic>)['order'];
+        if (raw is num) return raw.toInt();
+        return int.tryParse(raw?.toString() ?? '');
+      }
+
+      DateTime? getCreatedAt(QueryDocumentSnapshot doc) {
+        final raw = (doc.data() as Map<String, dynamic>)['createdAt'];
+        if (raw is Timestamp) return raw.toDate();
+        return null;
+      }
+
+      sorted.sort((a, b) {
+        if (tbIdOrder.isNotEmpty) {
+          final aIdx = tbIdOrder.indexOf(a.id);
+          final bIdx = tbIdOrder.indexOf(b.id);
+          if (aIdx != -1 && bIdx != -1) return aIdx.compareTo(bIdx);
+          if (aIdx != -1) return -1;
+          if (bIdx != -1) return 1;
+        }
+
+        final aOrder = getOrder(a);
+        final bOrder = getOrder(b);
+        if (aOrder != null && bOrder != null && aOrder != bOrder) {
+          return aOrder.compareTo(bOrder);
+        }
+        if (aOrder != null && bOrder == null) return -1;
+        if (aOrder == null && bOrder != null) return 1;
+
+        final aCreated = getCreatedAt(a);
+        final bCreated = getCreatedAt(b);
+        if (aCreated != null && bCreated != null) {
+          final dateCompare = aCreated.compareTo(bCreated);
+          if (dateCompare != 0) return dateCompare;
+        } else if (aCreated != null) {
+          return -1;
+        } else if (bCreated != null) {
+          return 1;
+        }
+
+        return a.id.compareTo(b.id);
+      });
+
+      return sorted;
+    }
 
     int getLevel(QueryDocumentSnapshot doc) {
       final data = doc.data() as Map<String, dynamic>;
@@ -10233,7 +10292,16 @@ class _QuizScreenState extends State<QuizScreen> {
                 );
               }
 
-              final displayQuestionIndex = currentQuestion;
+              final targetQuestionId =
+                  quizData['currentQuestionId']?.toString() ??
+                  quizData['currentQuestionDocId']?.toString();
+              int targetIndex = -1;
+              if (targetQuestionId != null && targetQuestionId.isNotEmpty) {
+                targetIndex = questions.indexWhere((q) => q.id == targetQuestionId);
+              }
+              final displayQuestionIndex = (targetIndex >= 0)
+                  ? targetIndex
+                  : currentQuestion.clamp(0, questions.length - 1);
 
               final question = questions[displayQuestionIndex];
 

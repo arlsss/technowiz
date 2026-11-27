@@ -529,6 +529,66 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     final result = (isTieBreakerActive && filtered.isEmpty) ? docs : filtered;
 
+    if (isTieBreakerActive) {
+      final rawTbIds = _quizData?['tieBreakerQuestionIds'] ??
+          _quizData?['levelQuestions']?['Tie Breaker'] ??
+          _quizData?['levelQuestions']?['tie breaker'];
+      final List<String> tbIdOrder = [];
+      if (rawTbIds is List) {
+        for (final item in rawTbIds) {
+          final s = item.toString().trim();
+          if (s.isNotEmpty && !tbIdOrder.contains(s)) {
+            tbIdOrder.add(s);
+          }
+        }
+      }
+
+      int? getOrder(QueryDocumentSnapshot doc) {
+        final raw = (doc.data() as Map<String, dynamic>)['order'];
+        if (raw is num) return raw.toInt();
+        return int.tryParse(raw?.toString() ?? '');
+      }
+
+      DateTime? getCreatedAt(QueryDocumentSnapshot doc) {
+        final raw = (doc.data() as Map<String, dynamic>)['createdAt'];
+        if (raw is Timestamp) return raw.toDate();
+        return null;
+      }
+
+      result.sort((a, b) {
+        if (tbIdOrder.isNotEmpty) {
+          final aIdx = tbIdOrder.indexOf(a.id);
+          final bIdx = tbIdOrder.indexOf(b.id);
+          if (aIdx != -1 && bIdx != -1) return aIdx.compareTo(bIdx);
+          if (aIdx != -1) return -1;
+          if (bIdx != -1) return 1;
+        }
+
+        final aOrder = getOrder(a);
+        final bOrder = getOrder(b);
+        if (aOrder != null && bOrder != null && aOrder != bOrder) {
+          return aOrder.compareTo(bOrder);
+        }
+        if (aOrder != null && bOrder == null) return -1;
+        if (aOrder == null && bOrder != null) return 1;
+
+        final aCreated = getCreatedAt(a);
+        final bCreated = getCreatedAt(b);
+        if (aCreated != null && bCreated != null) {
+          final dateCompare = aCreated.compareTo(bCreated);
+          if (dateCompare != 0) return dateCompare;
+        } else if (aCreated != null) {
+          return -1;
+        } else if (bCreated != null) {
+          return 1;
+        }
+
+        return a.id.compareTo(b.id);
+      });
+
+      return result;
+    }
+
     int getLevel(QueryDocumentSnapshot doc) {
       // Use the same level parser used by the question screen and level flow,
       // so missing/alternate level values cannot sort differently from display.
@@ -980,6 +1040,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         'countdown': 0,
         'status': 'waiting',
         'currentQuestion': targetQuestion,
+        if (targetQuestion >= 0 && targetQuestion < _questions.length) ...{
+          'currentQuestionId': _questions[targetQuestion].id,
+          'currentQuestionDocId': _questions[targetQuestion].id,
+        },
         'currentLevel': targetLevel,
         'timer': 0,
         if (!widget.isTieBreaker) ...{
@@ -1210,11 +1274,20 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
       return;
     }
 
+    final String? currentQId =
+        (questionIndex >= 0 && questionIndex < _questions.length)
+            ? _questions[questionIndex].id
+            : null;
+
     await quizDoc.reference.update({
       'status': 'countdown',
       'eventStatus': 'countdown',
       'preparedLevel': FieldValue.delete(),
       'currentQuestion': questionIndex,
+      if (currentQId != null) ...{
+        'currentQuestionId': currentQId,
+        'currentQuestionDocId': currentQId,
+      },
       'currentLevel': level,
       'countdown': 3,
       'countdownActive': true,
@@ -1621,10 +1694,19 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               );
       }
 
+      final String? currentQId =
+          (_currentQuestion >= 0 && _currentQuestion < _questions.length)
+              ? _questions[_currentQuestion].id
+              : null;
+
       await quizDoc.reference.update({
         'status': 'active',
         'timer': remaining,
         'currentQuestion': _currentQuestion,
+        if (currentQId != null) ...{
+          'currentQuestionId': currentQId,
+          'currentQuestionDocId': currentQId,
+        },
         'currentLevel': _currentLevel,
         'manuallyPaused': false,
       });
@@ -2679,6 +2761,10 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         'readyCheckActive': false,
         'manuallyPaused': false,
         'currentQuestion': next,
+        if (next >= 0 && next < _questions.length) ...{
+          'currentQuestionId': _questions[next].id,
+          'currentQuestionDocId': _questions[next].id,
+        },
         'currentLevel': nextLevel,
       });
 
