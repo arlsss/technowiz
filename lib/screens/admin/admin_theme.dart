@@ -1148,11 +1148,21 @@ class AdminNotification {
                     dismiss();
                   },
                   child: GestureDetector(
-                    onVerticalDragEnd: (details) {
-                      if (details.primaryVelocity != null &&
-                          details.primaryVelocity! < -50) {
+                    behavior: HitTestBehavior.opaque,
+                    onPanUpdate: (details) {
+                      // Wipe out / swipe up or fast swipe in any direction
+                      if (details.delta.dy < -2 || details.delta.dx.abs() > 6) {
                         dismiss();
                       }
+                    },
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity != null &&
+                          details.primaryVelocity! <= 0) {
+                        dismiss();
+                      }
+                    },
+                    onHorizontalDragEnd: (_) {
+                      dismiss();
                     },
                     onTap: () {
                       dismiss();

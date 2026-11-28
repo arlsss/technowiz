@@ -4390,41 +4390,92 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
   }
 
   int _getAdminPointsForLevel(int level, Map<String, dynamic>? quizData) {
-    if (quizData == null) return level;
-    final rawSettings = quizData['levelSettings'] ?? quizData['levels'];
-    if (rawSettings is Map) {
-      final target = 'level$level';
-      for (final entry in rawSettings.entries) {
-        final norm = entry.key
-            .toString()
-            .toLowerCase()
-            .replaceAll(RegExp(r'[^a-z0-9]'), '');
-        if ((norm == target || norm == '$level') && entry.value is Map) {
-          final val = entry.value['pointsPerCorrectAnswer'] ??
-              entry.value['points_per_correct_answer'] ??
-              entry.value['pointsPerQuestion'] ??
-              entry.value['points'];
-          if (val is num && val > 0) return val.toInt();
-          if (val != null) {
-            final p = int.tryParse(val.toString());
-            if (p != null && p > 0) return p;
+    if (level < 1) return 1;
+    final effectiveData = quizData ?? _quizData;
+    if (effectiveData == null) return level;
+
+    int? parsePts(dynamic val) {
+      if (val is num && val > 0) return val.toInt();
+      if (val != null) {
+        final p = int.tryParse(val.toString().trim());
+        if (p != null && p > 0) return p;
+      }
+      return null;
+    }
+
+    final dataSources = <Map<String, dynamic>>[
+      effectiveData,
+      if (effectiveData['settings'] is Map)
+        Map<String, dynamic>.from(effectiveData['settings'] as Map),
+      if (effectiveData['quizSettings'] is Map)
+        Map<String, dynamic>.from(effectiveData['quizSettings'] as Map),
+    ];
+
+    for (final src in dataSources) {
+      final rawSettings =
+          src['levelSettings'] ?? src['levels'] ?? src['level_settings'];
+      if (rawSettings is Map) {
+        final target = 'level$level';
+        for (final entry in rawSettings.entries) {
+          final norm = entry.key
+              .toString()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '');
+          if (norm == target || norm == '$level') {
+            if (entry.value is Map) {
+              final map = entry.value as Map;
+              final pts = parsePts(map['pointsPerCorrectAnswer']) ??
+                  parsePts(map['points_per_correct_answer']) ??
+                  parsePts(map['pointsPerQuestion']) ??
+                  parsePts(map['points']) ??
+                  parsePts(map['scorePerQuestion']);
+              if (pts != null) return pts;
+            } else {
+              final pts = parsePts(entry.value);
+              if (pts != null) return pts;
+            }
+          }
+        }
+      } else if (rawSettings is List) {
+        for (final item in rawSettings) {
+          if (item is Map) {
+            final lvlVal = item['level'] ?? item['levelNumber'] ?? item['id'];
+            final lvlParsed = int.tryParse(lvlVal.toString());
+            if (lvlParsed == level) {
+              final pts = parsePts(item['pointsPerCorrectAnswer']) ??
+                  parsePts(item['points_per_correct_answer']) ??
+                  parsePts(item['pointsPerQuestion']) ??
+                  parsePts(item['points']);
+              if (pts != null) return pts;
+            }
           }
         }
       }
-    }
-    for (final key in [
-      'level${level}Points',
-      'level${level}PointsPerCorrectAnswer',
-      'level${level}PointsPerQuestion',
-      'level_${level}_points',
-    ]) {
-      final val = quizData[key];
-      if (val is num && val > 0) return val.toInt();
-      if (val != null) {
-        final p = int.tryParse(val.toString());
-        if (p != null && p > 0) return p;
+
+      for (final key in [
+        'level${level}Points',
+        'level${level}PointsPerCorrectAnswer',
+        'level${level}PointsPerQuestion',
+        'level_${level}_points',
+        'level_$level',
+      ]) {
+        final pts = parsePts(src[key]);
+        if (pts != null) return pts;
       }
     }
+
+    // Fallback: check session questions for this level if available
+    for (final q in _questions) {
+      final qData = q.data() as Map<String, dynamic>?;
+      if (qData != null) {
+        final qLvl = int.tryParse(qData['level']?.toString() ?? '');
+        if (qLvl == level) {
+          final pts = parsePts(qData['points']);
+          if (pts != null) return pts;
+        }
+      }
+    }
+
     return level;
   }
 

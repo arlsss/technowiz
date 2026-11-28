@@ -968,7 +968,14 @@ class _QuizScreenState extends State<QuizScreen> {
         : (int.tryParse(quizData['currentLevel']?.toString() ?? '') ?? 1);
 
     // 1. Check quiz session levelSettings configured by Admin FIRST!
-    final rawLevelSettings = quizData['levelSettings'] ?? quizData['levels'];
+    final rawLevelSettings = quizData['levelSettings'] ??
+        quizData['levels'] ??
+        (quizData['settings'] is Map
+            ? quizData['settings']['levelSettings']
+            : null) ??
+        (quizData['quizSettings'] is Map
+            ? quizData['quizSettings']['levelSettings']
+            : null);
     if (rawLevelSettings is Map) {
       final target = 'level$effectiveLevel';
       for (final entry in rawLevelSettings.entries) {
@@ -976,11 +983,30 @@ class _QuizScreenState extends State<QuizScreen> {
           RegExp(r'[^a-z0-9]'),
           '',
         );
-        if ((norm == target || norm == '$effectiveLevel') && entry.value is Map) {
-          final lp = _parsePoints(
-            Map<String, dynamic>.from(entry.value as Map),
-          );
-          if (lp != null && lp > 0) return lp;
+        if (norm == target || norm == '$effectiveLevel') {
+          if (entry.value is Map) {
+            final lp = _parsePoints(
+              Map<String, dynamic>.from(entry.value as Map),
+            );
+            if (lp != null && lp > 0) return lp;
+          } else if (entry.value is num && (entry.value as num) > 0) {
+            return (entry.value as num).toInt();
+          } else if (entry.value != null) {
+            final p = int.tryParse(entry.value.toString().trim());
+            if (p != null && p > 0) return p;
+          }
+        }
+      }
+    } else if (rawLevelSettings is List) {
+      for (final item in rawLevelSettings) {
+        if (item is Map) {
+          final lvlVal = item['level'] ?? item['levelNumber'] ?? item['sessionLevel'];
+          final m = RegExp(r'(\d+)').firstMatch(lvlVal?.toString() ?? '');
+          final lvlNum = m != null ? int.tryParse(m.group(1)!) : null;
+          if (lvlNum == effectiveLevel) {
+            final lp = _parsePoints(item);
+            if (lp != null && lp > 0) return lp;
+          }
         }
       }
     }
@@ -991,7 +1017,11 @@ class _QuizScreenState extends State<QuizScreen> {
       'level${effectiveLevel}PointsPerCorrectAnswer',
       'level${effectiveLevel}PointsPerQuestion',
       'level${effectiveLevel}PointValue',
+      'pointsLevel$effectiveLevel',
+      'pointsPerQuestionLevel$effectiveLevel',
       'level_${effectiveLevel}_points',
+      'level_${effectiveLevel}_pts',
+      'level${effectiveLevel}_points_per_correct_answer',
     ]) {
       final v = quizData[key];
       final p = _parsePoints(v);
@@ -1004,7 +1034,19 @@ class _QuizScreenState extends State<QuizScreen> {
       if (qp != null && qp > 0) return qp;
     }
 
-    // 4. Fallback default based on level (Level 1 = 1, Level 2 = 2, Level 3 = 3)
+    // 4. Check if any question in this level has configured points
+    if (_sortedSessionQuestions.isNotEmpty) {
+      for (final qDoc in _sortedSessionQuestions) {
+        final qData = qDoc.data() as Map<String, dynamic>?;
+        if (qData != null &&
+            getLevelFromSessionQuestion(qData) == effectiveLevel) {
+          final p = _parsePoints(qData);
+          if (p != null && p > 0) return p;
+        }
+      }
+    }
+
+    // 5. Fallback default based on level (Level 1 = 1, Level 2 = 2, Level 3 = 3)
     switch (effectiveLevel) {
       case 1:
         return 1;

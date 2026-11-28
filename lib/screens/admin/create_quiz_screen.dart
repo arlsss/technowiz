@@ -627,6 +627,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
       ),
       'location': locationController.text.trim(),
       'quizCode': destinationRef.id,
+      'sourceQuizCode': sourceQuizCode,
+      'reusedFrom': sourceQuizCode,
+      'isReused': true,
       'status': 'waiting',
       'eventStatus': 'waiting',
       'published': false,
@@ -643,6 +646,35 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Ensure all levelSettings and points configurations from the previous
+    // quiz are guaranteed to be carried over completely untouched.
+    if (sourceData['levelSettings'] != null) {
+      copiedData['levelSettings'] = sourceData['levelSettings'];
+    }
+    if (sourceData['levels'] != null) {
+      copiedData['levels'] = sourceData['levels'];
+    }
+    if (sourceData['levelQuestions'] != null) {
+      copiedData['levelQuestions'] = sourceData['levelQuestions'];
+    }
+
+    // Carry over any top-level level points configurations
+    for (int l = 1; l <= 20; l++) {
+      for (final pKey in [
+        'level${l}Points',
+        'level${l}PointsPerCorrectAnswer',
+        'level${l}PointsPerQuestion',
+        'level${l}PointValue',
+        'pointsLevel$l',
+        'pointsPerQuestionLevel$l',
+        'level_${l}_points',
+      ]) {
+        if (sourceData[pKey] != null) {
+          copiedData[pKey] = sourceData[pKey];
+        }
+      }
+    }
 
     await destinationRef.set(copiedData);
 

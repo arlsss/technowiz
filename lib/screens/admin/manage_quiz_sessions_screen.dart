@@ -1634,14 +1634,19 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        // Clear previous session participants, scores, and join requests
-        // so the reused quiz starts completely fresh for the new event.
+        // Clear previous session participants, scores, join requests, answers, and contests
+        // so the reused quiz starts completely fresh for the new event,
+        // while preserving all questions and levelSettings configurations completely intact.
         final participantsSnap = await quizRef.collection('participants').get();
         final scoresSnap = await quizRef.collection('scores').get();
         final requestsSnap = await quizRef.collection('join_requests').get();
+        final contestsSnap = await quizRef.collection('contest_requests').get();
+        final answersSnap = await quizRef.collection('answers').get();
+
         if (participantsSnap.docs.isNotEmpty ||
             scoresSnap.docs.isNotEmpty ||
-            requestsSnap.docs.isNotEmpty) {
+            requestsSnap.docs.isNotEmpty ||
+            contestsSnap.docs.isNotEmpty) {
           final batch = FirebaseFirestore.instance.batch();
           for (final doc in participantsSnap.docs) {
             batch.delete(doc.reference);
@@ -1652,7 +1657,24 @@ class _QuizSessionDetailScreenState extends State<QuizSessionDetailScreen> {
           for (final doc in requestsSnap.docs) {
             batch.delete(doc.reference);
           }
+          for (final doc in contestsSnap.docs) {
+            batch.delete(doc.reference);
+          }
           await batch.commit();
+        }
+
+        for (final doc in answersSnap.docs) {
+          final responsesSnap = await doc.reference.collection('responses').get();
+          if (responsesSnap.docs.isNotEmpty) {
+            final b = FirebaseFirestore.instance.batch();
+            for (final r in responsesSnap.docs) {
+              b.delete(r.reference);
+            }
+            b.delete(doc.reference);
+            await b.commit();
+          } else {
+            await doc.reference.delete();
+          }
         }
       } else {
         await quizRef.update({

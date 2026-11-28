@@ -394,11 +394,14 @@ class _ContestantOverallTallyScreenState
                                         }
                                       }
 
-                                      final int effectiveTbPoints = myParticipant!.tieBreakerPoints > 0
-                                          ? myParticipant.tieBreakerPoints
-                                          : (tbPointsFromResponses > 0
-                                              ? tbPointsFromResponses
-                                              : tbCorrect);
+                                      final int effectiveTbPoints =
+                                          (myParticipant!.tieBreakerPoints > 0)
+                                              ? myParticipant.tieBreakerPoints
+                                              : (tbPointsFromResponses > 0
+                                                  ? tbPointsFromResponses
+                                                  : (tbCorrect > 0
+                                                      ? tbCorrect
+                                                      : 0));
 
                                       return _buildMyTallyCard(
                                         me: myParticipant,
@@ -468,9 +471,13 @@ class _ContestantOverallTallyScreenState
     for (final pts in me.levelPoints.values) {
       levelPointsSum += pts;
     }
-    final int displayedTotal = (me.totalScore < levelPointsSum + effectiveTbPoints)
-        ? (levelPointsSum + effectiveTbPoints)
-        : me.totalScore;
+    final int safeTbPoints = effectiveTbPoints > 0
+        ? effectiveTbPoints
+        : (tbCorrect > 0 ? tbCorrect : 0);
+    final int displayedTotal =
+        (me.totalScore < levelPointsSum + safeTbPoints)
+            ? (levelPointsSum + safeTbPoints)
+            : me.totalScore;
     final displayName = me.isTeam
         ? (me.teamName.isNotEmpty ? me.teamName : me.name)
         : me.name;
@@ -692,7 +699,9 @@ class _ContestantOverallTallyScreenState
               tbContest > 0) ...[
             _buildLevelBreakdownCard(
               title: "Tie Breaker",
-              points: effectiveTbPoints,
+              points: (effectiveTbPoints > 0)
+                  ? effectiveTbPoints
+                  : (tbCorrect > 0 ? tbCorrect : 0),
               correct: tbCorrect,
               wrong: tbWrong,
               contest: tbContest,
