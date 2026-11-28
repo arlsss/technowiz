@@ -90,6 +90,8 @@ class _ContestantOverallTallyScreenState
             stream: sessionRef.snapshots(),
             builder: (context, sessionSnap) {
               final sessionData = sessionSnap.data?.data() ?? {};
+              final bool publishedWinners =
+                  sessionData['publishedWinners'] == true;
 
               // If Quiz Master starts a Tie Breaker for this contestant, immediately return to Quiz Screen
               final isTieBreakerActive =
@@ -413,6 +415,7 @@ class _ContestantOverallTallyScreenState
                                         tbWrong: tbWrong,
                                         tbContest: tbContest,
                                         effectiveTbPoints: effectiveTbPoints,
+                                        publishedWinners: publishedWinners,
                                       );
                                     },
                                   )
@@ -426,12 +429,26 @@ class _ContestantOverallTallyScreenState
                                           color: const Color(0xFFE2E8F0)),
                                     ),
                                     alignment: Alignment.center,
-                                    child: const Text(
-                                      "No score records yet.",
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                        fontSize: 14,
-                                      ),
+                                    child: const Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.hourglass_top_rounded,
+                                          size: 32,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                        SizedBox(height: 12),
+                                        Text(
+                                          "Please wait for the quizmaster to announce the winners.",
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Color(0xFF334155),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
 
@@ -466,6 +483,7 @@ class _ContestantOverallTallyScreenState
     required int tbWrong,
     required int tbContest,
     int effectiveTbPoints = 0,
+    bool publishedWinners = false,
   }) {
     int levelPointsSum = 0;
     for (final pts in me.levelPoints.values) {
@@ -662,7 +680,96 @@ class _ContestantOverallTallyScreenState
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+
+          // Waiting for Quiz Master Announcement Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: publishedWinners
+                    ? [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)]
+                    : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: publishedWinners
+                    ? const Color(0xFF86EFAC)
+                    : const Color(0xFFFDE68A),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: publishedWinners
+                      ? primaryGreen.withValues(alpha: 0.08)
+                      : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: publishedWinners
+                        ? const Color(0xFF86EFAC).withValues(alpha: 0.35)
+                        : const Color(0xFFF59E0B).withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    publishedWinners
+                        ? Icons.emoji_events_rounded
+                        : Icons.campaign_rounded,
+                    color: publishedWinners
+                        ? darkGreen
+                        : const Color(0xFFB45309),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        publishedWinners
+                            ? "WINNERS ANNOUNCED"
+                            : "QUIZ CONCLUDED",
+                        style: TextStyle(
+                          color: publishedWinners
+                              ? darkGreen
+                              : const Color(0xFF92400E),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        publishedWinners
+                            ? "The Quiz Master has officially announced the winners!"
+                            : "Please wait for the quizmaster to announce the winners.",
+                        style: TextStyle(
+                          color: publishedWinners
+                              ? const Color(0xFF14532D)
+                              : const Color(0xFF78350F),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 18),
 
           // Points Breakdown by Level
           Row(
@@ -708,6 +815,48 @@ class _ContestantOverallTallyScreenState
               isTieBreaker: true,
             ),
           ],
+
+          const SizedBox(height: 16),
+
+          // Bottom reminder badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  publishedWinners
+                      ? Icons.emoji_events_rounded
+                      : Icons.hourglass_top_rounded,
+                  size: 16,
+                  color: publishedWinners
+                      ? primaryGreen
+                      : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    publishedWinners
+                        ? "Winners officially announced by the Quiz Master."
+                        : "Please wait for the quizmaster to announce the winners.",
+                    style: TextStyle(
+                      color: publishedWinners
+                          ? const Color(0xFF14532D)
+                          : const Color(0xFF475569),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
