@@ -5882,31 +5882,85 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                       ),
                     ),
 
-                    // Signatory Count Selector
-                    Row(
+                    // Signatory Count Selector (Responsive)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.people_alt_rounded, size: 16, color: Color(0xFF4F46E5)),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Number of Signatories:',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        SegmentedButton<int>(
-                          segments: const [
-                            ButtonSegment(value: 1, label: Text('1 Sig')),
-                            ButtonSegment(value: 2, label: Text('2 Sigs')),
-                            ButtonSegment(value: 3, label: Text('3 Sigs')),
+                        Row(
+                          children: [
+                            const Icon(Icons.people_alt_rounded, size: 16, color: Color(0xFF4F46E5)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Number of Signatories:',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AdminThemeColors.textPrimary,
+                              ),
+                            ),
                           ],
-                          selected: {_signatoryCount},
-                          onSelectionChanged: (newVal) {
-                            setState(() => _signatoryCount = newVal.first);
-                          },
-                          style: SegmentedButton.styleFrom(
-                            selectedBackgroundColor: const Color(0xFF4F46E5),
-                            selectedForegroundColor: Colors.white,
-                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                            visualDensity: VisualDensity.compact,
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark ? Colors.white12 : Colors.grey.shade300,
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              for (int count = 1; count <= 3; count++)
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _signatoryCount = count),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: _signatoryCount == count
+                                            ? const Color(0xFF4F46E5)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: _signatoryCount == count
+                                            ? [
+                                                BoxShadow(
+                                                  color: const Color(0xFF4F46E5)
+                                                      .withValues(alpha: 0.35),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (_signatoryCount == count) ...[
+                                            const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Text(
+                                            count == 1 ? '1 Sig' : '$count Sigs',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              color: _signatoryCount == count
+                                                  ? Colors.white
+                                                  : (isDark ? Colors.white70 : Colors.black87),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -5921,17 +5975,21 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
 
                     const SizedBox(height: 20),
 
-                    // Real-time Report Document Preview
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Report Document Preview Header (Responsive, "Live" removed)
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: const [
                             Icon(Icons.description_rounded, size: 16, color: Color(0xFF4F46E5)),
                             SizedBox(width: 6),
                             Text(
-                              'REAL-TIME REPORT DOCUMENT PREVIEW',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                              'REPORT DOCUMENT PREVIEW',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                             ),
                           ],
                         ),
@@ -5942,7 +6000,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
-                            'Live Page Replica',
+                            'Page Replica',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -6135,9 +6193,10 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                                     children: [
                                       if (_showLines[i])
                                         Container(
-                                          width: _signatoryCount == 1 ? 180 : 130,
+                                          width: _signatoryCount == 1 ? 180 : double.infinity,
                                           height: 1.2,
                                           color: const Color(0xFF0F172A),
+                                          margin: const EdgeInsets.symmetric(horizontal: 2),
                                         )
                                       else
                                         const SizedBox(height: 1.2),
@@ -6209,7 +6268,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
 
             // Modal Footer Actions
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
@@ -6219,73 +6278,161 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
                   ),
                 ),
               ),
-              child: Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: _resetToDefault,
-                    icon: const Icon(Icons.restart_alt_rounded, size: 16),
-                    label: const Text('Reset', style: TextStyle(fontSize: 12)),
-                    style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600),
-                  ),
-                  const Spacer(),
-                  OutlinedButton.icon(
-                    onPressed: _isPreviewing
-                        ? null
-                        : () async {
-                            setState(() => _isPreviewing = true);
-                            try {
-                              await widget.onPreview(_buildConfig(), _activeSection);
-                            } finally {
-                              if (mounted) setState(() => _isPreviewing = false);
-                            }
-                          },
-                    icon: _isPreviewing
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.visibility_rounded, size: 16),
-                    label: Text('Preview ${_sectionShortName(_activeSection)} PDF', style: const TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _isSaving
-                        ? null
-                        : () async {
-                            setState(() => _isSaving = true);
-                            try {
-                              await widget.onSave(_buildConfig());
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                              }
-                            } finally {
-                              if (mounted) setState(() => _isSaving = false);
-                            }
-                          },
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+              child: LayoutBuilder(
+                builder: (context, bConstraints) {
+                  final isCompact = bConstraints.maxWidth < 430;
+                  if (isCompact) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: _resetToDefault,
+                              icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                              label: const Text('Reset', style: TextStyle(fontSize: 12)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.grey.shade600,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              ),
                             ),
-                          )
-                        : const Icon(Icons.check_rounded, size: 16),
-                    label: const Text('Save & Apply', style: TextStyle(fontSize: 12)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ],
+                            const Spacer(),
+                            OutlinedButton.icon(
+                              onPressed: _isPreviewing
+                                  ? null
+                                  : () async {
+                                      setState(() => _isPreviewing = true);
+                                      try {
+                                        await widget.onPreview(_buildConfig(), _activeSection);
+                                      } finally {
+                                        if (mounted) setState(() => _isPreviewing = false);
+                                      }
+                                    },
+                              icon: _isPreviewing
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.visibility_rounded, size: 15),
+                              label: Text('Preview PDF', style: const TextStyle(fontSize: 11.5)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton.icon(
+                          onPressed: _isSaving
+                              ? null
+                              : () async {
+                                  setState(() => _isSaving = true);
+                                  try {
+                                    await widget.onSave(_buildConfig());
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  } finally {
+                                    if (mounted) setState(() => _isSaving = false);
+                                  }
+                                },
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_rounded, size: 16),
+                          label: const Text(
+                            'Save & Apply',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: _resetToDefault,
+                        icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                        label: const Text('Reset', style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600),
+                      ),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: _isPreviewing
+                            ? null
+                            : () async {
+                                setState(() => _isPreviewing = true);
+                                try {
+                                  await widget.onPreview(_buildConfig(), _activeSection);
+                                } finally {
+                                  if (mounted) setState(() => _isPreviewing = false);
+                                }
+                              },
+                        icon: _isPreviewing
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.visibility_rounded, size: 16),
+                        label: Text('Preview ${_sectionShortName(_activeSection)} PDF', style: const TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _isSaving
+                            ? null
+                            : () async {
+                                setState(() => _isSaving = true);
+                                try {
+                                  await widget.onSave(_buildConfig());
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => _isSaving = false);
+                                }
+                              },
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check_rounded, size: 16),
+                        label: const Text('Save & Apply', style: TextStyle(fontSize: 12)),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -6367,8 +6514,8 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
           const SizedBox(height: 10),
           Row(
             children: [
-              SizedBox(
-                width: 140,
+              Expanded(
+                flex: 2,
                 child: TextField(
                   controller: _labelControllers[index],
                   decoration: InputDecoration(
@@ -6385,6 +6532,7 @@ class _ManageReportSignaturesDialogState extends State<_ManageReportSignaturesDi
               ),
               const SizedBox(width: 8),
               Expanded(
+                flex: 3,
                 child: TextField(
                   controller: _nameControllers[index],
                   decoration: InputDecoration(
