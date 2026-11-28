@@ -12,6 +12,7 @@ import 'quiz_countdown_screen.dart';
 import 'technowiz_theme.dart';
 import 'contestant_overall_tally_screen.dart';
 import '../../navigation_persistence.dart';
+import '../../widgets/celebration_party_poppers.dart';
 
 class QuizScreen extends StatefulWidget {
   final String quizCode;
@@ -4670,7 +4671,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
     final bool publishedWinners = _latestQuizData['publishedWinners'] == true;
 
-    if (publishedWinners && !canStayOnTieBreakerResult) {
+    if (publishedWinners) {
       return _buildFinishedCongratulationsScreen(context, currentUid);
     } else if (isTieBreakerEnded && !canStayOnTieBreakerResult) {
       if (!isTiedContestant) {
@@ -9585,17 +9586,6 @@ class _QuizScreenState extends State<QuizScreen> {
                   quizData['tieBreakerActive'] == true);
           final bool publishedWinners = quizData['publishedWinners'] == true;
 
-          final bool isQuizFinished =
-              (rawStatus == 'finished' ||
-                  rawStatus == 'ended' ||
-                  rawStatus == 'completed' ||
-                  rawStatus == 'closed' ||
-                  quizData['isFinished'] == true ||
-                  quizData['finished'] == true ||
-                  quizData['completed'] == true ||
-                  quizData['isCompleted'] == true) &&
-              (!isTieBreakerEnded || publishedWinners);
-
           final isTieBreakerActive = quizData['tieBreakerActive'] == true;
           final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
           final rawTieUids = quizData['tieBreakerContestantUids'];
@@ -9622,12 +9612,8 @@ class _QuizScreenState extends State<QuizScreen> {
             }
           }
 
-          // Only show final ranking / congratulations screen if Quiz Master has published winners!
-          if (publishedWinners &&
-              (_showTieBreakerOverallTally ||
-                  _quizFinishedForContestant ||
-                  (isQuizFinished &&
-                      (!isTieBreakerActive || !isTiedContestant)))) {
+          // When Quiz Master publishes winners, immediately show the Congratulations & Trophy screen!
+          if (publishedWinners) {
             timer?.cancel();
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
@@ -11478,10 +11464,12 @@ class _QuizScreenState extends State<QuizScreen> {
                             rankSubtitle = "COMPETITOR • RANK #$finalRank";
                           }
 
-                          return TechCircuitBackground(
-                            child: SafeArea(
-                              child: Center(
-                                child: SingleChildScrollView(
+                          return Stack(
+                            children: [
+                              TechCircuitBackground(
+                                child: SafeArea(
+                                  child: Center(
+                                    child: SingleChildScrollView(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
                                     vertical: 20,
@@ -12233,19 +12221,24 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                          const Positioned.fill(
+                            child: CelebrationPartyPoppers(),
+                          ),
+                        ],
                       );
-                    },
-                  );
-                },
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+      );
+    },
+  );
+}
 
   // ==========================================================
   // FINISHED FINAL TALLY CARD (All Contestants Standings & Levels)

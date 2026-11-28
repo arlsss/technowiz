@@ -1083,19 +1083,18 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
     try {
       if (widget.onFinishQuiz != null) {
         await widget.onFinishQuiz!();
-      } else {
-        // Default finish quiz logic
-        await _sessionRef.set(
-          {
-            'status': 'finished',
-            'isFinished': true,
-            'publishedWinners': true,
-            'finishedAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
       }
+      // Always guarantee publishedWinners is true in Firestore for real-time celebration
+      await _sessionRef.set(
+        {
+          'status': 'finished',
+          'isFinished': true,
+          'publishedWinners': true,
+          'finishedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       await QuizMasterNavPersistence.savePage(
         'ranking',

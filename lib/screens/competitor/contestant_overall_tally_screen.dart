@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'technowiz_theme.dart';
+import 'quiz_screen.dart';
+import '../../widgets/celebration_party_poppers.dart';
 
 class ContestantOverallTallyScreen extends StatefulWidget {
   final String quizCode;
@@ -129,6 +131,23 @@ class _ContestantOverallTallyScreenState
               final List<String> tieBreakerNames = rawNames is List
                   ? rawNames.map((e) => e.toString()).toList()
                   : <String>[];
+
+              // If Quiz Master publishes winners, immediately return to Quiz Screen to reveal the Trophy & Celebration!
+              if (publishedWinners) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted) {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => QuizScreen(quizCode: widget.quizCode),
+                        ),
+                      );
+                    }
+                  }
+                });
+              }
 
               if (!widget.fromTieBreakerEnd &&
                   isTieBreakerActive &&
@@ -320,17 +339,19 @@ class _ContestantOverallTallyScreenState
                         }
                       }
 
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 18,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 540),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
+                      return Stack(
+                        children: [
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 18,
+                            ),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 540),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
                                 // ==========================================
                                 // CURRENT CONTESTANT HIGHLIGHT CARD
                                 // ==========================================
@@ -498,7 +519,13 @@ class _ContestantOverallTallyScreenState
                             ),
                           ),
                         ),
-                      );
+                      ),
+                      if (publishedWinners)
+                        const Positioned.fill(
+                          child: CelebrationPartyPoppers(),
+                        ),
+                    ],
+                  );
                     },
                   );
                 },
