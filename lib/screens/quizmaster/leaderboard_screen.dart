@@ -2956,16 +2956,25 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     'approved';
             if (isCorrect) {
               int pts = 0;
-              final rawPts = rData['points'];
-              if (rawPts is num && rawPts > 0) {
-                pts = rawPts.toInt();
-              } else if (rawPts != null &&
-                  int.tryParse(rawPts.toString()) != null &&
-                  int.tryParse(rawPts.toString())! > 0) {
-                pts = int.tryParse(rawPts.toString())!;
+              final bool isTB = rData['isTieBreaker'] == true ||
+                  lvl == 0 ||
+                  r.id.startsWith('tb_');
+              if (isTB) {
+                pts = 1;
               } else {
                 final adminPts = _getAdminPointsForLevel(lvl, quizData);
-                pts = adminPts > 0 ? adminPts : 1;
+                final rawPts = rData['points'];
+                if (adminPts > 0) {
+                  pts = adminPts;
+                } else if (rawPts is num && rawPts > 0) {
+                  pts = rawPts.toInt();
+                } else if (rawPts != null &&
+                    int.tryParse(rawPts.toString()) != null &&
+                    int.tryParse(rawPts.toString())! > 0) {
+                  pts = int.tryParse(rawPts.toString())!;
+                } else {
+                  pts = 1;
+                }
               }
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
               totalRespPoints += pts;

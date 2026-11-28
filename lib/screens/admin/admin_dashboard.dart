@@ -2743,10 +2743,14 @@ class _AdminFinishedQuizResultsScreenState
 
           final isCorrect =
               rd['isCorrect'] == true ||
-              rd['answerStatus']?.toString().toLowerCase() == 'correct';
-          final points = isCorrect
-              ? (_asNum(rd['points'])?.toInt() ?? 1)
-              : 0;
+              rd['answerStatus']?.toString().toLowerCase() == 'correct' ||
+              rd['contestStatus']?.toString().toLowerCase() == 'approved';
+          final int levelConfigPts = (session['levelSettings'] is Map
+                  ? (_asInt((session['levelSettings'] as Map)['Level $level']?['pointsPerCorrectAnswer']) ??
+                      _asInt((session['levelSettings'] as Map)['$level']?['pointsPerCorrectAnswer']))
+                  : null) ??
+              (_asNum(rd['points'])?.toInt() ?? level);
+          final points = isCorrect ? levelConfigPts : 0;
 
           final tally = tallies.putIfAbsent(level, () => _LevelTally());
           if (isCorrect) {

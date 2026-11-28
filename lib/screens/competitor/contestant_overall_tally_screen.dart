@@ -332,6 +332,7 @@ class _ContestantOverallTallyScreenState
                                         final data = doc.data();
                                         final bool isTb =
                                             data['isTieBreaker'] == true ||
+                                                doc.id.startsWith('tb_') ||
                                                 (data['level']
                                                         ?.toString()
                                                         .toLowerCase()

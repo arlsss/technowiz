@@ -216,6 +216,41 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
   }
 
   int _getPointsForLevel(int level) {
+    if (level == 0) return 1;
+    final rawSettings = _sessionData['levelSettings'] ?? _sessionData['levels'];
+    if (rawSettings is Map) {
+      final target = 'level$level';
+      for (final entry in rawSettings.entries) {
+        final norm = entry.key
+            .toString()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if ((norm == target || norm == '$level') && entry.value is Map) {
+          final val = entry.value['pointsPerCorrectAnswer'] ??
+              entry.value['points_per_correct_answer'] ??
+              entry.value['pointsPerQuestion'] ??
+              entry.value['points'];
+          if (val is num && val > 0) return val.toInt();
+          if (val != null) {
+            final p = int.tryParse(val.toString());
+            if (p != null && p > 0) return p;
+          }
+        }
+      }
+    }
+    for (final key in [
+      'level${level}Points',
+      'level${level}PointsPerCorrectAnswer',
+      'level${level}PointsPerQuestion',
+      'level_${level}_points',
+    ]) {
+      final val = _sessionData[key];
+      if (val is num && val > 0) return val.toInt();
+      if (val != null) {
+        final p = int.tryParse(val.toString());
+        if (p != null && p > 0) return p;
+      }
+    }
     switch (level) {
       case 1:
         return 1;
@@ -223,10 +258,8 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         return 2;
       case 3:
         return 3;
-      case 4:
-        return 5;
       default:
-        return 1;
+        return level > 0 ? level : 1;
     }
   }
 
@@ -609,11 +642,11 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
           (hasAnswer && _isAnswerCorrect(qData, selectedAnswer));
 
       final int points = isCorrect
-          ? (int.tryParse(response?['points']?.toString() ?? '') ?? levelPoints)
+          ? (levelPoints > 0 ? levelPoints : (int.tryParse(response?['points']?.toString() ?? '') ?? 1))
           : 0;
 
       if (isCorrect) {
-        calculatedScore += (points > 0 ? points : levelPoints);
+        calculatedScore += points;
       }
 
       reviewList.add({
@@ -630,7 +663,7 @@ class _QuizHistoryScoreScreenState extends State<QuizHistoryScoreScreen> {
         'isCorrect': isCorrect,
         'hasAnswer': hasAnswer,
         'isTimedOut': isTimedOut,
-        'points': points > 0 ? points : (isCorrect ? levelPoints : 0),
+        'points': points,
         'isContested': isContested,
         'contestStatus': contestStatus,
         'contestExplanation': contestExplanation,

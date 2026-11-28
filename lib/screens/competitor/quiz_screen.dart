@@ -951,8 +951,18 @@ class _QuizScreenState extends State<QuizScreen> {
     int level, {
     Map<String, dynamic>? question,
     Map<String, dynamic>? sessionData,
+    bool? isTieBreaker,
   }) {
     final quizData = sessionData ?? _latestQuizData;
+    final bool isTb = isTieBreaker == true ||
+        (isTieBreaker == null &&
+            (_isCurrentlyInTieBreaker() ||
+                quizData['tieBreakerActive'] == true ||
+                level == 0));
+    if (isTb) {
+      return 1;
+    }
+
     final int effectiveLevel = level > 0
         ? level
         : (int.tryParse(quizData['currentLevel']?.toString() ?? '') ?? 1);
@@ -988,7 +998,13 @@ class _QuizScreenState extends State<QuizScreen> {
       if (p != null && p > 0) return p;
     }
 
-    // 3. Fallback default based on level (Level 1 = 1, Level 2 = 2, Level 3 = 3)
+    // 3. Check question-level points if explicitly set on question
+    if (question != null) {
+      final qp = _parsePoints(question);
+      if (qp != null && qp > 0) return qp;
+    }
+
+    // 4. Fallback default based on level (Level 1 = 1, Level 2 = 2, Level 3 = 3)
     switch (effectiveLevel) {
       case 1:
         return 1;
@@ -2432,10 +2448,13 @@ class _QuizScreenState extends State<QuizScreen> {
             _scoredQuestionKeys.add(scoreKey);
             _scoredQuestionKeys.add(altKey);
             try {
-              final earnedPoints = getPointsForLevel(
-                sessionLevel,
-                question: questionForEval,
-              );
+              final earnedPoints = isTB
+                  ? 1
+                  : getPointsForLevel(
+                      sessionLevel,
+                      question: questionForEval,
+                      isTieBreaker: isTB,
+                    );
               responseRef
                   .update({
                     'isCorrect': true,
@@ -2634,10 +2653,13 @@ class _QuizScreenState extends State<QuizScreen> {
                       !_scoredQuestionKeys.contains(altKey)) {
                     _scoredQuestionKeys.add(scoreKey);
                     _scoredQuestionKeys.add(altKey);
-                    final earnedPoints = getPointsForLevel(
-                      sessionLevel,
-                      question: questionForEval,
-                    );
+                    final earnedPoints = isTieBreakerActive
+                        ? 1
+                        : getPointsForLevel(
+                            sessionLevel,
+                            question: questionForEval,
+                            isTieBreaker: isTieBreakerActive,
+                          );
                     responseRef
                         .update({
                           'isCorrect': true,
@@ -6110,13 +6132,18 @@ class _QuizScreenState extends State<QuizScreen> {
       currentQuestionData ?? {},
       fallbackQuestionNumber: questionNumber,
     );
-    final points = getPointsForLevel(
-      contestLevel,
-      question: currentQuestionData,
-    );
-
     final bool isTieBreakerActive =
-        _latestQuizData['tieBreakerActive'] == true;
+        _latestQuizData['tieBreakerActive'] == true ||
+        _isCurrentlyInTieBreaker() ||
+        contestLevel == 0;
+    final points = isTieBreakerActive
+        ? 1
+        : getPointsForLevel(
+            contestLevel,
+            question: currentQuestionData,
+            isTieBreaker: isTieBreakerActive,
+          );
+
     final responseDocId = _getResponseDocId(
       questionIndex,
       isTieBreaker: isTieBreakerActive,
@@ -6201,6 +6228,19 @@ class _QuizScreenState extends State<QuizScreen> {
       if (shouldAwardPoints) {
         await updateScore(uid, points, questionNumber, level: contestLevel);
       }
+
+      // Ensure local currentScore is immediately synced from the scores collection
+      try {
+        final scoreSnap = await _sessionRef.collection('scores').doc(uid).get();
+        if (scoreSnap.exists && scoreSnap.data() != null) {
+          final sData = scoreSnap.data()!;
+          final rawScore = sData['score'] ?? sData['totalScore'];
+          final s = rawScore is num ? rawScore.toInt() : int.tryParse(rawScore?.toString() ?? '') ?? 0;
+          if (s > currentScore && mounted) {
+            setState(() => currentScore = s);
+          }
+        }
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -6545,7 +6585,8 @@ class _QuizScreenState extends State<QuizScreen> {
         .doc(uid);
 
     final bool isTieBreakerActive = _latestQuizData['tieBreakerActive'] == true ||
-        _isCurrentlyInTieBreaker();
+        _isCurrentlyInTieBreaker() ||
+        (level == 0);
     final int targetLevel =
         (level != null && level > 0) ? level : getLevelFromQuestionNumber(questionNumber);
     final String levelKey = 'level${targetLevel}Score';
@@ -6605,11 +6646,14 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
 
+      final int directLevelSum = (oldLevelScore + points).clamp(0, 999999);
       final int newLevelScore = isTieBreakerActive
           ? oldLevelScore
-          : (calculatedLevelFromScored > 0
+          : (calculatedLevelFromScored > directLevelSum
               ? calculatedLevelFromScored
-              : ((oldLevelScore + points).clamp(0, 999999)));
+              : (calculatedLevelFromScored > 0 && calculatedLevelFromScored >= oldLevelScore
+                  ? calculatedLevelFromScored
+                  : directLevelSum));
 
       final Map<String, dynamic> mergedLevelScores = {};
       if (scoreData['levelScores'] is Map) {
@@ -8944,7 +8988,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   sqSum += v.toInt();
                                 }
                               });
-                              if (sqSum > 0 && sqSum < lvlSum) {
+                              if (sqSum > lvlSum) {
                                 lvlSum = sqSum;
                               }
                             }
@@ -8969,7 +9013,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
                             // Total score displayed: regular level quiz points + tie breaker points (+1 if scored)
                             int scoreVal = baseLevelScore + tiePts;
-                            if (storedScore > scoreVal && sData['scoredQuestions'] is! Map) {
+                            if (storedScore > scoreVal) {
                               scoreVal = storedScore;
                             }
 

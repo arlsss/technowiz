@@ -2003,21 +2003,11 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
         }
         // When approved, award points directly to the contestant's score
         if (approve) {
-          int pointsToAward = 1;
-          if (qIndex < _questions.length) {
-            final qDoc = _questions[qIndex];
-            final qData = qDoc.data() as Map<String, dynamic>;
-            final p = qData['points'] ??
-                qData['pointValue'] ??
-                qData['pts'] ??
-                qData['score'];
-            if (p is num && p > 0) {
-              pointsToAward = p.toInt();
-            } else if (p != null) {
-              final parsed = int.tryParse(p.toString());
-              if (parsed != null && parsed > 0) pointsToAward = parsed;
-            }
-          }
+          final qLevel = _getLevel(qIndex);
+          final int adminLevelPts = _getAdminPointsForLevel(qLevel, _quizData);
+          final int pointsToAward = _isTieBreakerActive
+              ? 1
+              : (adminLevelPts > 0 ? adminLevelPts : 1);
 
           respUpdate['points'] = pointsToAward;
 
@@ -2027,23 +2017,116 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
               .collection('scores')
               .doc(contestantUid);
 
-          final qLevel = _getLevel(qIndex);
-          final scoreUpdate = <String, dynamic>{
-            'score': FieldValue.increment(pointsToAward),
-            'totalScore': FieldValue.increment(pointsToAward),
-            'level${qLevel}Score': FieldValue.increment(pointsToAward),
-            'levelScores': {
-              'Level $qLevel': FieldValue.increment(pointsToAward),
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          };
-          if (_isTieBreakerActive) {
-            scoreUpdate['tieBreakerScore'] = FieldValue.increment(pointsToAward);
+          final String questionScoreKey =
+              '${_isTieBreakerActive ? "tb_" : "lvl_"}${qLevel}_q${qIndex + 1}';
+
+          try {
+            await FirebaseFirestore.instance.runTransaction((transaction) async {
+              final scoreDoc = await transaction.get(scoreRef);
+              final scoreData = scoreDoc.data() ?? {};
+
+              final Map<String, dynamic> scoredQuestions = {};
+              if (scoreData['scoredQuestions'] is Map) {
+                (scoreData['scoredQuestions'] as Map).forEach((k, v) {
+                  scoredQuestions[k.toString()] = v;
+                });
+              }
+              scoredQuestions[questionScoreKey] = pointsToAward;
+
+              int oldLevelScore = 0;
+              final dynamic rawLvl = scoreData['level${qLevel}Score'] ??
+                  scoreData['level_$qLevel'] ??
+                  (scoreData['levelScores'] is Map
+                      ? scoreData['levelScores']['Level $qLevel']
+                      : null);
+              if (rawLvl != null) {
+                oldLevelScore = int.tryParse(rawLvl.toString()) ?? 0;
+              }
+
+              int calculatedLevelFromScored = 0;
+              for (final entry in scoredQuestions.entries) {
+                if (entry.key.startsWith('lvl_${qLevel}_')) {
+                  calculatedLevelFromScored +=
+                      int.tryParse(entry.value.toString()) ?? 0;
+                }
+              }
+
+              final int newLevelScore = _isTieBreakerActive
+                  ? oldLevelScore
+                  : (calculatedLevelFromScored > 0
+                      ? calculatedLevelFromScored
+                      : (oldLevelScore + pointsToAward));
+
+              final Map<String, dynamic> mergedLevelScores = {};
+              if (scoreData['levelScores'] is Map) {
+                (scoreData['levelScores'] as Map).forEach((k, v) {
+                  mergedLevelScores[k.toString()] = v;
+                });
+              }
+              if (!_isTieBreakerActive) {
+                mergedLevelScores['Level $qLevel'] = newLevelScore;
+              }
+
+              int sumOfLevels = 0;
+              for (int l = 1; l <= 20; l++) {
+                if (!_isTieBreakerActive && l == qLevel) {
+                  sumOfLevels += newLevelScore;
+                } else {
+                  final dynamic r = scoreData['level${l}Score'] ??
+                      scoreData['level_$l'] ??
+                      mergedLevelScores['Level $l'] ??
+                      mergedLevelScores['$l'];
+                  if (r != null) {
+                    sumOfLevels += int.tryParse(r.toString()) ?? 0;
+                  }
+                }
+              }
+
+              final int oldTieBreaker =
+                  int.tryParse(scoreData['tieBreakerScore']?.toString() ?? '') ?? 0;
+              final int newTieBreaker = _isTieBreakerActive
+                  ? (oldTieBreaker + pointsToAward)
+                  : oldTieBreaker;
+              final int effectiveScore = sumOfLevels + newTieBreaker;
+
+              final Map<String, dynamic> scoreUpdate = {
+                'score': effectiveScore,
+                'totalScore': effectiveScore,
+                'tieBreakerScore': newTieBreaker,
+                'tie_breaker_score': newTieBreaker,
+                'currentLevel': qLevel,
+                'scoredQuestions': scoredQuestions,
+                'updatedAt': FieldValue.serverTimestamp(),
+              };
+              if (!_isTieBreakerActive) {
+                scoreUpdate['level${qLevel}Score'] = newLevelScore;
+                scoreUpdate['levelScores'] = mergedLevelScores;
+              }
+
+              transaction.set(scoreRef, scoreUpdate, SetOptions(merge: true));
+            });
+          } catch (e) {
+            debugPrint("CONTEST APPROVAL SCORE UPDATE TRANSACTION ERROR: $e");
+            // Fallback non-transactional increment
+            final fallbackUpdate = <String, dynamic>{
+              'score': FieldValue.increment(pointsToAward),
+              'totalScore': FieldValue.increment(pointsToAward),
+              'level${qLevel}Score': FieldValue.increment(pointsToAward),
+              'levelScores': {
+                'Level $qLevel': FieldValue.increment(pointsToAward),
+              },
+              'scoredQuestions.$questionScoreKey': pointsToAward,
+              'updatedAt': FieldValue.serverTimestamp(),
+            };
+            if (_isTieBreakerActive) {
+              fallbackUpdate['tieBreakerScore'] = FieldValue.increment(pointsToAward);
+            }
+            await scoreRef.set(fallbackUpdate, SetOptions(merge: true));
           }
-          await scoreRef.set(scoreUpdate, SetOptions(merge: true));
 
           await request.reference.update({
             'scoreApplied': true,
+            'awardedPoints': pointsToAward,
           });
         }
 
@@ -4474,17 +4557,26 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
                     'approved';
             if (isCorrect) {
               int pts = 0;
-              final rawPts = rData['points'];
-              if (rawPts is num && rawPts > 0) {
-                pts = rawPts.toInt();
-              } else if (rawPts != null &&
-                  int.tryParse(rawPts.toString()) != null &&
-                  int.tryParse(rawPts.toString())! > 0) {
-                pts = int.tryParse(rawPts.toString())!;
+              final bool isTB = rData['isTieBreaker'] == true ||
+                  lvl == 0 ||
+                  r.id.startsWith('tb_');
+              if (isTB) {
+                pts = 1;
               } else {
                 final adminPts =
                     _getAdminPointsForLevel(lvl, quizData ?? _quizData);
-                pts = adminPts > 0 ? adminPts : 1;
+                final rawPts = rData['points'];
+                if (adminPts > 0) {
+                  pts = adminPts;
+                } else if (rawPts is num && rawPts > 0) {
+                  pts = rawPts.toInt();
+                } else if (rawPts != null &&
+                    int.tryParse(rawPts.toString()) != null &&
+                    int.tryParse(rawPts.toString())! > 0) {
+                  pts = int.tryParse(rawPts.toString())!;
+                } else {
+                  pts = 1;
+                }
               }
               userLevelScores[lvl] = (userLevelScores[lvl] ?? 0) + pts;
             }
@@ -4514,12 +4606,16 @@ class _QuizControlScreenState extends State<QuizControlScreen> {
 
     // Sum up configured level scores from levelScores map and level1Score..level20Score
     final Map<int, int> levelPointsMap = {};
+    if (uid != null && _levelScoresCache.containsKey(uid)) {
+      levelPointsMap.addAll(_levelScoresCache[uid]!);
+    }
+
     if (sData['levelScores'] is Map) {
       (sData['levelScores'] as Map).forEach((k, v) {
         final m = RegExp(r'\d+').firstMatch(k.toString());
         final lvlNum = m != null ? int.tryParse(m.group(0)!) ?? 0 : 0;
         final p = _asInt(v) ?? 0;
-        if (lvlNum > 0 && p > 0) {
+        if (lvlNum > 0 && p > 0 && (!levelPointsMap.containsKey(lvlNum) || levelPointsMap[lvlNum]! < p)) {
           levelPointsMap[lvlNum] = p;
         }
       });

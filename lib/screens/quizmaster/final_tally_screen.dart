@@ -259,6 +259,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
         int unanswered = 0;
         int contested = 0;
         int latestTimeMs = 0;
+        int tbPoints = 0;
         final Map<int, int> levelPoints = {};
 
         for (final doc in snapshot.docs) {
@@ -300,25 +301,34 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
           }
           lvl ??= 1;
 
+          final bool isTB = data['isTieBreaker'] == true ||
+              doc.id.startsWith('tb_') ||
+              (rawLvl != null &&
+                  rawLvl.toString().toLowerCase().contains('tie'));
+
           final bool isCorrect = answerStatus == 'correct' ||
               rawCorrect == true ||
               contestStatus == 'approved';
 
           if (isCorrect) {
-            final adminPts = _getAdminPointsForLevel(lvl);
-            final rawPts = data['points'] ?? data['score'];
-            int pts = 0;
-            if (rawPts is num && rawPts > 0) {
-              pts = rawPts.toInt();
-            } else if (rawPts != null) {
-              final parsed = int.tryParse(rawPts.toString());
-              if (parsed != null && parsed > 0) pts = parsed;
+            if (isTB) {
+              tbPoints += 1;
+            } else {
+              final adminPts = _getAdminPointsForLevel(lvl);
+              final rawPts = data['points'] ?? data['score'];
+              int pts = 0;
+              if (adminPts > 0) {
+                pts = adminPts;
+              } else if (rawPts is num && rawPts > 0) {
+                pts = rawPts.toInt();
+              } else if (rawPts != null) {
+                final parsed = int.tryParse(rawPts.toString());
+                if (parsed != null && parsed > 0) pts = parsed;
+              } else {
+                pts = 1;
+              }
+              levelPoints[lvl] = (levelPoints[lvl] ?? 0) + pts;
             }
-            if (pts == 0 || (pts < adminPts && adminPts > 1)) {
-              pts = adminPts;
-            }
-
-            levelPoints[lvl] = (levelPoints[lvl] ?? 0) + pts;
           }
         }
 
@@ -331,6 +341,7 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
               'contested': contested,
               'latestTimeMs': latestTimeMs,
               'levelPoints': levelPoints,
+              'tbPoints': tbPoints,
             };
           });
         }
@@ -1237,6 +1248,12 @@ class _FinalTallyScreenState extends State<FinalTallyScreen> {
                                data['tieBreakerScore'] ??
                                data['tie_breaker_score'])?.toString() ?? '',
                             ) ?? 0;
+                            final cachedTb = cachedResp != null
+                                ? (cachedResp['tbPoints'] as int? ?? 0)
+                                : 0;
+                            if (cachedTb > tiePts) {
+                              tiePts = cachedTb;
+                            }
                             if (tiePts == 0 && stored > lvlSum) {
                               tiePts = stored - lvlSum;
                             }
