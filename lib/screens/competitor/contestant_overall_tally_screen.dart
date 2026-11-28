@@ -95,7 +95,13 @@ class _ContestantOverallTallyScreenState
 
               // If Quiz Master starts a Tie Breaker for this contestant, immediately return to Quiz Screen
               final isTieBreakerActive =
-                  sessionData['tieBreakerActive'] == true;
+                  sessionData['tieBreakerActive'] == true ||
+                  sessionData['isTieBreakerActive'] == true ||
+                  (sessionData['status']
+                          ?.toString()
+                          .toLowerCase()
+                          .contains('tie') ??
+                      false);
               final isTieBreakerEnded =
                   sessionData['tieBreakerEnded'] == true;
               final rawTieUids = sessionData['tieBreakerContestantUids'];
@@ -104,6 +110,25 @@ class _ContestantOverallTallyScreenState
                   : <String>[];
               final bool isTiedContestant =
                   tieBreakerContestantUids.contains(_currentUid);
+
+              final bool isTieBreakerInProgress =
+                  isTieBreakerActive && !isTieBreakerEnded && !isTiedContestant;
+
+              final dynamic rawRank = sessionData['tieBreakerRank'];
+              final String tieBreakerRankText = rawRank != null
+                  ? (rawRank == 1
+                      ? '1st Place'
+                      : rawRank == 2
+                          ? '2nd Place'
+                          : rawRank == 3
+                              ? '3rd Place'
+                              : 'Rank #$rawRank')
+                  : '';
+
+              final rawNames = sessionData['tieBreakerContestantNames'];
+              final List<String> tieBreakerNames = rawNames is List
+                  ? rawNames.map((e) => e.toString()).toList()
+                  : <String>[];
 
               if (!widget.fromTieBreakerEnd &&
                   isTieBreakerActive &&
@@ -416,6 +441,10 @@ class _ContestantOverallTallyScreenState
                                         tbContest: tbContest,
                                         effectiveTbPoints: effectiveTbPoints,
                                         publishedWinners: publishedWinners,
+                                        isTieBreakerInProgress:
+                                            isTieBreakerInProgress,
+                                        tieBreakerRankText: tieBreakerRankText,
+                                        tieBreakerNames: tieBreakerNames,
                                       );
                                     },
                                   )
@@ -429,19 +458,31 @@ class _ContestantOverallTallyScreenState
                                           color: const Color(0xFFE2E8F0)),
                                     ),
                                     alignment: Alignment.center,
-                                    child: const Column(
+                                    child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.hourglass_top_rounded,
+                                          isTieBreakerInProgress
+                                              ? Icons.balance_rounded
+                                              : (publishedWinners
+                                                  ? Icons.emoji_events_rounded
+                                                  : Icons.hourglass_top_rounded),
                                           size: 32,
-                                          color: Color(0xFF64748B),
+                                          color: isTieBreakerInProgress
+                                              ? const Color(0xFFD97706)
+                                              : (publishedWinners
+                                                  ? primaryGreen
+                                                  : const Color(0xFF64748B)),
                                         ),
-                                        SizedBox(height: 12),
+                                        const SizedBox(height: 12),
                                         Text(
-                                          "Please wait for the quizmaster to announce the winners.",
+                                          isTieBreakerInProgress
+                                              ? "Please wait, there's a tie breaker currently in progress."
+                                              : (publishedWinners
+                                                  ? "The Quiz Master has officially announced the winners!"
+                                                  : "Please wait for the quizmaster to announce the winners."),
                                           textAlign: TextAlign.center,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             color: Color(0xFF334155),
                                             fontSize: 14,
                                             fontWeight: FontWeight.w700,
@@ -484,6 +525,9 @@ class _ContestantOverallTallyScreenState
     required int tbContest,
     int effectiveTbPoints = 0,
     bool publishedWinners = false,
+    bool isTieBreakerInProgress = false,
+    String tieBreakerRankText = '',
+    List<String> tieBreakerNames = const [],
   }) {
     int levelPointsSum = 0;
     for (final pts in me.levelPoints.values) {
@@ -682,29 +726,35 @@ class _ContestantOverallTallyScreenState
 
           const SizedBox(height: 14),
 
-          // Waiting for Quiz Master Announcement Banner
+          // Status Announcement Banner (Tie Breaker in progress / Winners / Quiz Concluded)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: publishedWinners
-                    ? [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)]
-                    : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)],
+                colors: isTieBreakerInProgress
+                    ? [const Color(0xFFFFF7ED), const Color(0xFFFFEDD5)]
+                    : (publishedWinners
+                        ? [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)]
+                        : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)]),
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: publishedWinners
-                    ? const Color(0xFF86EFAC)
-                    : const Color(0xFFFDE68A),
+                color: isTieBreakerInProgress
+                    ? const Color(0xFFFDBA74)
+                    : (publishedWinners
+                        ? const Color(0xFF86EFAC)
+                        : const Color(0xFFFDE68A)),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: publishedWinners
-                      ? primaryGreen.withValues(alpha: 0.08)
-                      : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  color: isTieBreakerInProgress
+                      ? const Color(0xFFEA580C).withValues(alpha: 0.12)
+                      : (publishedWinners
+                          ? primaryGreen.withValues(alpha: 0.08)
+                          : const Color(0xFFF59E0B).withValues(alpha: 0.12)),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -715,18 +765,24 @@ class _ContestantOverallTallyScreenState
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: publishedWinners
-                        ? const Color(0xFF86EFAC).withValues(alpha: 0.35)
-                        : const Color(0xFFF59E0B).withValues(alpha: 0.22),
+                    color: isTieBreakerInProgress
+                        ? const Color(0xFFF97316).withValues(alpha: 0.22)
+                        : (publishedWinners
+                            ? const Color(0xFF86EFAC).withValues(alpha: 0.35)
+                            : const Color(0xFFF59E0B).withValues(alpha: 0.22)),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    publishedWinners
-                        ? Icons.emoji_events_rounded
-                        : Icons.campaign_rounded,
-                    color: publishedWinners
-                        ? darkGreen
-                        : const Color(0xFFB45309),
+                    isTieBreakerInProgress
+                        ? Icons.balance_rounded
+                        : (publishedWinners
+                            ? Icons.emoji_events_rounded
+                            : Icons.campaign_rounded),
+                    color: isTieBreakerInProgress
+                        ? const Color(0xFFC2410C)
+                        : (publishedWinners
+                            ? darkGreen
+                            : const Color(0xFFB45309)),
                     size: 22,
                   ),
                 ),
@@ -736,13 +792,19 @@ class _ContestantOverallTallyScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        publishedWinners
-                            ? "WINNERS ANNOUNCED"
-                            : "QUIZ CONCLUDED",
+                        isTieBreakerInProgress
+                            ? (tieBreakerRankText.isNotEmpty
+                                ? "TIE BREAKER IN PROGRESS • $tieBreakerRankText"
+                                : "TIE BREAKER IN PROGRESS")
+                            : (publishedWinners
+                                ? "WINNERS ANNOUNCED"
+                                : "QUIZ CONCLUDED"),
                         style: TextStyle(
-                          color: publishedWinners
-                              ? darkGreen
-                              : const Color(0xFF92400E),
+                          color: isTieBreakerInProgress
+                              ? const Color(0xFF9A3412)
+                              : (publishedWinners
+                                  ? darkGreen
+                                  : const Color(0xFF92400E)),
                           fontSize: 10.5,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.5,
@@ -750,18 +812,34 @@ class _ContestantOverallTallyScreenState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        publishedWinners
-                            ? "The Quiz Master has officially announced the winners!"
-                            : "Please wait for the quizmaster to announce the winners.",
+                        isTieBreakerInProgress
+                            ? "Please wait, there's a tie breaker currently in progress."
+                            : (publishedWinners
+                                ? "The Quiz Master has officially announced the winners!"
+                                : "Please wait for the quizmaster to announce the winners."),
                         style: TextStyle(
-                          color: publishedWinners
-                              ? const Color(0xFF14532D)
-                              : const Color(0xFF78350F),
+                          color: isTieBreakerInProgress
+                              ? const Color(0xFF7C2D12)
+                              : (publishedWinners
+                                  ? const Color(0xFF14532D)
+                                  : const Color(0xFF78350F)),
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
                           height: 1.3,
                         ),
                       ),
+                      if (isTieBreakerInProgress &&
+                          tieBreakerNames.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          "Showdown: ${tieBreakerNames.join(' vs ')}",
+                          style: const TextStyle(
+                            color: Color(0xFFC2410C),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -822,32 +900,47 @@ class _ContestantOverallTallyScreenState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isTieBreakerInProgress
+                  ? const Color(0xFFFFF7ED)
+                  : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+              border: Border.all(
+                color: isTieBreakerInProgress
+                    ? const Color(0xFFFED7AA)
+                    : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  publishedWinners
-                      ? Icons.emoji_events_rounded
-                      : Icons.hourglass_top_rounded,
+                  isTieBreakerInProgress
+                      ? Icons.balance_rounded
+                      : (publishedWinners
+                          ? Icons.emoji_events_rounded
+                          : Icons.hourglass_top_rounded),
                   size: 16,
-                  color: publishedWinners
-                      ? primaryGreen
-                      : const Color(0xFF64748B),
+                  color: isTieBreakerInProgress
+                      ? const Color(0xFFEA580C)
+                      : (publishedWinners
+                          ? primaryGreen
+                          : const Color(0xFF64748B)),
                 ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    publishedWinners
-                        ? "Winners officially announced by the Quiz Master."
-                        : "Please wait for the quizmaster to announce the winners.",
+                    isTieBreakerInProgress
+                        ? "Please wait, there's a tie breaker currently in progress."
+                        : (publishedWinners
+                            ? "Winners officially announced by the Quiz Master."
+                            : "Please wait for the quizmaster to announce the winners."),
                     style: TextStyle(
-                      color: publishedWinners
-                          ? const Color(0xFF14532D)
-                          : const Color(0xFF475569),
+                      color: isTieBreakerInProgress
+                          ? const Color(0xFF9A3412)
+                          : (publishedWinners
+                              ? const Color(0xFF14532D)
+                              : const Color(0xFF475569)),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
