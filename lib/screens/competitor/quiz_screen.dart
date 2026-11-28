@@ -4609,6 +4609,9 @@ class _QuizScreenState extends State<QuizScreen> {
     if (publishedWinners && !canStayOnTieBreakerResult) {
       return _buildFinishedCongratulationsScreen(context, currentUid);
     } else if (isTieBreakerEnded && !canStayOnTieBreakerResult) {
+      if (!isTiedContestant) {
+        return _buildTieBreakerSpectatorScreen(context, _latestQuizData);
+      }
       return _buildTieBreakerEndedWaitingScreen(
         context,
         _latestQuizData,
@@ -5237,7 +5240,13 @@ class _QuizScreenState extends State<QuizScreen> {
                 'tie_breaker_ended' ||
             _latestQuizData['tieBreakerResolved'] == true);
 
-    if (isTieBreakerActive || isTieBreakerEnded) {
+    // When the Quiz Master ends the tie breaker in Quiz Control,
+    // nothing should pop up or show below the result on the contestant side.
+    if (isTieBreakerEnded) {
+      return const SizedBox.shrink();
+    }
+
+    if (isTieBreakerActive) {
       final rawTieUids = _latestQuizData['tieBreakerContestantUids'];
       final List<String> tiedUids = rawTieUids is List
           ? rawTieUids
@@ -5295,7 +5304,6 @@ class _QuizScreenState extends State<QuizScreen> {
 
           final bool isTieBroken =
               (tiedUids.length >= 2 && maxTb > minTb && maxTb > 0) ||
-              isTieBreakerEnded ||
               _latestQuizData['tieBreakerResolved'] == true;
 
           if (isTieBroken) {
@@ -9520,6 +9528,14 @@ class _QuizScreenState extends State<QuizScreen> {
             _quizFinishedForContestant = false;
           }
 
+          if (isTieBreakerEnded) {
+            _tieBreakerNextQuestionConfirmed = false;
+            if (isTiedContestant) {
+              answered = true;
+              resultRevealed = true;
+            }
+          }
+
           // Only show final ranking / congratulations screen if Quiz Master has published winners!
           if (publishedWinners &&
               (_showTieBreakerOverallTally ||
@@ -9530,13 +9546,18 @@ class _QuizScreenState extends State<QuizScreen> {
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
 
-          if (isTieBreakerEnded && !publishedWinners && !(answered && resultRevealed && !_quizFinishedForContestant && !_showTieBreakerOverallTally)) {
-            return _buildTieBreakerEndedWaitingScreen(
-              context,
-              quizData,
-              currentUid,
-              isTiedContestant,
-            );
+          if (isTieBreakerEnded && !publishedWinners) {
+            if (!isTiedContestant) {
+              return _buildTieBreakerSpectatorScreen(context, quizData);
+            }
+            if (!(answered && resultRevealed && !_quizFinishedForContestant && !_showTieBreakerOverallTally)) {
+              return _buildTieBreakerEndedWaitingScreen(
+                context,
+                quizData,
+                currentUid,
+                isTiedContestant,
+              );
+            }
           }
 
           final status = quizData['status']?.toString() ?? 'waiting';
@@ -9963,14 +9984,20 @@ class _QuizScreenState extends State<QuizScreen> {
             return _buildFinishedCongratulationsScreen(context, currentUid);
           }
 
-          if (isTieBreakerEnded && !publishedWinners && !(answered && resultRevealed && !_quizFinishedForContestant && !_showTieBreakerOverallTally)) {
-            timer?.cancel();
-            return _buildTieBreakerEndedWaitingScreen(
-              context,
-              quizData,
-              currentUid,
-              isTiedContestant,
-            );
+          if (isTieBreakerEnded && !publishedWinners) {
+            if (!isTiedContestant) {
+              timer?.cancel();
+              return _buildTieBreakerSpectatorScreen(context, quizData);
+            }
+            if (!(answered && resultRevealed && !_quizFinishedForContestant && !_showTieBreakerOverallTally)) {
+              timer?.cancel();
+              return _buildTieBreakerEndedWaitingScreen(
+                context,
+                quizData,
+                currentUid,
+                isTiedContestant,
+              );
+            }
           }
 
           if (answered && resultRevealed) {
