@@ -681,21 +681,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   final DateTime time =
                                       timestamp?.toDate() ?? DateTime.now();
 
-                                  return GestureDetector(
-                                    onTap: () {
-                                      markNotificationAsRead(doc);
+                                  return Dismissible(
+                                    key: Key(doc.id),
+                                    direction: DismissDirection.horizontal,
+                                    background: Container(
+                                      alignment: Alignment.centerLeft,
+                                      padding: const EdgeInsets.only(left: 20),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade600,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    secondaryBackground: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.only(right: 20),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade600,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    onDismissed: (_) async {
+                                      try {
+                                        await doc.reference.delete();
+                                      } catch (e) {
+                                        debugPrint("Error deleting notification: $e");
+                                      }
                                     },
-
-                                    child: notificationCard(
-                                      icon: getNotificationIcon(type),
-
-                                      title: title,
-
-                                      message: message,
-
-                                      time: formatNotificationTime(time),
-
-                                      isNew: !isRead,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        markNotificationAsRead(doc);
+                                      },
+                                      child: notificationCard(
+                                        icon: getNotificationIcon(type),
+                                        title: title,
+                                        message: message,
+                                        time: formatNotificationTime(time),
+                                        isNew: !isRead,
+                                      ),
                                     ),
                                   );
                                 },

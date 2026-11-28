@@ -201,12 +201,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           onSave: (newConfig) async {
             await _saveCertificateConfig(newConfig);
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Certificate signatures and layout updated successfully!'),
-                  backgroundColor: Color(0xFF16A34A),
-                  behavior: SnackBarBehavior.floating,
-                ),
+              AdminNotification.success(
+                context,
+                'Certificate signatures and layout updated successfully!',
               );
             }
           },
@@ -334,12 +331,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           onSave: (newConfig) async {
             await _saveReportConfig(newConfig);
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Report signatures updated successfully!'),
-                  backgroundColor: Color(0xFF16A34A),
-                  behavior: SnackBarBehavior.floating,
-                ),
+              AdminNotification.success(
+                context,
+                'Report signatures updated successfully!',
               );
             }
           },
@@ -4062,12 +4056,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 });
 
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('School updated to "$newSchool"'),
-                      backgroundColor: AdminThemeColors.primary,
-                      duration: const Duration(seconds: 2),
-                    ),
+                  AdminNotification.success(
+                    context,
+                    'School updated to "$newSchool"',
                   );
                 }
               }

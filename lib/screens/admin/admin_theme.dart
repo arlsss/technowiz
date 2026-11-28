@@ -1082,6 +1082,18 @@ class _LazyPageWrapper extends StatelessWidget {
 /// official TechNoWiz Admin Theme electric-purple gradient (or error/warning).
 class AdminNotification {
   static OverlayEntry? _currentEntry;
+  static Timer? _currentTimer;
+
+  static void dismiss() {
+    _currentTimer?.cancel();
+    _currentTimer = null;
+    if (_currentEntry != null) {
+      if (_currentEntry!.mounted) {
+        _currentEntry!.remove();
+      }
+      _currentEntry = null;
+    }
+  }
 
   static void show(
     BuildContext context,
@@ -1098,12 +1110,7 @@ class AdminNotification {
       ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     } catch (_) {}
 
-    if (_currentEntry != null) {
-      if (_currentEntry!.mounted) {
-        _currentEntry!.remove();
-      }
-      _currentEntry = null;
-    }
+    dismiss();
 
     final overlay = Overlay.maybeOf(context, rootOverlay: true) ??
         Overlay.maybeOf(context);
@@ -1134,77 +1141,111 @@ class AdminNotification {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  tween: Tween<double>(begin: 0.0, end: 1.0),
-                  builder: (context, value, child) {
-                    return Transform.translate(
-                      offset: Offset(0, -22 * (1.0 - value)),
-                      child: Opacity(
-                        opacity: value.clamp(0.0, 1.0),
-                        child: child,
-                      ),
-                    );
+                child: Dismissible(
+                  key: UniqueKey(),
+                  direction: DismissDirection.horizontal,
+                  onDismissed: (_) {
+                    dismiss();
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [bgStart, bgEnd],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: shadowColor,
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: isMobile ? MainAxisSize.max : MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.22),
-                            borderRadius: BorderRadius.circular(10),
+                  child: GestureDetector(
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity != null &&
+                          details.primaryVelocity! < -50) {
+                        dismiss();
+                      }
+                    },
+                    onTap: () {
+                      dismiss();
+                    },
+                    child: TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Transform.translate(
+                          offset: Offset(0, -22 * (1.0 - value)),
+                          child: Opacity(
+                            opacity: value.clamp(0.0, 1.0),
+                            child: child,
                           ),
-                          child: Icon(
-                            icon ?? defaultIcon,
-                            color: Colors.white,
-                            size: 18,
-                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            message,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.1,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [bgStart, bgEnd],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: shadowColor,
+                              blurRadius: 18,
+                              offset: const Offset(0, 6),
                             ),
-                          ),
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize:
+                              isMobile ? MainAxisSize.max : MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                icon ?? defaultIcon,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                message,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () {
+                                dismiss();
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1218,7 +1259,8 @@ class AdminNotification {
     _currentEntry = entry;
     overlay.insert(entry);
 
-    Timer(duration, () {
+    _currentTimer?.cancel();
+    _currentTimer = Timer(duration, () {
       if (entry.mounted && _currentEntry == entry) {
         entry.remove();
         _currentEntry = null;
@@ -1376,7 +1418,7 @@ PreferredSizeWidget buildAdminStandardAppBar({
       ],
     ),
     actions: [
-      if (additionalActions != null) ...additionalActions,
+      ...?additionalActions,
       Padding(
         padding: const EdgeInsets.only(right: 8),
         child: SizedBox(
